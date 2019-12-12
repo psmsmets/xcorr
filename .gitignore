@@ -1,7 +1,7 @@
 
 ###> ignore python folders ###
 /*.egg-info
-/nms_tools/__pycache__
+/ccf/__pycache__
 ###< ignore python folders ###
 
 
