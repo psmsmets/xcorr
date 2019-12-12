@@ -2,6 +2,9 @@
 ###> ignore python folders ###
 /*.egg-info
 /ccf/__pycache__
+/notebooks/.ipynb_checkpoints
+/notebooks/*.nc
+/scripts/*.nc
 ###< ignore python folders ###
 
 
