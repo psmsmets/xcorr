@@ -13,10 +13,17 @@ $ git clone https://github.com/psmsmets/ccf.git
 Run `git pull` to update the local repository to this master repository.
 
 ### Install
-```shel
+```shell
 $ cd ccf/
 $ pip install -e .
 ```
 
+## A working Python environment
+Obspy, numpy and some other packages tend to cause problems which kills the `remove_response` function of `obspy`. Create a working (non-conflicting) Python 3.7 environment in conda as follows:
+```shell
+conda env create -f ccf.yml
+```
+
 ## More info
+
 To be continued.
