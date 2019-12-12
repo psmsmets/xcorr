@@ -1,0 +1,12 @@
+
+###> ignore python folders ###
+/*.egg-info
+/nms_tools/__pycache__
+###< ignore python folders ###
+
+
+###> ignore specific filetypes ###
+*.key
+*.swp
+*.DS_Store
+###< ignore specific filetypes ###
