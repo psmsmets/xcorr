@@ -49,13 +49,29 @@ class CC:
         zero_index = int(len(ccf) / 2)
         shift =  np.argmax(ccf) - zero_index
         return shift * ( delta or 1 )
+    
+    def extract_shift_and_max(ccf, delta = None):
+        """
+        Returns the sample (or time) shift at the maximum of cross-correlation function `ccf` and the maximum.
+        """
+        zero_index = int(len(ccf) / 2)
+        index_max = np.argmax(ccf)
+        shift =  index_max - zero_index
+        return shift * ( delta or 1 ), ccf[index_max]
+    
+    def compute_shift_and_max(x, y, delta = None, **kwargs):
+        """
+        Returns the sample (or time) shift at the maximum of cross-correlation function and the maximum.
+        """
+        c = CC.cc(x, y, **kwargs)
+        return CC.extract_shift_and_max(c,delta)
 
     def compute_shift(x, y, delta = None, **kwargs):
         """
         Returns the sample (or time) shift at the maximum of cross-correlation function.
         """
         c = CC.cc(x, y, **kwargs)
-        return extract_shift(c,delta)
+        return CC.extract_shift_and_max(c,delta)[0]
 
 
 class Preprocess: 
@@ -287,15 +303,36 @@ class Postprocess:
                 dataset.cc.loc[:,t] -= dataset.cc.loc[:,t].mean()
         return dataset
     
+    def list_variables(dataset:xr.Dataset,dim='time'):
+        if isinstance(dim,str):
+            d = dim
+        elif isinstance(dim,xr.DataArray):
+            d = dim.name
+        else:
+            raise TypeError('Only xr.Dataset and str are allowed.')
+        var = []
+        for v in dataset.data_vars:
+            if d in dataset[v].dims:
+                var.append(v)
+        return var
+    
+    def stack_dataset(dataset:xr.Dataset, dim:xr.DataArray=None, **kwargs):
+        """
+        Return the averaged dataset over the coordinate `dim` (default 'time') preserving attributes.
+        The first element of the coordinate is re-added to the dataset.
+        """
+        ds = dataset.mean( dim='time' if dim is None else dim.name, keep_attrs=True, **kwargs )
+        return ds.assign_coords( dim or {'time':dataset.time[0]} )
+    
     def stack_year_month(dataset:xr.Dataset):
         year_month_idx = pd.MultiIndex.from_arrays([dataset['time.year'], dataset['time.month']])
         dataset.coords['year_month'] = ('time', year_month_idx)
         
         month_length = xr.DataArray(Postprocess.get_dpm(dataset.time.to_index()),coords=[dataset.time], name='month_length')
         weights = month_length.groupby('time.month') / month_length.groupby('time.month').sum()
-        return (dataset * weights).groupby('year_month').sum(dim='time')
+        return (dataset * weights).groupby('year_month').sum(dim='time',keep_attrs=True) 
     
-    def stack_year_doy(dataset:xr.Dataset):
+    def stack_year_dayofyear(dataset:xr.Dataset, **kwargs):
         year_doy_idx = pd.MultiIndex.from_arrays([dataset['time.year'], dataset['time.dayofyear']])
-        dataset.coords['year_doy'] = ('time', year_doy_idx)
-        return dataset.groupby('year_doy').mean(dim='time')
+        dataset.coords['year_dayofyear'] = ('time', year_doy_idx)
+        return dataset[Postprocess.list_variables(dataset,**kwargs)].groupby('year_dayofyear').mean(dim='time',keep_attrs=True)
