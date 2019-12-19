@@ -16,7 +16,7 @@ def filename(pair:str,time:pd.datetime):
     return '{pair}.{y:04d}.{d:03d}.nc'.format(pair=pair,y=time.year,d=time.dayofyear)
 
 # local clients
-cct.Clients.set(sds_root='/vardim/home/smets/Hydro')
+ccf.clients.set(sds_root='/vardim/home/smets/Hydro')
 
 # general parameters
 sampling_rate = 50.
