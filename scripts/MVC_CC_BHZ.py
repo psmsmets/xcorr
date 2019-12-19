@@ -58,7 +58,7 @@ for pair in pairs:
         ncfile = os.path.join(dest,pair,filename(pair, time))
         if os.path.isfile(ncfile):
             ds = xr.open_dataset(ncfile)
-            if np.all(ds.status.values != 0):
+            if np.all(ds.status.values == 1):
                 ds.close()
                 continue
         else:
@@ -74,7 +74,7 @@ for pair in pairs:
                 title_prefix = title_prefix
             )
         try:
-            ccf.cc_dataset(ds,inventory=inv)
+            ccf.cc_dataset(ds,inventory=inv,retry_missing=True)
         except KeyboardInterrupt:
             raise
         except Exception as e:

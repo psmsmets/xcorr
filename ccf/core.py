@@ -38,10 +38,13 @@ def write_dataset(dataset:xr.Dataset, path:str, close:bool = True):
     os.replace(tmp,os.path.join(abspath,file))
     print('Done.')
     
-def init_dataset( 
+def init_dataset(
     pair:str, starttime:pd.datetime, endtime:pd.datetime, preprocess:dict, sampling_rate = 50., window_length = 86400.,
     window_overlap = 0.875, clip_max_abs_lag = None, title_prefix = '', closed:str = 'left'
 ):
+    """
+    Initiate a dataset. 
+    """
     # config
     delta = 1/sampling_rate
     npts = int(window_length*sampling_rate)
@@ -137,14 +140,18 @@ def init_dataset(
     )
     return ds
     
-def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, **kwargs ):
+def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, retry_missing:bool = False, **kwargs ):
+    """
+    Process a dataset. 
+    """
     ccf.clients.check(raise_error = True)
     p = ds.pair
     for t in ds.time:
         print(str(p.values), str(t.values)[:19], end='. ')
         if ds.status.loc[{'time':t}].values != 0:
-            print('Has status = {}. Skip.'.format(ds.status.loc[{'time':t}].values))
-            continue
+            if not (retry_missing and ds.status.loc[{'time':t}].values == -1):
+                print('Has status = {}. Skip.'.format(ds.status.loc[{'time':t}].values))
+                continue
         print('Waveforms', end='. ')
         stream = ccf.clients.get_preprocessed_pair_stream(
             pair = p.values,

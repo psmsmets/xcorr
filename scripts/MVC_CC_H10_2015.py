@@ -58,6 +58,9 @@ pairs = [
     'IM.H10N1..EDH-IU.RAR.00.BHZ',
     'IM.H10N2..EDH-IU.RAR.00.BHZ',
     'IM.H10N3..EDH-IU.RAR.00.BHZ',
+    'IM.H03S1..EDH-IU.RAR.00.BHZ',
+    'IM.H03S2..EDH-IU.RAR.00.BHZ',
+    'IM.H03S3..EDH-IU.RAR.00.BHZ',
 ]
 times = pd.date_range('2015', '2016', freq='1D')
 
@@ -70,7 +73,7 @@ for pair in pairs:
         ncfile = os.path.join(dest,pair,filename(pair, time))
         if os.path.isfile(ncfile):
             ds = xr.open_dataset(ncfile)
-            if np.all(ds.status.values != 0):
+            if np.all(ds.status.values == 1):
                 ds.close()
                 continue
         else:
@@ -86,7 +89,7 @@ for pair in pairs:
                 title_prefix = title_prefix
             )
         try:
-            ccf.cc_dataset(ds,inventory=inv)
+            ccf.cc_dataset(ds,inventory=inv,retry_missing=True)
         except KeyboardInterrupt:
             raise
         except Exception as e:
