@@ -327,7 +327,7 @@ class Postprocess:
         Return the root-mean-square of the dataarray.
         """
         da = xr.ufuncs.square(da) # square
-        return xr.ufuncs.sqrt(da.mean(dim=dim,keep_attrs=keep_attrs)) # mean and root
+        return xr.ufuncs.sqrt(da.mean(dim=dim,keep_attrs=keep_attrs,skipna=True)) # mean and root
     
     def snr(da:xr.DataArray, signal_lag_window, noise_percentages = (.2, .8), **kwargs):
         """

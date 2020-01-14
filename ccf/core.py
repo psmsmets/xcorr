@@ -20,7 +20,7 @@ def toUTCDateTime(datetime):
     elif isinstance(datetime,np.datetime64):
         return UTCDateTime(pd.to_datetime(datetime))
 
-def write_dataset(dataset:xr.Dataset, path:str, close:bool = True):
+def write_dataset(dataset:xr.Dataset, path:str, close:bool = True, **kwargs):
     """
     Write a dataset to netCDF using a tmp file and replacing the destination. 
     """
@@ -33,7 +33,7 @@ def write_dataset(dataset:xr.Dataset, path:str, close:bool = True):
         print('Close', end='. ')
         dataset.close()
     print('To temporary netcdf', end='. ')
-    dataset.to_netcdf(path=tmp,mode='w')
+    dataset.to_netcdf(path=tmp,mode='w',**kwargs)
     print('Replace', end='. ')
     os.replace(tmp,os.path.join(abspath,file))
     print('Done.')
@@ -43,13 +43,13 @@ def open_dataset(path:str, extract:bool = True, close:bool = False, debug:bool =
     Open a netCDF dataset with cc while checking the data availability. 
     """
     if not os.path.isfile(path):
-        return None
+        return False
     ds = xr.open_dataset(path)
     if debug:
         print(np.sum(ds.status.values == 1))
     if np.sum(ds.status.values == 1) == 0:
-        tmp.close()
-        return None
+        ds.close()
+        return False
     
     if extract:
         ds['cc'] = ds.cc.where(ds.status == 1, drop=True )
