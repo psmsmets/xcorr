@@ -38,6 +38,28 @@ def write_dataset(dataset:xr.Dataset, path:str, close:bool = True):
     os.replace(tmp,os.path.join(abspath,file))
     print('Done.')
     
+def open_dataset(path:str, extract:bool = True, close:bool = False, debug:bool = False):
+    """
+    Open a netCDF dataset with cc while checking the data availability. 
+    """
+    if not os.path.isfile(path):
+        return None
+    ds = xr.open_dataset(path)
+    if debug:
+        print(np.sum(ds.status.values == 1))
+    if np.sum(ds.status.values == 1) == 0:
+        tmp.close()
+        return None
+    
+    if extract:
+        ds['cc'] = ds.cc.where(ds.status == 1, drop=True )
+        ds = ds.drop_vars('status')
+        
+    if close:
+        ds.close()
+        
+    return ds
+    
 def init_dataset(
     pair:str, starttime:pd.datetime, endtime:pd.datetime, preprocess:dict, sampling_rate = 50., window_length = 86400.,
     window_overlap = 0.875, clip_max_abs_lag = None, title_prefix = '', closed:str = 'left'
@@ -75,7 +97,7 @@ def init_dataset(
         normalize = 1,
     )
     
-    ds['operations'] = np.int8(1)
+    ds['preprocess'] = np.int8(1)
     for channel, operations in preprocess.items():
         ccf.preprocess.add_operations_to_dataset(ds, channel, operations, variable = 'preprocess')
     

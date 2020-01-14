@@ -316,6 +316,37 @@ class Postprocess:
                 var.append(v)
         return var
     
+    def lag_window(da:xr.DataArray, window, scalar=1., **kwargs):
+        assert isinstance(window,list) or isinstance(window,tuple), 'Window should be list or tuple of length 2!'
+        assert len(window)==2, 'Window should be list or tuple of length 2!'
+        assert window[1]*scalar > window[0]*scalar, 'Window start should be greater than window end!'
+        return da.where( (da.lag >= window[0]*scalar) & (da.lag <= window[1]*scalar), drop=True )
+    
+    def rms(da:xr.DataArray,dim:str='lag',keep_attrs=True):
+        """
+        Return the root-mean-square of the dataarray.
+        """
+        da = xr.ufuncs.square(da) # square
+        return xr.ufuncs.sqrt(da.mean(dim=dim,keep_attrs=keep_attrs)) # mean and root
+    
+    def snr(da:xr.DataArray, signal_lag_window, noise_percentages = (.2, .8), **kwargs):
+        """
+        Return the signal-to-noise ratio of the dataarray.
+        """
+        signal = Postprocess.lag_window(da, window=signal_lag_window)
+        noise = Postprocess.lag_window(da, window=noise_percentages, scalar=signal_lag_window[0])
+        
+        snr = Postprocess.rms( signal ) / Postprocess.rms( noise )        
+        snr.attrs = {
+            'long_name': 'signal-to-noise ratio',
+            'standard_name': 'signal_to_noise_ratio',
+            'units': '-',
+            'signal_lag_window': tuple(signal_lag_window),
+            'noise_lag_window': tuple([noise_percentages[0]*signal_lag_window[0], noise_percentages[1]*signal_lag_window[0]]),
+            'noise_percentages': tuple(noise_percentages),
+        }
+        return snr
+    
     def stack_dataset(dataset:xr.Dataset, dim:xr.DataArray=None, **kwargs):
         """
         Return the averaged dataset over the coordinate `dim` (default 'time') preserving attributes.
