@@ -8,7 +8,12 @@ import pandas as pd
 import json
 
 from numpy.fft import fftshift, fftfreq
-from pyfftw.interfaces.numpy_fft import fft, ifft
+try:
+    from pyfftw.interfaces.numpy_fft import fft, ifft
+except Exception as e:
+    print("Could not import fft and ifft from pyfftw. Fallback on numpy")
+    print(e.strerror)
+    from numpy.fft import fft, ifft
 
 from ccf.core import toUTCDateTime
 
