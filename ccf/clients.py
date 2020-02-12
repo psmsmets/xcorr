@@ -6,6 +6,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import json
+import re
 
 from obspy import UTCDateTime, Trace, Stream, Inventory
 from obspy.clients.fdsn import Client as fdsnClient
@@ -24,7 +25,7 @@ class Clients:
     fdsn = None
     nms = None
     
-    def check(raise_error=False):
+    def check(raise_error:bool = False):
         """
         Verify if the client globals are set.
         """
@@ -32,6 +33,27 @@ class Clients:
         if error and raise_error:
             raise RuntimeError('Clients not yet set! Run Clients.set(..) first!')
         return not error
+    
+    def verify_receiver(receiver:str, allow_wildcards:bool = False, raise_error:bool = False):
+        """
+        Verify if the receiver string matche the SEED-id regex pattern and optionally verify if
+        it contains wildcards (by default allowd).
+        """
+        if allow_wildcards == False:
+            if '*' in receiver or '?' in receiver:
+                if raise_error:
+                    raise ValueError('Receiver SEED-id cannot contain wildcards (? or *)! Be specific.')
+                return False
+            if not re.match('^([A-Z]{2})\.([A-Z,0-9]{3,5})\.([0-9]{0,2})\.([A-Z]{2}[0-9,A-Z]{1})', receiver):
+                if raise_error:
+                    raise ValueError('Receiver SEED-id is not of valid format "network.station.location.channel".')
+                return False
+        else:
+            if not re.match('^([A-Z,?*]{1,2})\.([A-Z,0-9,?*]{1,5})\.([0-9,?*]{0,2})\.([0-9,A-Z,?*]{1,3})', receiver):
+                if raise_error:
+                    raise ValueError('Receiver SEED-id is not of valid format "network.station.location.channel".')
+                return False
+        return True
 
     def set(sds_root:str, fdsn_base_url:str = 'IRIS', **kwargs):
         """
@@ -43,7 +65,9 @@ class Clients:
         Clients.nms = nmsClient()
         
         
-    def get_pair_inventory(pair:str,inventory:Inventory):
+    def get_pair_inventory(
+        pair:str, inventory:Inventory
+    ):
         """
         Return the filtered inventory given receiver SEED-ids `pair` and `inventory`.
         """
@@ -51,16 +75,27 @@ class Clients:
         rA_net, rA_sta, rA_loc, rA_cha = rA.split('.')
         rB_net, rB_sta, rB_loc, rB_cha = rB.split('.')
         return (
-            inventory.select(network=rA_net, station=rA_sta, channel=rA_cha) + 
-            inventory.select(network=rB_net, station=rB_sta, channel=rB_cha)
+            inventory.select(network=rA_net, station=rA_sta, location=rA_loc, channel=rA_cha) + 
+            inventory.select(network=rB_net, station=rB_sta, location=rB_loc, channel=rB_cha)
         )
 
-    def get_waveforms(receiver:str, time:np.datetime64, centered:bool = True, duration = 86400., buffer = 60., verbose:bool = True ):
+    def get_waveforms(
+        receiver:str, time:np.datetime64, centered:bool = True, duration = 86400., buffer = 60., 
+        allow_wildcards: bool = False, verbose:bool = False
+    ):
         """
-        Get waveforms given the SEED-id `receiver` and `time` (default `centered`) for `duration` (default 86400s) and `buffer` (default 60s).
+        Get waveforms given the SEED-id `receiver` and `time` (default `centered`)
+        for `duration` (default 86400s) and `buffer` (default 60s).
         """
-        network, station, location, channel = receiver.split('.')
+        # check if clients are set
         Clients.check(raise_error = True)
+                        
+        # check if receiver SEED-id is valid
+        Clients.verify_receiver(receiver, allow_wildcards = allow_wildcards, raise_error = True)
+        
+        # split receiver SEED-id
+        network, station, location, channel = receiver.split('.')
+        
         t0 = UTCDateTime(pd.to_datetime(time)) # center time of 24h window -12h
         if centered:
             t0 -= duration/2
@@ -135,7 +170,9 @@ class Clients:
 
         return stream.trim(starttime=t0, endtime=t1)
 
-    def daystream_length_passed(stream:Stream, verbose:bool = False, max_gap = 300.):
+    def daystream_length_passed(
+        stream:Stream, verbose:bool = False, max_gap = 300.
+    ):
         """
         Return if a stream (assuming a uniqe SEED-id) contains a day of data not exceeding the allowed `gap` (default 300s.)
         """
@@ -148,7 +185,9 @@ class Clients:
             print('Samples in day = {}, samples in stream = {}, max gaps = {}.'.format(npts_day,npts_str, npts_gap))
         return npts_str >= ( npts_day - npts_gap )
 
-    def get_preprocessed_pair_stream( pair:str, time:np.datetime64, operations:dict, **kwargs ):
+    def get_preprocessed_pair_stream(
+        pair:str, time:np.datetime64, operations:dict, **kwargs
+    ):
         """
         Get the preprocessed `obspy.Stream` given the SEED-ids receiver `pair`, `time` and preprocess `operations`.
         """
@@ -158,26 +197,57 @@ class Clients:
             Clients.get_preprocessed_stream(rB, time, operations, **kwargs)
         )
 
-    def get_preprocessed_stream( receiver:str, time:np.datetime64, operations:dict, duration = 86400., inventory:Inventory = None, operations_from_json:bool = False, verbose:bool = False, debug:bool = False, **kwargs ):
+    def get_preprocessed_stream( 
+        receiver:str, time:np.datetime64, operations:dict, duration = 86400., inventory:Inventory = None,
+        operations_from_json:bool = False, three_components:str = '12Z', verbose:bool = False, debug:bool = False, **kwargs 
+    ):
         """
-        Get the preprocessed `obspy.Stream` given the SEED-id `receiver`, `time`, preprocess `operations` and `duration` (default 86400s). Optionally provide the `obspy.Inventory` and some other options.
+        Get the preprocessed `obspy.Stream` given the SEED-id `receiver`, `time`, 
+        preprocess `operations` and `duration` (default 86400s).
+        Optionally provide the `obspy.Inventory` and some other options.
         """
+        # check if receiver SEED-id is valid
+        Clients.verify_receiver(receiver, allow_wildcards = False, raise_error = True)
+        
         t0 = toUTCDateTime(time) - duration/2
         t1 = t0 + duration
         ch = receiver.split('.')[-1]
-        st = Clients.get_waveforms( receiver, time, duration = duration, centered = True, verbose = debug, **kwargs )
+        
+        # radial or transverse component? Request all Z,1,2 channels manually.
+        if ch[-1] == 'R' or ch[-1] == 'T':
+            st = Stream()
+            for c in three_components:
+                st += Clients.get_waveforms( 
+                    receiver = receiver[:-1]+c, 
+                    time = time, 
+                    duration = duration, 
+                    centered = True, 
+                    verbose = debug, 
+                    **kwargs
+                )
+        else:
+            st = Clients.get_waveforms( 
+                receiver = receiver,
+                time = time,
+                duration = duration,
+                centered = True,
+                verbose = debug,
+                **kwargs
+            )
+        
         if verbose:
             print(st)
         if not isinstance(st,Stream) or len(st)==0:
             return Stream()
         try:
             st = Preprocess.preprocess( 
-                signal = st, 
+                stream = st, 
                 operations = json.loads(operations[ch]) if operations_from_json else operations[ch],
                 inventory = inventory, 
                 starttime = t0, 
                 endtime = t1,
-                verbose = verbose
+                verbose = verbose,
+                debug = debug,
             )
         except:
             return Stream()

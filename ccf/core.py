@@ -62,7 +62,7 @@ def open_dataset(path:str, extract:bool = True, close:bool = False, debug:bool =
     
 def init_dataset(
     pair:str, starttime:pd.datetime, endtime:pd.datetime, preprocess:dict, sampling_rate = 50., window_length = 86400.,
-    window_overlap = 0.875, clip_max_abs_lag = None, title_prefix = '', closed:str = 'left'
+    window_overlap = 0.875, clip_max_abs_lag = None, unbiased = True, title_prefix = '', closed:str = 'left'
 ):
     """
     Initiate a dataset. 
@@ -82,7 +82,7 @@ def init_dataset(
         institution = 'Delft University of Technology, Department of Geoscience and Engineering',
         author = 'Pieter Smets - P.S.M.Smets@tudelft.nl',
         source = 'CTBTO/IMS hydroacoustic data and IRIS/USGS seismic data', 
-        references = 'n/a',
+        references = 'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). Random data : analysis and measurement procedures. New York (N.Y.): Wiley-Interscience.',
         comment = 'n/a',
     )
     
@@ -152,8 +152,8 @@ def init_dataset(
         np.empty((len(ds.time),len(ds.lag)),dtype=np.float32), 
         {
             'units':'-',
-            'long_name': 'Cross-Correlation Function',
-            'standard_name': 'cross_correlation_function',
+            'long_name': 'Cross-Correlation Estimate',
+            'standard_name': 'cross_correlation_estimate',
             'add_offset': np.float32(0),
             'scale_factor': np.float32(1.),
             'valid_range': [np.float32(-1), np.float32(1)],
@@ -192,6 +192,8 @@ def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, re
                 break
             continue
         print('CC', end='. ')
+        # Todo:
+        # - store noise window outside of the valid domain when clipping!
         ds.cc.loc[{'time':t}] = ccf.cc.cc(
             x = stream[0].data[:ds.stats.attrs['npts']],
             y = stream[1].data[:ds.stats.attrs['npts']],

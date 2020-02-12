@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from obspy import UTCDateTime, Trace, Stream, Inventory
+import warnings
 import numpy as np
 import xarray as xr
 import pandas as pd
@@ -11,18 +12,20 @@ from numpy.fft import fftshift, fftfreq
 try:
     from pyfftw.interfaces.numpy_fft import fft, ifft
 except Exception as e:
-    print("Could not import fft and ifft from pyfftw. Fallback on numpy")
-    print(e.strerror)
+    warnings.warn(
+        "Could not import fft and ifft from pyfftw. Fallback on numpy's (i)fft. Import error: " + e.strerror, 
+        ImportWarning
+    )
     from numpy.fft import fft, ifft
 
 from ccf.core import toUTCDateTime
 
 class CC:
     
-    def cc(x, y, normalize:bool = True, pad:bool = True, dtype = np.float32):
+    def cc(x, y, normalize:bool = True, pad:bool = True, unbiased:bool = True, dtype = np.float32):
         """
-        Returns the cross-correlation function for vectors `x` and `y`. 
-        Cross-correlation is performed in the frequency domain using the pyfftw library.
+        Returns the cross-correlation estimate for vectors `x` and `y`. 
+        Cross-correlation is performed in the frequency domain.
         """
         n = len(x)
         assert n == len(y), "Vectors `x` and `y` should have the same length!"
@@ -38,7 +41,8 @@ class CC:
         fg = fft(xx) * np.conjugate(fft(yy))
         if normalize:
             fg = fg / (np.linalg.norm(xx) * np.linalg.norm(yy))
-        return fftshift(np.real(ifft(fg)))
+        Rxy = fftshift(np.real(ifft(fg)))
+        return Rxy * CC.weight(nn, False) if unbiased else Rxy
 
     def lag(n, delta, pad = True):
         """
@@ -46,137 +50,185 @@ class CC:
         """
         nn = n*2-1 if pad else n
         return fftshift(np.fft.fftfreq(nn, 1/(nn*delta)))
+    
+    def weight(n, pad = True, clip = None):
+        """
+        Returns an array with scale factors to obtain the unbaised cross-correction estimate.
+        """
+        nn = n*2-1 if pad else n
+        n = np.int((nn+1)/2)
+        w = n / (n - np.abs(np.arange(1-n,nn+1-n,1,np.float64)))
+        if clip is not None:
+            w[np.where(w > clip)] = clip
+        return w
 
-    def extract_shift(ccf, delta = None):
+    def extract_shift(cc, delta = None):
         """
-        Returns the sample (or time) shift at the maximum of cross-correlation function `ccf`.
+        Returns the sample (or time) shift at the maximum of the cross-correlation estimate `Rxy`.
         """
-        zero_index = int(len(ccf) / 2)
-        shift =  np.argmax(ccf) - zero_index
+        zero_index = int(len(cc) / 2)
+        shift =  np.argmax(cc) - zero_index
         return shift * ( delta or 1 )
     
-    def extract_shift_and_max(ccf, delta = None):
+    def extract_shift_and_max(Rxy, delta = None):
         """
-        Returns the sample (or time) shift at the maximum of cross-correlation function `ccf` and the maximum.
+        Returns the sample (or time) shift at the maximum of cross-correlation estimate `Rxy` and the maximum.
         """
-        zero_index = int(len(ccf) / 2)
-        index_max = np.argmax(ccf)
+        zero_index = int(len(Rxy) / 2)
+        index_max = np.argmax(Rxy)
         shift =  index_max - zero_index
-        return shift * ( delta or 1 ), ccf[index_max]
+        return shift * ( delta or 1 ), Rxy[index_max]
     
     def compute_shift_and_max(x, y, delta = None, **kwargs):
         """
-        Returns the sample (or time) shift at the maximum of cross-correlation function and the maximum.
+        Returns the sample (or time) shift at the maximum of cross-correlation estimate and the maximum.
         """
-        c = CC.cc(x, y, **kwargs)
-        return CC.extract_shift_and_max(c,delta)
+        Rxy = CC.cc(x, y, **kwargs)
+        return CC.extract_shift_and_max(Rxy,delta)
 
     def compute_shift(x, y, delta = None, **kwargs):
         """
-        Returns the sample (or time) shift at the maximum of cross-correlation function.
+        Returns the sample (or time) shift at the maximum of cross-correlation estimate.
         """
-        c = CC.cc(x, y, **kwargs)
-        return CC.extract_shift_and_max(c,delta)[0]
+        Rxy = CC.cc(x, y, **kwargs)
+        return CC.extract_shift_and_max(Rxy,delta)[0]
 
 
 class Preprocess: 
     
-    __signal_operations__ = [
-        'decimate',
-        'detrend',
-        'filter',
-        'interpolate',
-        'merge',
-        'normalize',
-        'remove_response',
-        'remove_sensitivity',
-        'resample',
-        'taper',
-        'trim',
-        'running_rms',
-        'running_am',
-    ]
+    __stream_operations__ = {
+        'decimate' : { 'method': 'self', 'inject': []},
+        'detrend' : { 'method': 'self', 'inject': []},
+        'filter' : { 'method': 'self', 'inject': []},
+        'interpolate' : { 'method': 'self', 'inject': []},
+        'merge' : { 'method': 'self', 'inject': []},
+        'normalize' : { 'method': 'self', 'inject': []},
+        'remove_response' : { 'method': 'self', 'inject': ['inventory']},
+        'remove_sensitivity': { 'method': 'self', 'inject': ['inventory']},
+        'resample' : { 'method': 'self', 'inject': []},
+        'rotate' : { 'method': 'self', 'inject': ['inventory']},
+        'select' : { 'method': 'self', 'inject': []},
+        'taper' : { 'method': 'self', 'inject': []},
+        'trim' : { 'method': 'self', 'inject': ['starttime','endtime']},
+        'running_rms': { 'method': 'Preprocess.running_rms', 'inject': []},
+    }
 
-    def is_signal_operation(operation:str):
+    def is_stream_operation(operation:str):
         """
-        Verify if the operation is a valid signal operation.
+        Verify if the operation is a valid stream operation.
         """
-        return operation in Preprocess.__signal_operations__
+        return operation in Preprocess.__stream_operations__
 
-    def signal_operations():
+    def stream_operations():
         """
-        Returns a list with all valid signal operations.
+        Returns a list with all valid stream operations.
         """
-        return Preprocess.__signal_operations__
+        return Preprocess.__stream_operations__
+    
+    def inject_parameters(operation:str, parameters:dict, inventory:Inventory = None, starttime = None, endtime = None):
+        """
+        Inject starttime, endtime and inventory to the parameters dictionary when needed.
+        """
+        if 'inventory' in Preprocess.__stream_operations__[operation]['inject']:
+            parameters['inventory'] = inventory
+        if 'starttime' in Preprocess.__stream_operations__[operation]['inject']:
+            parameters['starttime'] = toUTCDateTime(starttime)
+        if 'endtime' in Preprocess.__stream_operations__[operation]['inject']:
+            parameters['endtime'] = toUTCDateTime(endtime)
+        return parameters
+    
+    def apply_stream_operation(stream, operation:str, parameters:dict, verbose: bool = False):
+        """
+        Apply a stream operation with the provided parameters.
+        """
+        if not Preprocess.is_stream_operation(operation):
+            return
+        method = Preprocess.__stream_operations__[operation]['method']
+        if verbose:
+            print(operation, ':', parameters)
+        if method == 'self':
+            return eval(f'stream.{operation}(**parameters)')
+        else:
+            return eval(f'{method}(stream,**parameters)')
 
-    def preprocess(signal, operations:list, inventory:Inventory = None, starttime = None, endtime = None, verbose:bool = False):
-        sig = signal.copy()
+    def preprocess(
+        stream, operations:list, inventory:Inventory = None, starttime = None, endtime = None, 
+        verbose:bool = False, debug:bool = False
+    ):
         """
-        Preprocess a `signal` (~obspy.Stream or ~obspy.Trace) given a list of operations.
-        Optionally provide the `inventory`, `starttime`, `endtime` or `verbose`.
+        Preprocess a `stream` (~obspy.Stream or ~obspy.Trace) given a list of operations.
+        Optionally provide the `inventory`, `starttime`, `endtime` to inject in the parameters.
         """
+        st = stream.copy()
         for operation_params in operations:
             if not(isinstance(operation_params,tuple) or isinstance(operation_params,list)) or len(operation_params) != 2:
-                warn('Provided operation should be a tuple or list with length 2 (method:str,params:dict).')
-                continue    
+                warnings.warn(
+                    'Provided operation should be a tuple or list with length 2 (method:str,params:dict).',
+                    UserWarning
+                )
+                continue
             operation, parameters = operation_params
-            if verbose:
-                print(operation)
-            if not Preprocess.is_signal_operation(operation):
-                warn('Provided operation "{}" is invalid thus ignored.'.format(operation))
-                continue 
+            if not Preprocess.is_stream_operation(operation):
+                warnings.warn(
+                    'Provided operation "{}" is invalid thus ignored.'.format(operation),
+                    UserWarning
+                )
+                continue
             try:
-                if operation == 'decimate':
-                    sig.decimate(**parameters)
-                elif operation == 'detrend':
-                    sig.detrend(**parameters)
-                elif operation == 'filter':
-                    sig.filter(**parameters)
-                elif operation == 'interpolate':
-                    sig.interpolate(**parameters)
-                elif operation == 'merge':
-                    sig.merge(**parameters)
-                elif operation == 'normalize':
-                    sig.normalize(**parameters)
-                elif operation == 'remove_response':
-                    sig.remove_response(inventory, **parameters)
-                elif operation == 'remove_sensitivity':
-                    sig.remove_sensitivity(inventory, **parameters)
-                elif operation == 'resample':
-                    sig.resample(**parameters)
-                elif operation == 'taper':
-                    sig.taper(**parameters)
-                elif operation == 'trim': 
-                    sig.trim(starttime = toUTCDateTime(starttime), endtime = toUTCDateTime(endtime), **parameters)
-                elif operation == 'running_rms':
-                    sig = Preprocess.running_rms(sig,**parameters)
+                st = Preprocess.apply_stream_operation(
+                    stream = st,
+                    operation = operation,
+                    parameters = Preprocess.inject_parameters(operation,parameters,inventory,starttime,endtime),
+                    verbose = verbose,
+                )
             except Exception as e:
-                warn('Failed to execute operation "{}".'.format(operation))
+                warnings.warn(
+                    'Failed to execute operation "{}".'.format(operation),
+                    RuntimeWarning
+                )
                 if verbose:
                     print(e)
-        return sig
+            if debug:
+                print(st)
+        return st
 
     def example_operations():
-        return {
+        return {            
             'BHZ': [
-                ('merge', { 'method': 1, 'fill_value': 'interpolate', 'interpolation_samples':0 }),
+                ('merge', { 'method': 1, 'fill_value': 'interpolate', 'interpolation_samples': 0 }),
                 ('filter', {'type':'highpass','freq':.05}),
                 ('detrend', { 'type': 'demean' }),
                 ('remove_response', {'output': 'VEL'}),
-                ('filter', { 'type': 'highpass', 'freq': 4. }),
+                ('filter', { 'type': 'highpass', 'freq': 3. }),
+                ('interpolate', {'sampling_rate': 50, 'method':'lanczos', 'a':20 }),
+                ('filter', { 'type': 'lowpass', 'freq': 20. }),
                 ('trim', {}),
                 ('detrend', { 'type': 'demean' }),
-                ('interpolate', {'sampling_rate': 50, 'method':'lanczos', 'a':20}),
+                ('taper', { 'type': 'cosine', 'max_percentage': 0.05, 'max_length': 30.}),
+            ],
+            'BHR': [
+                ('merge', { 'method': 1, 'fill_value': 'interpolate', 'interpolation_samples': 0 }),
+                ('filter', {'type':'highpass','freq':.05}),
+                ('detrend', { 'type': 'demean' }),
+                ('remove_response', {'output': 'VEL'}),
+                ('rotate', {'method':'->ZNE'}),
+                ('rotate', {'method':'NE->RT', 'back_azimuth':250.30 }), # toward MVC
+                ('select', {'channel':'BHR'}),
+                ('filter', { 'type': 'highpass', 'freq': 3. }),
+                ('interpolate', {'sampling_rate': 50, 'method':'lanczos', 'a':20 }),
+                ('filter', { 'type': 'lowpass', 'freq': 20. }),
+                ('trim', {}),
+                ('detrend', { 'type': 'demean' }),
                 ('taper', { 'type': 'cosine', 'max_percentage': 0.05, 'max_length': 30.}),
             ],
             'EDH': [
-                ('merge', { 'method': 1, 'fill_value': 'interpolate', 'interpolation_samples':0 }),
+                ('merge', { 'method': 1, 'fill_value': 'interpolate', 'interpolation_samples': 0 }),
                 ('detrend', { 'type': 'demean' }),
                 ('remove_sensitivity', {}),
-                ('filter', { 'type': 'bandpass', 'freqmin': 4., 'freqmax': 10. }),
+                ('filter', { 'type': 'bandpass', 'freqmin': 3., 'freqmax': 20. }),
+                ('decimate', { 'factor': 5 }),
                 ('trim', {}),
                 ('detrend', { 'type': 'demean' }),
-                ('decimate', { 'factor': 5 }),
                 ('taper', {'type': 'cosine', 'max_percentage': 0.05, 'max_length': 30.}),
             ],
         }
@@ -327,7 +379,7 @@ class Postprocess:
         assert window[1]*scalar > window[0]*scalar, 'Window start should be greater than window end!'
         return da.where( (da.lag >= window[0]*scalar) & (da.lag <= window[1]*scalar), drop=True )
     
-    def rms(da:xr.DataArray,dim:str='lag',keep_attrs=True):
+    def rms(da:xr.DataArray, dim:str='lag', keep_attrs=True):
         """
         Return the root-mean-square of the dataarray.
         """
