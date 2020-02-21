@@ -6,7 +6,7 @@ dependencies:
   - python=3.7
   - numpy=1.16.4
   - obspy=1.1.0
-  - pandas=0.24.2
+  - pandas=1.0.1
   - basemap=1.2.0
   - gdal=2.4.1
   - h5netcdf=0.7.4
@@ -26,4 +26,4 @@ dependencies:
   - tornado=5.1.1
   - pip:
     - python-crontab==2.3.9
-    - xarray==0.14.1
+    - xarray==0.15.0
