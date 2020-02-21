@@ -107,7 +107,6 @@ def init_dataset(
     
     # lag
     lag_attrs = {
-        'unit': 's',
         'long_name': 'Lag time',
         'standard_name': 'lag_time',
     }
@@ -124,7 +123,7 @@ def init_dataset(
         nmin = np.argmin( abs( lag - clip_lag[0] / one_second ) )
         nmax = np.argmin( abs( lag - clip_lag[1] / one_second ) )
         
-        ds.coords['lag'] = lag[nmin:nmax]
+        ds.coords['lag'] = pd.to_timedelta( lag[nmin:nmax], unit = 's' )
         ds.coords['lag'].attrs = { **lag_attrs,
             'clip': 1, 
             'clip_lag': clip_lag.values / one_second,
@@ -132,7 +131,7 @@ def init_dataset(
             'index_max': nmax,
         }
     else:
-        ds.coords['lag'] = ccf.cc.lag( npts, delta, pad = True)
+        ds.coords['lag'] = pd.to_timedelta( ccf.cc.lag( npts, delta, pad = True), unit = 's' )
         ds.coords['lag'].attrs = { **lag_attrs,
             'clip': 0,
             'index_min': 0,
@@ -166,7 +165,6 @@ def init_dataset(
         ('time'),
         np.zeros((len(ds.time)), dtype = np.timedelta64),
         {
-            'units': '-',
             'long_name': 'receiver pair start sample offset',
             'standard_name': 'receiver_pair_start_sample_offset',
             'description': 'offset = receiver[0].starttime - receiver[1].starttime',
@@ -178,7 +176,6 @@ def init_dataset(
         ('time'),
         np.zeros((len(ds.time)), dtype = np.timedelta64),
         {
-            'units': '-',
             'long_name': 'first receiver start sample offset',
             'standard_name': 'first_receiver_start_sample_offset',
             'description': 'offset = receiver[0].starttime - time + window_length/2',
