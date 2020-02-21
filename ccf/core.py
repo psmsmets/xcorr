@@ -105,6 +105,13 @@ def init_dataset(
     for channel, operations in preprocess.items():
         ccf.preprocess.add_operations_to_dataset(ds, channel, operations, variable = 'preprocess')
     
+    # lag
+    lag_attrs = {
+        'unit': 's',
+        'long_name': 'Lag time',
+        'standard_name': 'lag_time',
+    }
+    
     if clip_lag is not None:
         if isinstance( clip_lag, pd.Timedelta ):
             clip_lag = pd.to_timedelta((-np.abs(clip_lag),np.abs(clip_lag)))
@@ -117,27 +124,22 @@ def init_dataset(
         nmin = np.argmin( abs( lag - clip_lag[0] / one_second ) )
         nmax = np.argmin( abs( lag - clip_lag[1] / one_second ) )
         
-        ds.coords['lag'] = pd.to_timedelta( lag[nmin:nmax], unit = 's' )
-        ds.coords['lag'].attrs = {
-            'unit': 'ns',
-            'long_name': 'Lag time',
-            'standard_name': 'lag_time',
+        ds.coords['lag'] = lag[nmin:nmax]
+        ds.coords['lag'].attrs = { **lag_attrs,
             'clip': 1, 
-            'max_abs_lag': clip_lag,
+            'clip_lag': clip_lag.values / one_second,
             'index_min': nmin,
             'index_max': nmax,
         }
     else:
-        ds.coords['lag'] = pd.to_timedelta( ccf.cc.lag( npts, delta, pad = True), unit = 's')
-        ds.coords['lag'].attrs = {
-            'unit': 'ns',
-            'long_name': 'Lag time',
-            'standard_name': 'lag_time',
+        ds.coords['lag'] = ccf.cc.lag( npts, delta, pad = True)
+        ds.coords['lag'].attrs = { **lag_attrs,
             'clip': 0,
             'index_min': 0,
             'index_max': 2*npts-1,
         }
     
+    # pair
     ds.coords['pair'] = pair
     ds.coords['pair'].attrs = {'long_name': 'Cross-correlation receiver pair', 'units':'-', 'standard_name': 'receiver_pair'} 
 
@@ -148,6 +150,7 @@ def init_dataset(
         closed = closed,
     )
 
+    # status
     ds['status'] = (
         ('time'),
         np.zeros((len(ds.time)), dtype = np.int8),
