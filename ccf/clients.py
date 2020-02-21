@@ -143,6 +143,8 @@ class Clients:
                         print('Waveform data for {} downloaded and added to archive.'.format(t))
                     stream += daystream
                     continue
+            except KeyboardInterrupt:
+                exit()
             except FDSNNoDataException:
                 if verbose:
                     print('No waveform data found for day. Try NMS_Client')
@@ -163,6 +165,8 @@ class Clients:
                         print('Waveform data downloaded and added to archive.')
                     stream += daystream
                     continue
+            except KeyboardInterrupt:
+                exit()
             except Exception as e:
                 if verbose:
                     print('an error occurred:')
@@ -249,6 +253,8 @@ class Clients:
                 verbose = verbose,
                 debug = debug,
             )
+        except KeyboardInterrupt:
+                exit()
         except:
             return Stream()
         if not isinstance(st,Stream) or len(st)!=1:

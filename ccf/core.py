@@ -9,6 +9,8 @@ import os
 
 import ccf
 
+one_second = pd.to_timedelta(1,unit='s')
+
 def toUTCDateTime(datetime):
     """
     Convert various datetime formats to `obspy.UTCDateTime`
@@ -62,7 +64,8 @@ def open_dataset(path:str, extract:bool = True, close:bool = False, debug:bool =
     
 def init_dataset(
     pair:str, starttime:pd.datetime, endtime:pd.datetime, preprocess:dict, sampling_rate = 50., window_length = 86400.,
-    window_overlap = 0.875, clip_max_abs_lag = None, unbiased = True, title_prefix = '', closed:str = 'left'
+    window_overlap = 0.875, clip_lag = None, unbiased:bool = False, title_prefix:str = '', closed:str = 'left',
+    dtype = np.float32,
 ):
     """
     Initiate a dataset. 
@@ -93,30 +96,46 @@ def init_dataset(
         sampling_rate = sampling_rate,
         delta = delta,
         npts = npts,
-        pad = 1,
-        normalize = 1,
+        pad = np.int8(1),
+        normalize = np.int8(1),
+        unbiased = np.int8(unbiased),
     )
     
     ds['preprocess'] = np.int8(1)
     for channel, operations in preprocess.items():
         ccf.preprocess.add_operations_to_dataset(ds, channel, operations, variable = 'preprocess')
     
-    if clip_max_abs_lag is not None:
+    if clip_lag is not None:
+        if isinstance( clip_lag, pd.Timedelta ):
+            clip_lag = pd.to_timedelta((-np.abs(clip_lag),np.abs(clip_lag)))
+        elif not ( isinstance(clip_lag,pd.TimedeltaIndex) and len(clip_lag) == 2 ):
+            raise TypeError(
+                'clip_lag should be of type ~pandas.Timedelta or ' +
+                '~pandas.TimedeltaIndex with length 2 specifying start and end lag.'
+            )
         lag = ccf.cc.lag( npts, delta, pad = True)
-        n = np.argmax(lag>clip_max_abs_lag)-1 
-        nmin = 2*(npts-1)-n
-        nmax = n+1
+        nmin = np.argmin( abs( lag - clip_lag[0] / one_second ) )
+        nmax = np.argmin( abs( lag - clip_lag[1] / one_second ) )
         
-        ds.coords['lag'] = lag[nmin:nmax]
+        ds.coords['lag'] = pd.to_timedelta( lag[nmin:nmax], unit = 's' )
         ds.coords['lag'].attrs = {
-            'long_name': 'Lag time', 'units': 's', 'standard_name': 'lag_time', 'clip': 1, 
-            'max_abs_lag': clip_max_abs_lag, 'lag_index_min': nmin, 'lag_index_max': nmax,
+            'unit': 'ns',
+            'long_name': 'Lag time',
+            'standard_name': 'lag_time',
+            'clip': 1, 
+            'max_abs_lag': clip_lag,
+            'index_min': nmin,
+            'index_max': nmax,
         }
     else:
-        ds.coords['lag'] = ccf.cc.lag( npts, delta, pad = True)
+        ds.coords['lag'] = pd.to_timedelta( ccf.cc.lag( npts, delta, pad = True), unit = 's')
         ds.coords['lag'].attrs = {
-            'long_name': 'Lag time', 'units': 's', 'standard_name': 'lag_time', 'clip': 0,
-            'lag_index_min': 0, 'lag_index_max': 2*npts-1,
+            'unit': 'ns',
+            'long_name': 'Lag time',
+            'standard_name': 'lag_time',
+            'clip': 0,
+            'index_min': 0,
+            'index_max': 2*npts-1,
         }
     
     ds.coords['pair'] = pair
@@ -131,35 +150,57 @@ def init_dataset(
 
     ds['status'] = (
         ('time'),
-        np.zeros((len(ds.time)),dtype=np.int8),
+        np.zeros((len(ds.time)), dtype = np.int8),
         {
             'units': '-',
             'long_name': 'processing status',
             'standard_name': 'processing_status',
-##
-# Returns all as float32 instead of int8 !!
-##
-#             'add_offset': np.int8(0),
-#             'scale_factor': np.int8(1),
-#             'valid_range': [np.int8(-1), np.int8(1)],
-##
+        },
+        encoding
+    )
+    
+    ds['pair_offset'] = (
+        ('time'),
+        np.zeros((len(ds.time)), dtype = np.timedelta64),
+        {
+            'units': '-',
+            'long_name': 'receiver pair start sample offset',
+            'standard_name': 'receiver_pair_start_sample_offset',
+            'description': 'offset = receiver[0].starttime - receiver[1].starttime',
+        },
+        encoding
+    )
+    
+    ds['time_offset'] = (
+        ('time'),
+        np.zeros((len(ds.time)), dtype = np.timedelta64),
+        {
+            'units': '-',
+            'long_name': 'first receiver start sample offset',
+            'standard_name': 'first_receiver_start_sample_offset',
+            'description': 'offset = receiver[0].starttime - time + window_length/2',
         },
         encoding
     )
 
     ds['cc'] = (
         ('time','lag'), 
-        np.empty((len(ds.time),len(ds.lag)),dtype=np.float32), 
+        np.zeros((len(ds.time),len(ds.lag)), dtype = dtype ), 
         {
             'units':'-',
             'long_name': 'Cross-Correlation Estimate',
             'standard_name': 'cross_correlation_estimate',
-            'add_offset': np.float32(0),
-            'scale_factor': np.float32(1.),
-            'valid_range': [np.float32(-1), np.float32(1)],
+            'add_offset': dtype(0),
+            'scale_factor': dtype(1),
+            'valid_range': dtype([-1.,1.]),
+            'unbiased' : np.int8(0), # flag to track if biased correction is applied.
         },
         encoding
     )
+    
+    if unbiased:
+        ds['w'] = get_cc_weights_dataset(ds, dtype = dtype )
+        
     return ds
     
 def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, retry_missing:bool = False, **kwargs ):
@@ -179,8 +220,8 @@ def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, re
             pair = p.values,
             time = t.values,
             operations = ds.preprocess.attrs,
-            duration = ds.stats.attrs['window_length'],
-            buffer = ds.stats.attrs['window_length']/2,
+            duration = ds.stats.window_length,
+            buffer = ds.stats.window_length / 4,
             inventory = inventory,
             operations_from_json = True,
             **kwargs
@@ -191,16 +232,59 @@ def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, re
             if test:
                 break
             continue
+        ds.pair_offset.loc[{'time':t}] = (
+            pd.to_datetime( stream[0].stats.starttime.datetime ) - 
+            pd.to_datetime( stream[1].stats.starttime.datetime )
+        )
+        ds.time_offset.loc[{'time':t}] = (
+            pd.to_datetime( stream[0].stats.starttime.datetime ) +
+            pd.to_timedelta(ds.stats.window_length / 2, unit = 's') -
+            ds.time.loc[{'time':t}].values
+        )
         print('CC', end='. ')
         # Todo:
         # - store noise window outside of the valid domain when clipping!
         ds.cc.loc[{'time':t}] = ccf.cc.cc(
-            x = stream[0].data[:ds.stats.attrs['npts']],
-            y = stream[1].data[:ds.stats.attrs['npts']],
-            normalize = ds.stats.attrs['normalize'] == 1,
-            pad = ds.stats.attrs['pad'] == 1
-        )[ds.lag.attrs['lag_index_min']:ds.lag.attrs['lag_index_max']]
+            x = stream[0].data[:ds.stats.npts],
+            y = stream[1].data[:ds.stats.npts],
+            normalize = ds.stats.normalize == 1,
+            pad = ds.stats.pad == 1,
+            unbiased = False, # apply correction for full dataset!
+        )[ds.lag.index_min:ds.lag.index_max]
         ds.status.loc[{'time':t}] = 1
         print('Done.')
         if test:
             break
+    if ds.stats.unbiased == 1:
+        ds = bias_correct_cc_dataset(ds)
+
+def bias_correct_dataset( ds:xr.Dataset, biased_var:str = 'cc', unbiased_var:str = None, weight_var:str='w' ):
+    if ds[biased_var].attrs['unbiased'] != 0:
+        print('No need to bias correct again.')
+        return
+    unbiased_var = unbiased_var or biased_var
+    
+    if not weight_var in ds.data_vars:
+        ds[weight_var] = get_dataset_weights(ds, name = weight_var)
+
+    # create unbiased_var in dataset
+    if biased_var != unbiased_var:
+        ds[unbiased_var] = ds[biased_var].copy()
+    ds[unbiased_var].data = ds[unbiased_var] * ds[weight_var].astype(ds[unbiased_var].dtype)
+
+    # update attributes
+    ds[unbiased_var].attrs['unbiased'] = np.int8(True)
+    ds[unbiased_var].attrs['long_name'] = 'Unbiased ' + ds[unbiased_var].attrs['long_name']
+    ds[unbiased_var].attrs['standard_name'] = 'unbiased_' + ds[unbiased_var].attrs['standard_name']
+    
+def get_dataset_weights( ds:xr.Dataset, name:str = 'w' ):
+    return xr.DataArray (
+        data = ccf.cc.weight(ds.stats.npts,pad=True)[ds.lag.index_min:ds.lag.index_max],
+        dims = ('lag'),
+        coords = {'lag': ds.lag},
+        name = name,
+        attrs = {
+            'long_name': 'Unbiased CC estimate scale factor',
+            'units': '-',
+        }
+    )
