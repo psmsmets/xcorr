@@ -233,22 +233,20 @@ class Preprocess:
             ],
         }
 
-    def add_operations_to_dataset(dataset:xr.Dataset, channel:str, operations:list, variable:str = 'preprocess'):
+    def add_operations_to_dataarray(da:xr.DataArray, preprocess:dict, attribute:str = 'preprocess'):
         """
-        Add the preprocess operations list to the `dataset` given the `channel`.
-        Optionally change `variable` name (default is `preprocess`).
+        Add the preprocess dict{ channel : [operations] } `dataarray`.
+        Optionally change the `attribute` name (default is `preprocess`).
         """
-        if not variable in dataset.data_vars:
-            dataset[variable] = True
-        dataset[variable].attrs[channel] = json.dumps(operations)
+        da.attrs[attribute] = json.dumps(preprocess)
 
-    def get_operations_from_dataset(dataset:xr.Dataset, channel:str, variable:str = 'preprocess'):
+    def get_operations_from_dataarray(da:xr.DataArray, channel:str, attribute:str = 'preprocess'):
         """
-        Get the list of preprocess operations from the `dataset` given the `channel`.
-        Optionally provide the `variable` name (default is `preprocess`).
+        Get the list of preprocess operations from the `dataarray` attribute given the `channel`.
+        Optionally provide the `attribute` name (default is `preprocess`).
         """
-        assert variable in dataset.data_vars, 'Variable "{}" not found in dataset!'.format(variable)
-        return json.loads(dataset[variable].attrs[channel])
+        assert attribute in da.attrs, 'Attribue "{}" not found in dataarray!'.format(attribute)
+        return json.loads(da.attrs[attribute][channel])
     
     def running_rms(signal, **kwargs):
         """

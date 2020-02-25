@@ -5,6 +5,7 @@ from obspy import UTCDateTime, Trace, Stream, Inventory
 import numpy as np
 import xarray as xr
 import pandas as pd
+import json
 import os
 
 import ccf
@@ -68,7 +69,7 @@ def init_dataset(
     dtype = np.float32,
 ):
     """
-    Initiate a dataset. 
+    Initiate a ccf xarray.Dataset. 
     """
     # config
     delta = 1/sampling_rate
@@ -77,90 +78,91 @@ def init_dataset(
     
     # start dataset
     ds = xr.Dataset()
-
-    ds.attrs = dict(
-        title = (title_prefix + ' Cross-correlations - {}'.format(starttime.strftime('%B %Y'))).strip(),
-        history = 'Created @ {}'.format(UTCDateTime()),
-        conventions = 'CF-1.7',
-        institution = 'Delft University of Technology, Department of Geoscience and Engineering',
-        author = 'Pieter Smets - P.S.M.Smets@tudelft.nl',
-        source = 'CTBTO/IMS hydroacoustic data and IRIS/USGS seismic data', 
-        references = 'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). Random data : analysis and measurement procedures. New York (N.Y.): Wiley-Interscience.',
-        comment = 'n/a',
-    )
     
-    ds['stats'] = np.int8(1)
-    ds['stats'].attrs = dict(
-        window_length = window_length,
-        window_overlap = window_overlap,
-        sampling_rate = sampling_rate,
-        delta = delta,
-        npts = npts,
-        pad = np.int8(1),
-        normalize = np.int8(1),
-        unbiased = np.int8(unbiased),
-    )
-    
-    ds['preprocess'] = np.int8(1)
-    for channel, operations in preprocess.items():
-        ccf.preprocess.add_operations_to_dataset(ds, channel, operations, variable = 'preprocess')
+    # global attributes
+    ds.attrs = {
+        'title' : (title_prefix + ' Cross-correlations - {}'.format(starttime.strftime('%B %Y'))).strip(),
+        'history' : 'Created @ {}'.format(UTCDateTime()),
+        'conventions' : 'CF-1.7',
+        'institution' : 'Delft University of Technology, Department of Geoscience and Engineering',
+        'author' : 'Pieter Smets - P.S.M.Smets@tudelft.nl',
+        'source' : 'CTBTO/IMS hydroacoustic data and IRIS/USGS seismic data', 
+        'references' : 'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). Random data : analysis and measurement procedures. New York (N.Y.): Wiley-Interscience.',
+        'comment' : 'n/a',
+    }
     
     # lag
     lag_attrs = {
         'long_name': 'Lag time',
         'standard_name': 'lag_time',
-    }
-    
+        'sampling_rate' : sampling_rate,
+        'delta' : delta,
+        'npts': npts,
+        'pad' : np.int8(1),
+    }  
     if clip_lag is not None:
         if isinstance( clip_lag, pd.Timedelta ):
             clip_lag = pd.to_timedelta((-np.abs(clip_lag),np.abs(clip_lag)))
         elif not ( isinstance(clip_lag,pd.TimedeltaIndex) and len(clip_lag) == 2 ):
             raise TypeError(
-                'clip_lag should be of type ~pandas.Timedelta or ' +
-                '~pandas.TimedeltaIndex with length 2 specifying start and end lag.'
+                'clip_lag should be of type ~pandas.Timedelta or ~pandas.TimedeltaIndex with length 2 specifying start and end lag.'
             )
         lag = ccf.cc.lag( npts, delta, pad = True)
         nmin = np.argmin( abs( lag - clip_lag[0] / one_second ) )
         nmax = np.argmin( abs( lag - clip_lag[1] / one_second ) )
         
         ds.coords['lag'] = pd.to_timedelta( lag[nmin:nmax], unit = 's' )
-        ds.coords['lag'].attrs = { **lag_attrs,
-            'clip': 1, 
+        ds.lag.attrs = { 
+            **lag_attrs,
+            'clip': np.int8(1), 
             'clip_lag': clip_lag.values / one_second,
             'index_min': nmin,
             'index_max': nmax,
         }
     else:
         ds.coords['lag'] = pd.to_timedelta( ccf.cc.lag( npts, delta, pad = True), unit = 's' )
-        ds.coords['lag'].attrs = { **lag_attrs,
-            'clip': 0,
+        ds.coords['lag'].attrs = { 
+            **lag_attrs,
+            'clip': np.int8(1),
             'index_min': 0,
             'index_max': 2*npts-1,
         }
     
     # pair
     ds.coords['pair'] = pair
-    ds.coords['pair'].attrs = {'long_name': 'Cross-correlation receiver pair', 'units':'-', 'standard_name': 'receiver_pair'} 
-
+    ds.pair.attrs = {
+        'long_name': 'Cross-correlation receiver pair',
+        'standard_name': 'receiver_pair',
+        'units': '-',
+        'preprocess': json.dumps(preprocess)
+    }
+    
+    # time
     ds.coords['time'] = pd.date_range(
         start = starttime, 
         end = endtime, 
         freq = '{0:.0f}s'.format(window_length*(1-window_overlap)),
         closed = closed,
     )
+    ds.time.attrs = {
+        'window_length' : window_length,
+        'window_overlap' : window_overlap,
+        'closed' : closed,
+    }
 
     # status
     ds['status'] = (
         ('time'),
         np.zeros((len(ds.time)), dtype = np.int8),
         {
-            'units': '-',
             'long_name': 'processing status',
             'standard_name': 'processing_status',
+            'units': '-',
         },
         encoding
     )
     
+    # pair offset
     ds['pair_offset'] = (
         ('time'),
         np.zeros((len(ds.time)), dtype = np.timedelta64),
@@ -172,6 +174,7 @@ def init_dataset(
         encoding
     )
     
+    # time offset
     ds['time_offset'] = (
         ('time'),
         np.zeros((len(ds.time)), dtype = np.timedelta64),
@@ -183,16 +186,19 @@ def init_dataset(
         encoding
     )
 
+    # cc
     ds['cc'] = (
         ('time','lag'), 
         np.zeros((len(ds.time),len(ds.lag)), dtype = dtype ), 
         {
-            'units':'-',
             'long_name': 'Cross-Correlation Estimate',
             'standard_name': 'cross_correlation_estimate',
+            'units':'-',
             'add_offset': dtype(0),
             'scale_factor': dtype(1),
             'valid_range': dtype([-1.,1.]),
+            'normalize' : np.int8(1),
+            'bias_correct': np.int8(unbiased),
             'unbiased' : np.int8(0), # flag to track if biased correction is applied.
         },
         encoding
@@ -209,6 +215,7 @@ def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, re
     """
     ccf.clients.check(raise_error = True)
     p = ds.pair
+    o = json.loads(ds.pair.preprocess)
     for t in ds.time:
         print(str(p.values), str(t.values)[:19], end='. ')
         if ds.status.loc[{'time':t}].values != 0:
@@ -219,11 +226,11 @@ def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, re
         stream = ccf.clients.get_preprocessed_pair_stream(
             pair = p.values,
             time = t.values,
-            operations = ds.preprocess.attrs,
-            duration = ds.stats.window_length,
-            buffer = ds.stats.window_length / 4,
+            operations = o,
+            duration = t.window_length,
+            buffer = t.window_length / 4,
             inventory = inventory,
-            operations_from_json = True,
+            operations_from_json = False,
             **kwargs
         )
         if not isinstance(stream,Stream) or len(stream)!=2:
@@ -238,28 +245,28 @@ def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, re
         )
         ds.time_offset.loc[{'time':t}] = (
             pd.to_datetime( stream[0].stats.starttime.datetime ) +
-            pd.to_timedelta(ds.stats.window_length / 2, unit = 's') -
+            pd.to_timedelta(ds.time.window_length / 2, unit = 's') -
             ds.time.loc[{'time':t}].values
         )
         print('CC', end='. ')
         # Todo:
         # - store noise window outside of the valid domain when clipping!
         ds.cc.loc[{'time':t}] = ccf.cc.cc(
-            x = stream[0].data[:ds.stats.npts],
-            y = stream[1].data[:ds.stats.npts],
-            normalize = ds.stats.normalize == 1,
-            pad = ds.stats.pad == 1,
+            x = stream[0].data[:ds.lag.npts],
+            y = stream[1].data[:ds.lag.npts],
+            normalize = ds.cc.normalize == 1,
+            pad = ds.lag.pad == 1,
             unbiased = False, # apply correction for full dataset!
         )[ds.lag.index_min:ds.lag.index_max]
         ds.status.loc[{'time':t}] = 1
         print('Done.')
         if test:
             break
-    if ds.stats.unbiased == 1:
+    if ds.cc.bias_correct == 1:
         ds = bias_correct_cc_dataset(ds)
 
 def bias_correct_dataset( ds:xr.Dataset, biased_var:str = 'cc', unbiased_var:str = None, weight_var:str='w' ):
-    if ds[biased_var].attrs['unbiased'] != 0:
+    if ds[biased_var].unbiased != 0:
         print('No need to bias correct again.')
         return
     unbiased_var = unbiased_var or biased_var
@@ -279,7 +286,7 @@ def bias_correct_dataset( ds:xr.Dataset, biased_var:str = 'cc', unbiased_var:str
     
 def get_dataset_weights( ds:xr.Dataset, name:str = 'w' ):
     return xr.DataArray (
-        data = ccf.cc.weight(ds.stats.npts,pad=True)[ds.lag.index_min:ds.lag.index_max],
+        data = ccf.cc.weight(ds.lag.npts,pad=True)[ds.lag.index_min:ds.lag.index_max],
         dims = ('lag'),
         coords = {'lag': ds.lag},
         name = name,
