@@ -66,7 +66,7 @@ def open_dataset(path:str, extract:bool = True, close:bool = False, debug:bool =
 def init_dataset(
     pair:str, starttime:pd.datetime, endtime:pd.datetime, preprocess:dict, sampling_rate = 50., window_length = 86400.,
     window_overlap = 0.875, clip_lag = None, unbiased:bool = False, title_prefix:str = '', closed:str = 'left',
-    dtype = np.float32,
+    dtype = np.float32, inventory:Inventory = None, stationary_poi:dict = None,
 ):
     """
     Initiate a ccf xarray.Dataset. 
@@ -91,52 +91,6 @@ def init_dataset(
         'comment' : 'n/a',
     }
     
-    # lag
-    lag_attrs = {
-        'long_name': 'Lag time',
-        'standard_name': 'lag_time',
-        'sampling_rate' : sampling_rate,
-        'delta' : delta,
-        'npts': npts,
-        'pad' : np.int8(1),
-    }  
-    if clip_lag is not None:
-        if isinstance( clip_lag, pd.Timedelta ):
-            clip_lag = pd.to_timedelta((-np.abs(clip_lag),np.abs(clip_lag)))
-        elif not ( isinstance(clip_lag,pd.TimedeltaIndex) and len(clip_lag) == 2 ):
-            raise TypeError(
-                'clip_lag should be of type ~pandas.Timedelta or ~pandas.TimedeltaIndex with length 2 specifying start and end lag.'
-            )
-        lag = ccf.cc.lag( npts, delta, pad = True)
-        nmin = np.argmin( abs( lag - clip_lag[0] / one_second ) )
-        nmax = np.argmin( abs( lag - clip_lag[1] / one_second ) )
-        
-        ds.coords['lag'] = pd.to_timedelta( lag[nmin:nmax], unit = 's' )
-        ds.lag.attrs = { 
-            **lag_attrs,
-            'clip': np.int8(1), 
-            'clip_lag': clip_lag.values / one_second,
-            'index_min': nmin,
-            'index_max': nmax,
-        }
-    else:
-        ds.coords['lag'] = pd.to_timedelta( ccf.cc.lag( npts, delta, pad = True), unit = 's' )
-        ds.coords['lag'].attrs = { 
-            **lag_attrs,
-            'clip': np.int8(1),
-            'index_min': 0,
-            'index_max': 2*npts-1,
-        }
-    
-    # pair
-    ds.coords['pair'] = pair
-    ds.pair.attrs = {
-        'long_name': 'Cross-correlation receiver pair',
-        'standard_name': 'receiver_pair',
-        'units': '-',
-        'preprocess': json.dumps(preprocess)
-    }
-    
     # time
     ds.coords['time'] = pd.date_range(
         start = starttime, 
@@ -149,6 +103,55 @@ def init_dataset(
         'window_overlap' : window_overlap,
         'closed' : closed,
     }
+    
+    # lag
+    lag = ccf.cc.lag( npts, delta, pad = True)    
+    if clip_lag is not None:
+        if isinstance( clip_lag, pd.Timedelta ):
+            clip_lag = pd.to_timedelta((-np.abs(clip_lag),np.abs(clip_lag)))
+        elif not ( isinstance(clip_lag,pd.TimedeltaIndex) and len(clip_lag) == 2 ):
+            raise TypeError(
+                'clip_lag should be of type ~pandas.Timedelta or ~pandas.TimedeltaIndex with length 2 specifying start and end.'
+            )   
+        nmin = np.argmin( abs( lag - clip_lag[0] / one_second ) )
+        nmax = np.argmin( abs( lag - clip_lag[1] / one_second ) )
+    else:
+        nmin = 0
+        nmax = 2*npts-1
+    ds.coords['lag'] = pd.to_timedelta( lag[nmin:nmax], unit = 's' )
+    ds.lag.attrs = {
+        'long_name': 'Lag time',
+        'standard_name': 'lag_time',
+        'sampling_rate' : sampling_rate,
+        'delta' : delta,
+        'npts': npts,
+        'pad' : np.int8(1),        
+        'clip': np.int8(clip_lag is not None), 
+        'clip_lag': clip_lag.values / one_second if clip_lag is not None else None,
+        'index_min': nmin,
+        'index_max': nmax,
+    }
+    
+    # pair
+    ds.coords['pair'] = pair
+    ds.pair.attrs = {
+        'long_name': 'Cross-correlation receiver pair',
+        'standard_name': 'receiver_pair',
+        'units': '-',
+        'preprocess': json.dumps(preprocess)
+    }
+    
+    # pair distance
+    ds['distance'] = (
+        (),
+        ccf.clients.get_pair_distance(pair = pair, inventory = inventory, poi = stationary_poi, km = True),
+        {
+            'long_name': 'receiver pair distance',
+            'standard_name': 'receiver_pair_distance',
+            'units': 'km',
+            'relative_to' : json.dumps(stationary_poi),
+        },
+    )
 
     # status
     ds['status'] = (
@@ -159,7 +162,6 @@ def init_dataset(
             'standard_name': 'processing_status',
             'units': '-',
         },
-        encoding
     )
     
     # pair offset
@@ -171,7 +173,6 @@ def init_dataset(
             'standard_name': 'receiver_pair_start_sample_offset',
             'description': 'offset = receiver[0].starttime - receiver[1].starttime',
         },
-        encoding
     )
     
     # time offset
@@ -183,7 +184,6 @@ def init_dataset(
             'standard_name': 'first_receiver_start_sample_offset',
             'description': 'offset = receiver[0].starttime - time + window_length/2',
         },
-        encoding
     )
 
     # cc

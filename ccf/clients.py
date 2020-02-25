@@ -8,6 +8,7 @@ import pandas as pd
 import json
 import re
 
+from pyproj import Geod
 from obspy import UTCDateTime, Trace, Stream, Inventory
 from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
@@ -64,20 +65,67 @@ class Clients:
         Clients.fdsn = fdsnClient(fdsn_base_url, **kwargs)
         Clients.nms = nmsClient()
         
-        
-    def get_pair_inventory(
-        pair:str, inventory:Inventory
+    def split_pair(
+        pair, separator:str = '-', split_receiver:bool = False,
     ):
         """
-        Return the filtered inventory given receiver SEED-ids `pair` and `inventory`.
+        Split a receiver SEED-ids `pair` string.
         """
-        rA, rB = pair.split('-')
-        rA_net, rA_sta, rA_loc, rA_cha = rA.split('.')
-        rB_net, rB_sta, rB_loc, rB_cha = rB.split('.')
-        return (
-            inventory.select(network=rA_net, station=rA_sta, location=rA_loc, channel=rA_cha) + 
-            inventory.select(network=rB_net, station=rB_sta, location=rB_loc, channel=rB_cha)
-        )
+        if isinstance(pair,xr.DataArray):
+            pair = str(pair.values)
+        elif isinstance(pair,np.ndarray):
+            pair = str(pair)
+        assert isinstance(pair,str), "Pair should be either a string, numpy.ndarray or an xarray.DataArray"
+            
+        return [Clients.split_seed_id(p) for p in pair.split(separator)] if split_receiver else pair.split(separator)
+    
+    def split_receiver(
+        receiver:str
+    ):
+        """
+        Split a receiver SEED-id string.
+        """
+        return dict(zip(['network','station','location','channel'], receiver.split('.')))
+    
+    def get_pair_inventory(
+        pair, inventory:Inventory
+    ):
+        """
+        Return a filtered inventory given receiver SEED-ids `pair` and `inventory`.
+        """
+        if isinstance(pair,xr.DataArray):
+            pair = str(pair.values)
+        assert isinstance(pair,str), "Pair should be either a string or a xarray.DataArray"
+        
+        r = Clients.split_pair(pair)
+        return inventory.select(**r[0]) + inventory.select(**r[1])
+    
+    def get_pair_distance(
+        pair, inventory:Inventory, ellipsoid:str = 'WGS84', poi:dict = None, km:bool = True,
+    ):
+        """
+        Calculate the receiver pair distance. Optionally, specify the ellipsoid (default = WGS84), or specify
+        a point-of-interest (a dictionary with longitude and latitude in decimal degrees) to obtain a relative distance.
+        """
+        g = Geod(ellps=ellipsoid)
+        
+        r = Clients.split_pair(pair)  
+        c = [inventory.get_coordinates(i) for i in r]
+        
+        if poi:
+            az12, az21, d0 = g.inv( 
+                poi['longitude'], poi['latitude'], c[0]['longitude'], c[0]['latitude']
+            )
+            az12, az21, d1 = g.inv( 
+                poi['longitude'], poi['latitude'], c[1]['longitude'], c[1]['latitude']
+            )
+            d = d0 - d1
+            
+        else:
+            az12, az21, d = g.inv( 
+                c[0]['longitude'], c[0]['latitude'], c[1]['longitude'], c[1]['latitude']
+            )
+        return d*1e-3 if km else d
 
     def get_waveforms(
         receiver:str, time:np.datetime64, centered:bool = True, duration = 86400., buffer = 60., 
@@ -190,12 +238,14 @@ class Clients:
         return npts_str >= ( npts_day - npts_gap )
 
     def get_preprocessed_pair_stream(
-        pair:str, time:np.datetime64, operations:dict, **kwargs
+        pair, time:np.datetime64, operations:dict, **kwargs
     ):
         """
         Get the preprocessed `obspy.Stream` given the SEED-ids receiver `pair`, `time` and preprocess `operations`.
         """
-        rA, rB = str(pair).split('-')
+         
+        rA, rB = Clients.split_pair(pair)
+        
         return (
             Clients.get_preprocessed_stream(rA, time, operations, **kwargs) + 
             Clients.get_preprocessed_stream(rB, time, operations, **kwargs)
