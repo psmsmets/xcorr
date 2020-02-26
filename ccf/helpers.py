@@ -58,9 +58,20 @@ class Helpers:
 
     def split_receiver(receiver:str):
         """
-        Split a receiver SEED-id string.
+        Split a receiver SEED-id string to a dictionary.
         """
         return dict(zip(['network','station','location','channel'], receiver.split('.')))
+    
+    def merge_receiver(receiver:dict):
+        """
+        Merge a receiver SEED-id dictionary to a string.
+        """
+        return '{net}.{sta}.{loc}.{cha}'.format(
+            net = receiver['network'], 
+            sta = receiver['station'], 
+            loc = receiver['location'] if receiver['location'] else '',
+            cha = receiver['channel'],
+        )
 
     def get_pair_inventory(pair, inventory:Inventory):
         """
