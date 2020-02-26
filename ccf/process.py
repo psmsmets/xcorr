@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from obspy import UTCDateTime, Trace, Stream, Inventory
 import warnings
 import numpy as np
 import xarray as xr
 import pandas as pd
 import json
-
+from obspy import UTCDateTime, Trace, Stream, Inventory
 from numpy.fft import fftshift, fftfreq
 try:
     from pyfftw.interfaces.numpy_fft import fft, ifft
@@ -18,11 +17,11 @@ except Exception as e:
     )
     from numpy.fft import fft, ifft
 
-from ccf.core import toUTCDateTime
+from ccf.helpers import Helpers
 
 class CC:
-    
-    def cc(x, y, normalize:bool = True, pad:bool = True, unbiased:bool = True, dtype = np.float32):
+     
+    def cc(x:np.ndarray, y:np.ndarray, normalize:bool = True, pad:bool = True, unbiased:bool = True, dtype = np.float32):
         """
         Returns the cross-correlation estimate for vectors `x` and `y`. 
         Cross-correlation is performed in the frequency domain.
@@ -44,14 +43,14 @@ class CC:
         Rxy = fftshift(np.real(ifft(fg)))
         return Rxy * CC.weight(nn, False) if unbiased else Rxy
 
-    def lag(n, delta, pad = True):
+    def lag(n, delta, pad:bool = True):
         """
         Returns an array with lag times given the number of samples `n` and time step `delta`.
         """
         nn = n*2-1 if pad else n
         return fftshift(np.fft.fftfreq(nn, 1/(nn*delta)))
     
-    def weight(n, pad = True, clip = None):
+    def weight(n, pad:bool = True, clip = None):
         """
         Returns an array with scale factors to obtain the unbaised cross-correction estimate.
         """
@@ -79,14 +78,14 @@ class CC:
         shift =  index_max - zero_index
         return shift * ( delta or 1 ), Rxy[index_max]
     
-    def compute_shift_and_max(x, y, delta = None, **kwargs):
+    def compute_shift_and_max(x:np.ndarray, y:np.ndarray, delta = None, **kwargs):
         """
         Returns the sample (or time) shift at the maximum of cross-correlation estimate and the maximum.
         """
         Rxy = CC.cc(x, y, **kwargs)
         return CC.extract_shift_and_max(Rxy,delta)
 
-    def compute_shift(x, y, delta = None, **kwargs):
+    def compute_shift(x:np.ndarray, y:np.ndarray, delta = None, **kwargs):
         """
         Returns the sample (or time) shift at the maximum of cross-correlation estimate.
         """
@@ -94,7 +93,7 @@ class CC:
         return CC.extract_shift_and_max(Rxy,delta)[0]
 
 
-class Preprocess: 
+class Preprocess:
     
     __stream_operations__ = {
         'decimate' : { 'method': 'self', 'inject': []},
@@ -132,9 +131,9 @@ class Preprocess:
         if 'inventory' in Preprocess.__stream_operations__[operation]['inject']:
             parameters['inventory'] = inventory
         if 'starttime' in Preprocess.__stream_operations__[operation]['inject']:
-            parameters['starttime'] = toUTCDateTime(starttime)
+            parameters['starttime'] = Helpers.toUTCDateTime(starttime)
         if 'endtime' in Preprocess.__stream_operations__[operation]['inject']:
-            parameters['endtime'] = toUTCDateTime(endtime)
+            parameters['endtime'] = Helpers.toUTCDateTime(endtime)
         return parameters
     
     def apply_stream_operation(stream, operation:str, parameters:dict, verbose: bool = False):
@@ -290,6 +289,7 @@ class Preprocess:
             rms_trace.data[index] = np.sqrt(np.sum(np.power(windowed_trace.data,2))/windowed_trace.stats.npts)
             
         return rms_trace
+
 
 class Postprocess:
 

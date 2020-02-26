@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import numpy as np
+import xarray as xr
+import pandas as pd
+import re
+from obspy import UTCDateTime, Inventory
+from pyproj import Geod
+
+class Helpers:
+    
+    one_second = pd.to_timedelta( 1, unit = 's' )
+
+    def toUTCDateTime(datetime):
+        """
+        Convert various datetime formats to `obspy.UTCDateTime`
+        """
+        if isinstance(datetime,UTCDateTime):
+            return datetime
+        elif isinstance(datetime,str) or isinstance(datetime,pd.datetime):
+            return UTCDateTime(datetime)
+        elif isinstance(datetime,np.datetime64):
+            return UTCDateTime(pd.to_datetime(datetime))
+
+    def verify_receiver(receiver:str, allow_wildcards:bool = False, raise_error:bool = False):
+        """
+        Verify if the receiver string matche the SEED-id regex pattern and optionally verify if
+        it contains wildcards (by default allowd).
+        """
+        if allow_wildcards == False:
+            if '*' in receiver or '?' in receiver:
+                if raise_error:
+                    raise ValueError('Receiver SEED-id cannot contain wildcards (? or *)! Be specific.')
+                return False
+            if not re.match('^([A-Z]{2})\.([A-Z,0-9]{3,5})\.([0-9]{0,2})\.([A-Z]{2}[0-9,A-Z]{1})', receiver):
+                if raise_error:
+                    raise ValueError('Receiver SEED-id is not of valid format "network.station.location.channel".')
+                return False
+        else:
+            if not re.match('^([A-Z,?*]{1,2})\.([A-Z,0-9,?*]{1,5})\.([0-9,?*]{0,2})\.([0-9,A-Z,?*]{1,3})', receiver):
+                if raise_error:
+                    raise ValueError('Receiver SEED-id is not of valid format "network.station.location.channel".')
+                return False
+        return True
+
+    def split_pair(pair, separator:str = '-', split_receiver:bool = False):
+        """
+        Split a receiver SEED-ids `pair` string.
+        """
+        if isinstance(pair,xr.DataArray):
+            pair = str(pair.values)
+        elif isinstance(pair,np.ndarray):
+            pair = str(pair)
+        assert isinstance(pair,str), "Pair should be either a string, numpy.ndarray or an xarray.DataArray"
+
+        return [Helpers.split_seed_id(p) for p in pair.split(separator)] if split_receiver else pair.split(separator)
+
+    def split_receiver(receiver:str):
+        """
+        Split a receiver SEED-id string.
+        """
+        return dict(zip(['network','station','location','channel'], receiver.split('.')))
+
+    def get_pair_inventory(pair, inventory:Inventory):
+        """
+        Return a filtered inventory given receiver SEED-ids `pair` and `inventory`.
+        """
+        if isinstance(pair,xr.DataArray):
+            pair = str(pair.values)
+        assert isinstance(pair,str), "Pair should be either a string or a xarray.DataArray"
+
+        r = Helpers.split_pair(pair)
+        return inventory.select(**r[0]) + inventory.select(**r[1])
+
+    def get_pair_distance(pair, inventory:Inventory, ellipsoid:str = 'WGS84', poi:dict = None, km:bool = True):
+        """
+        Calculate the receiver pair distance. Optionally, specify the ellipsoid (default = WGS84), or specify
+        a point-of-interest (a dictionary with longitude and latitude in decimal degrees) to obtain a relative distance.
+        """
+        g = Geod(ellps=ellipsoid)
+
+        r = Helpers.split_pair(pair)  
+        c = [inventory.get_coordinates(i) for i in r]
+
+        if poi:
+            az12, az21, d0 = g.inv( 
+                poi['longitude'], poi['latitude'], c[0]['longitude'], c[0]['latitude']
+            )
+            az12, az21, d1 = g.inv( 
+                poi['longitude'], poi['latitude'], c[1]['longitude'], c[1]['latitude']
+            )
+            d = d0 - d1
+
+        else:
+            az12, az21, d = g.inv( 
+                c[0]['longitude'], c[0]['latitude'], c[1]['longitude'], c[1]['latitude']
+            )
+        return d*1e-3 if km else d

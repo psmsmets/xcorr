@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from obspy import UTCDateTime, Trace, Stream, Inventory
+from obspy import Stream, Inventory
+from datetime import datetime
 import numpy as np
 import xarray as xr
 import pandas as pd
@@ -9,19 +10,6 @@ import json
 import os
 
 import ccf
-
-one_second = pd.to_timedelta(1,unit='s')
-
-def toUTCDateTime(datetime):
-    """
-    Convert various datetime formats to `obspy.UTCDateTime`
-    """
-    if isinstance(datetime,UTCDateTime):
-        return datetime
-    elif isinstance(datetime,str) or isinstance(datetime,pd.datetime):
-        return UTCDateTime(datetime)
-    elif isinstance(datetime,np.datetime64):
-        return UTCDateTime(pd.to_datetime(datetime))
 
 def write_dataset(dataset:xr.Dataset, path:str, close:bool = True, **kwargs):
     """
@@ -31,7 +19,7 @@ def write_dataset(dataset:xr.Dataset, path:str, close:bool = True, **kwargs):
     abspath, file = os.path.split(os.path.abspath(path))
     if not os.path.exists(abspath):
         os.makedirs(abspath)    
-    tmp = os.path.join(abspath,'{f}.{t}'.format(f=file,t=int(pd.datetime.now().timestamp()*1e3)))
+    tmp = os.path.join(abspath,'{f}.{t}'.format(f=file,t=int(datetime.now().timestamp()*1e3)))
     if close:
         print('Close', end='. ')
         dataset.close()
@@ -40,7 +28,7 @@ def write_dataset(dataset:xr.Dataset, path:str, close:bool = True, **kwargs):
     print('Replace', end='. ')
     os.replace(tmp,os.path.join(abspath,file))
     print('Done.')
-    
+
 def open_dataset(path:str, extract:bool = True, close:bool = False, debug:bool = False):
     """
     Open a netCDF dataset with cc while checking the data availability. 
@@ -53,18 +41,18 @@ def open_dataset(path:str, extract:bool = True, close:bool = False, debug:bool =
     if np.sum(ds.status.values == 1) == 0:
         ds.close()
         return False
-    
+
     if extract:
         ds['cc'] = ds.cc.where(ds.status == 1, drop=True )
         ds = ds.drop_vars('status')
-        
+
     if close:
         ds.close()
-        
+
     return ds
-    
+
 def init_dataset(
-    pair:str, starttime:pd.datetime, endtime:pd.datetime, preprocess:dict, sampling_rate = 50., window_length = 86400.,
+    pair:str, starttime:datetime, endtime:datetime, preprocess:dict, sampling_rate = 50., window_length = 86400.,
     window_overlap = 0.875, clip_lag = None, unbiased:bool = False, title_prefix:str = '', closed:str = 'left',
     dtype = np.float32, inventory:Inventory = None, stationary_poi:dict = None,
 ):
@@ -75,14 +63,14 @@ def init_dataset(
     delta = 1/sampling_rate
     npts = int(window_length*sampling_rate)
     encoding = {'zlib': True, 'complevel': 9}
-    
+
     # start dataset
     ds = xr.Dataset()
-    
+
     # global attributes
     ds.attrs = {
         'title' : (title_prefix + ' Cross-correlations - {}'.format(starttime.strftime('%B %Y'))).strip(),
-        'history' : 'Created @ {}'.format(UTCDateTime()),
+        'history' : 'Created @ {}'.format(pd.to_datetime('now')),
         'conventions' : 'CF-1.7',
         'institution' : 'Delft University of Technology, Department of Geoscience and Engineering',
         'author' : 'Pieter Smets - P.S.M.Smets@tudelft.nl',
@@ -90,7 +78,7 @@ def init_dataset(
         'references' : 'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). Random data : analysis and measurement procedures. New York (N.Y.): Wiley-Interscience.',
         'comment' : 'n/a',
     }
-    
+
     # time
     ds.coords['time'] = pd.date_range(
         start = starttime, 
@@ -103,7 +91,7 @@ def init_dataset(
         'window_overlap' : window_overlap,
         'closed' : closed,
     }
-    
+
     # lag
     lag = ccf.cc.lag( npts, delta, pad = True)    
     if clip_lag is not None:
@@ -113,8 +101,8 @@ def init_dataset(
             raise TypeError(
                 'clip_lag should be of type ~pandas.Timedelta or ~pandas.TimedeltaIndex with length 2 specifying start and end.'
             )   
-        nmin = np.argmin( abs( lag - clip_lag[0] / one_second ) )
-        nmax = np.argmin( abs( lag - clip_lag[1] / one_second ) )
+        nmin = np.argmin( abs( lag - clip_lag[0] / ccf.helpers.one_second ) )
+        nmax = np.argmin( abs( lag - clip_lag[1] / ccf.helpers.one_second ) )
     else:
         nmin = 0
         nmax = 2*npts-1
@@ -127,11 +115,11 @@ def init_dataset(
         'npts': npts,
         'pad' : np.int8(1),        
         'clip': np.int8(clip_lag is not None), 
-        'clip_lag': clip_lag.values / one_second if clip_lag is not None else None,
+        'clip_lag': clip_lag.values / ccf.helpers.one_second if clip_lag is not None else None,
         'index_min': nmin,
         'index_max': nmax,
     }
-    
+
     # pair
     ds.coords['pair'] = pair
     ds.pair.attrs = {
@@ -140,11 +128,11 @@ def init_dataset(
         'units': '-',
         'preprocess': json.dumps(preprocess)
     }
-    
+
     # pair distance
     ds['distance'] = (
         (),
-        ccf.clients.get_pair_distance(pair = pair, inventory = inventory, poi = stationary_poi, km = True),
+        ccf.helpers.get_pair_distance(pair = pair, inventory = inventory, poi = stationary_poi, km = True),
         {
             'long_name': 'receiver pair distance',
             'standard_name': 'receiver_pair_distance',
@@ -163,7 +151,7 @@ def init_dataset(
             'units': '-',
         },
     )
-    
+
     # pair offset
     ds['pair_offset'] = (
         ('time'),
@@ -174,7 +162,7 @@ def init_dataset(
             'description': 'offset = receiver[0].starttime - receiver[1].starttime',
         },
     )
-    
+
     # time offset
     ds['time_offset'] = (
         ('time'),
@@ -203,12 +191,12 @@ def init_dataset(
         },
         encoding
     )
-    
+
     if unbiased:
         ds['w'] = get_cc_weights_dataset(ds, dtype = dtype )
-        
+
     return ds
-    
+
 def cc_dataset( ds:xr.Dataset, inventory:Inventory = None, test:bool = False, retry_missing:bool = False, **kwargs ):
     """
     Process a dataset. 
@@ -270,7 +258,7 @@ def bias_correct_dataset( ds:xr.Dataset, biased_var:str = 'cc', unbiased_var:str
         print('No need to bias correct again.')
         return
     unbiased_var = unbiased_var or biased_var
-    
+
     if not weight_var in ds.data_vars:
         ds[weight_var] = get_dataset_weights(ds, name = weight_var)
 
@@ -283,7 +271,7 @@ def bias_correct_dataset( ds:xr.Dataset, biased_var:str = 'cc', unbiased_var:str
     ds[unbiased_var].attrs['unbiased'] = np.int8(True)
     ds[unbiased_var].attrs['long_name'] = 'Unbiased ' + ds[unbiased_var].attrs['long_name']
     ds[unbiased_var].attrs['standard_name'] = 'unbiased_' + ds[unbiased_var].attrs['standard_name']
-    
+
 def get_dataset_weights( ds:xr.Dataset, name:str = 'w' ):
     return xr.DataArray (
         data = ccf.cc.weight(ds.lag.npts,pad=True)[ds.lag.index_min:ds.lag.index_max],
