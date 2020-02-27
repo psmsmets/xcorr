@@ -18,7 +18,7 @@ import ccf
 def filename(pair:str,time:pd.datetime):
     return '{pair}.{y:04d}.{d:03d}.nc'.format(pair=pair,y=time.year,d=time.dayofyear)
 
-def cc(start:datetime.datetime, debug:bool = None, test:bool = None):
+def cc(start:datetime.datetime, debug:bool = None, hidebug:bool = None, test:bool = None):
     # local clients
     ccf.clients.set(sds_root='/vardim/home/smets/Hydro')
 
@@ -142,7 +142,7 @@ def cc(start:datetime.datetime, debug:bool = None, test:bool = None):
                     ),
                     retry_missing = True,
                     verbose = debug or False,
-                    debug = debug or False,
+                    debug = hidebug or False,
                 )
             except (KeyboardInterrupt, SystemExit):
                 raise
@@ -163,7 +163,8 @@ def usage():
     print("-s,--start=   Set the start year and month (fmt \"yyyy-mm\").")
     print("-v,--version  Print the ccf library version.")
     print("-h,--help     Show this help.")
-    print("   --debug    Verbose a lot more.")
+    print("   --debug    General debugging messages.")
+    print("   --hidebug  Far more detailed debugging messages.")
     print("   --test     Quit the main loop after one step.")
     sys.exit()
  
@@ -173,9 +174,14 @@ def main():
     """
     time = None
     debug = False
+    hidebug = False
     test = False
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hs:v",["help","start=","version","debug","test"])
+        opts, args = getopt.getopt(
+            sys.argv[1:],
+            "hs:v",
+            ["help","start=","version","debug","hidebug","test"]
+        )
     except getopt.GetoptError as e:
         print(str(e))
         usage()
@@ -190,6 +196,8 @@ def main():
             time = arg
         elif opt in ("--debug"):
             debug = True
+        elif opt in ("--hidebug"):
+            hidebug = True
         elif opt in ( "--test"):
             test = True
         else:
@@ -197,7 +205,7 @@ def main():
             usage()
 
     assert time, "You should specify a valid start time -s<start>!" 
-    cc( start = pd.to_datetime(time), test = test, debug = debug )    
+    cc( start = pd.to_datetime(time), test = test, debug = debug, hidebug = hidebug )    
 
 if __name__ == "__main__":
     main()
