@@ -7,7 +7,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 import numpy as np
 import pandas as pd
 import xarray as xr
-from obspy import read_inventory
+from obspy import UTCDateTime, read_inventory
 from pathlib import Path
 import os
 import sys
@@ -18,7 +18,7 @@ import ccf
 def filename(pair:str,time:pd.datetime):
     return '{pair}.{y:04d}.{d:03d}.nc'.format(pair=pair,y=time.year,d=time.dayofyear)
 
-def cc(start:datetime.datetime):
+def cc(start:datetime.datetime, debug:bool = None, test:bool = None):
     # local clients
     ccf.clients.set(sds_root='/vardim/home/smets/Hydro')
 
@@ -92,6 +92,8 @@ def cc(start:datetime.datetime):
         'IM.H03S3..EDH-IU.RAR.10.BHR',
         'IM.H10N3..EDH-IU.RAR.10.BHR',
     ]
+    if debug or test:
+        print('pairs = ', pairs)
     start = start + pd.offsets.DateOffset(days=0,normalize=True)
     times = pd.date_range(
         start = start, 
@@ -99,9 +101,8 @@ def cc(start:datetime.datetime):
         freq='1D',
         closed = 'left'
     )
-
-    print(times)
-    return
+    if debug or test:
+        print('times = ', times)
 
     # cross-correlate all pairs and periods
     warnings.filterwarnings('ignore') # no warnings of duplicate inventory items
@@ -140,6 +141,8 @@ def cc(start:datetime.datetime):
                         endtime = UTCDateTime(time + pd.offsets.DateOffset(days=1))
                     ),
                     retry_missing = True,
+                    verbose = debug or False,
+                    debug = debug or False,
                 )
             except (KeyboardInterrupt, SystemExit):
                 raise
@@ -148,6 +151,8 @@ def cc(start:datetime.datetime):
                 print('Error:')
                 print(e)
             ccf.write_dataset(ds,ncfile)
+            if test:
+                sys.exit(0)
 
 def usage():
     """
@@ -158,6 +163,8 @@ def usage():
     print("-s,--start=   Set the start year and month (fmt \"yyyy-mm\").")
     print("-v,--version  Print the ccf library version.")
     print("-h,--help     Show this help.")
+    print("   --debug    Verbose a lot more.")
+    print("   --test     Quit the main loop after one step.")
     sys.exit()
  
 def main():
@@ -165,8 +172,10 @@ def main():
     Main caller function.
     """
     time = None
+    debug = False
+    test = False
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hs:v",["help","start=","version"])
+        opts, args = getopt.getopt(sys.argv[1:],"hs:v",["help","start=","version","debug","test"])
     except getopt.GetoptError as e:
         print(str(e))
         usage()
@@ -179,12 +188,16 @@ def main():
             sys.exit()
         elif opt in ("-s", "--start"):
             time = arg
+        elif opt in ("--debug"):
+            debug = True
+        elif opt in ( "--test"):
+            test = True
         else:
             print( "unhandled option \"{}\"".format(opt) )
             usage()
 
     assert time, "You should specify a valid start time -s<start>!" 
-    cc( start = pd.to_datetime(time) )    
+    cc( start = pd.to_datetime(time), test = test, debug = debug )    
 
 if __name__ == "__main__":
     main()
