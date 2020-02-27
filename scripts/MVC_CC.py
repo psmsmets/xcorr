@@ -10,6 +10,7 @@ import xarray as xr
 from obspy import read_inventory
 import os
 import sys
+import getopt
 import datetime
 import ccf
     
@@ -173,5 +174,5 @@ def main():
     assert time, "You should specify a valid starttime!" 
     cc(starttime = pd.to_datetime(time) )    
 
-if __name__ === "__main__":
+if __name__ == "__main__":
     main()
