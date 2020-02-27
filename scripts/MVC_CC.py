@@ -154,7 +154,7 @@ def main():
     year = None
     month = None
     try:
-        opts, params['args'] = getopt.getopt(sys.argv[1:],"ht:v",["help","time=","version"])
+        opts, args = getopt.getopt(sys.argv[1:],"ht:v",["help","time=","version"])
     except getopt.GetoptError as e:
         print(str(e))
         usage()
