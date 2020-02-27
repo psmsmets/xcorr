@@ -151,8 +151,7 @@ def main():
     """
     Main caller function.
     """
-    year = None
-    month = None
+    time = None
     try:
         opts, args = getopt.getopt(sys.argv[1:],"ht:v",["help","time=","version"])
     except getopt.GetoptError as e:
