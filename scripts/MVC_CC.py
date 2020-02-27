@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from obspy import read_inventory
+from pathlib import Path
 import os
 import sys
 import getopt
@@ -17,7 +18,7 @@ import ccf
 def filename(pair:str,time:pd.datetime):
     return '{pair}.{y:04d}.{d:03d}.nc'.format(pair=pair,y=time.year,d=time.dayofyear)
 
-def cc(starttime:datetime.datetime):
+def cc(start:datetime.datetime):
     # local clients
     ccf.clients.set(sds_root='/vardim/home/smets/Hydro')
 
@@ -30,7 +31,9 @@ def cc(starttime:datetime.datetime):
     poi = {'name': 'MVC', 'latitude': -25.887, 'longitude': -177.188, 'elevation': 0., 'local_depth': 132.}
 
     # set output destination
-    dest = '/ribarsko/data/smets/MVC.CC.RAW'
+    dest = '/ribarsko/data/smets/hydro/MVC.CC.RAW'
+    p = Path(dest)
+    p.touch()
 
     # stream preprocess operations (sequential!)
     preprocess = {
@@ -74,7 +77,7 @@ def cc(starttime:datetime.datetime):
         ],
     }
 
-    inv = read_inventory('/ribarsko/data/smets/Monowai.xml')
+    inv = read_inventory('/ribarsko/data/smets/hydro/Monowai.xml')
     pairs = [
         'IM.H03S1..EDH-IU.RAR.10.BHZ',
         'IM.H10N1..EDH-IU.RAR.10.BHZ',
@@ -89,8 +92,13 @@ def cc(starttime:datetime.datetime):
         'IM.H03S3..EDH-IU.RAR.10.BHR',
         'IM.H10N3..EDH-IU.RAR.10.BHR',
     ]
-    starttime = starttime + pd.offsets.DateOffset(days=0,normalize=True)
-    times = pd.date_range(starttime, starttime + pd.offsets.DateOffset(months=1), freq='1D')
+    start = start + pd.offsets.DateOffset(days=0,normalize=True)
+    times = pd.date_range(
+        start = start, 
+        end = start + pd.offsets.DateOffset(months=1), 
+        freq='1D',
+        closed = 'left'
+    )
 
     print(times)
     return
@@ -145,15 +153,20 @@ def usage():
     """
     Print the usage.
     """
-    print("MVC_CC -t<starttime> [-h]")
-    
+    print("{} -s<year-month> [-h -v]".format(sys.argv[0]))
+    print("Arguments:")
+    print("-s,--start=   Set the start year and month (fmt \"yyyy-mm\").")
+    print("-v,--version  Print the ccf library version.")
+    print("-h,--help     Show this help.")
+    sys.exit()
+ 
 def main():
     """
     Main caller function.
     """
     time = None
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"ht:v",["help","time=","version"])
+        opts, args = getopt.getopt(sys.argv[1:],"hs:v",["help","start=","version"])
     except getopt.GetoptError as e:
         print(str(e))
         usage()
@@ -161,17 +174,17 @@ def main():
     for opt, arg in opts:
         if opt in  ("-h", "--help"):
             usage()
-            sys.exit()
         if opt in  ("-v", "--version"):
             print(ccf.__version__)
             sys.exit()
-        elif opt in ("-t", "--starttime"):
+        elif opt in ("-s", "--start"):
             time = arg
         else:
-            assert False, "unhandled option"
+            print( "unhandled option \"{}\"".format(opt) )
+            usage()
 
-    assert time, "You should specify a valid starttime!" 
-    cc(starttime = pd.to_datetime(time) )    
+    assert time, "You should specify a valid start time -s<start>!" 
+    cc( start = pd.to_datetime(time) )    
 
 if __name__ == "__main__":
     main()
