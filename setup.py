@@ -5,7 +5,7 @@ ccf - Cross-Correlation Functions
 
 **ccf** is an open-source project containing tools to calculate and store cross-correlation functions
 automatically with proper documentation. Results, parameters and meta data are stored as xarray dataset
-and stored to disk as a netCDF4 file, following COARDS and CF-1.7 standards.
+and stored to disk as a netCDF4 file, following COARDS and CF-1.7 conventions.
 It contains pre- and postprocess routines and various clients to retrieve waveforms, all based on
 the xarray dataset metadata.
 
@@ -40,9 +40,8 @@ KEYWORDS = [
 INSTALL_REQUIRES = [
     'numpy>=1.16',
     'obspy>=1.1.0',
-    'xarray>=0.12.3',
-    'pandas>=0.23.0',
-    'nms_tools>=0.1.0',
+    'xarray>=0.14.0',
+    'pandas>=0.24.0',
     'pyfftw>=0.11.0',
 ]
 

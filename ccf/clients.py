@@ -14,12 +14,11 @@ from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
 
+from ccf.datafetch import stream2SDS
 try:
     from nms_tools.nms_client import Client as nmsClient
-    from nms_tools.datafetch import stream2SDS
 except:
     nmsClient = None # make it work without nmsClient
-    stream2SDS = None # fix to include stream2DS
 
 class Clients:
     
@@ -37,7 +36,7 @@ class Clients:
             raise RuntimeError('Clients not yet set! Run Clients.set(..) first!')
         return not error
 
-    def set(sds_root:str, fdsn_base_url:str = 'IRIS', **kwargs):
+    def set(sds_root:str, fdsn_base_url:str = 'IRIS', tmp_sds_root:str = None, **kwargs):
         """
         Set the client globals `sds_root`. Optionally change the `fdsn_base_url` (default 'IRIS')
         """
@@ -94,50 +93,60 @@ class Clients:
                 stream += daystream
                 continue
             if verbose:
-                print('No waveform data found for day. Try IRIS.')    
-            try:
-                daystream = Clients.fdsn.get_waveforms(
-                    network = network,
-                    station = station,
-                    location = location,
-                    channel = channel,
-                    starttime = t,
-                    endtime = t + 86400,
-                )
-                if Clients.daystream_length_passed(daystream, verbose):
-                    stream2SDS(daystream,sds_path=Clients.sds_root,force_override=True,verbose=False)
+                print('No waveform data found for day.')
+                
+            # get attempt via fdsn
+            if Clients.fdsn:
+                if verbose:
+                    print('Try FDSN.')
+                try:
+                    daystream = Clients.fdsn.get_waveforms(
+                        network = network,
+                        station = station,
+                        location = location,
+                        channel = channel,
+                        starttime = t,
+                        endtime = t + 86400,
+                    )
+                    if Clients.daystream_length_passed(daystream, verbose):
+                        stream2SDS(daystream,sds_path=Clients.sds_root,force_override=True,verbose=False)
+                        if verbose:
+                            print('Waveform data for {} downloaded and added to archive.'.format(t))
+                        stream += daystream
+                        continue
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except FDSNNoDataException:
                     if verbose:
-                        print('Waveform data for {} downloaded and added to archive.'.format(t))
-                    stream += daystream
-                    continue
-            except KeyboardInterrupt:
-                exit()
-            except FDSNNoDataException:
-                if verbose:
-                    print('No waveform data found for day. Try NMS_Client')
-            except Exception as e:
-                if verbose:
-                    print('an error occurred:')
-                    print(e)
-            try:   
-                daystream = Clients.nms.get_waveforms(
-                    starttime = t,
-                    station = station,
-                    channel = channel,
-                    verbose = False,
-                )
-                if Clients.daystream_length_passed(daystream, verbose):
-                    stream2SDS(daystream,sds_path=Clients.sds_root,force_override=True,verbose=False)
+                        print('No waveform data found for day.')
+                except Exception as e:
                     if verbose:
-                        print('Waveform data downloaded and added to archive.')
-                    stream += daystream
-                    continue
-            except KeyboardInterrupt:
-                exit()
-            except Exception as e:
+                        print('an error occurred:')
+                        print(e)
+
+            # get attempt via nms        
+            if Clients.nms:
                 if verbose:
-                    print('an error occurred:')
-                    print(e)
+                    print('Try NMS_Client')
+                try:   
+                    daystream = Clients.nms.get_waveforms(
+                        starttime = t,
+                        station = station,
+                        channel = channel,
+                        verbose = False,
+                    )
+                    if Clients.daystream_length_passed(daystream, verbose):
+                        stream2SDS(daystream,sds_path=Clients.sds_root,force_override=True,verbose=False)
+                        if verbose:
+                            print('Waveform data downloaded and added to archive.')
+                        stream += daystream
+                        continue
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except Exception as e:
+                    if verbose:
+                        print('an error occurred:')
+                        print(e)
 
         return stream.trim(starttime=t0, endtime=t1)
 
