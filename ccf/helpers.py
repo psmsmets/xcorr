@@ -83,6 +83,14 @@ class Helpers:
 
         r = Helpers.split_pair(pair)
         return inventory.select(**r[0]) + inventory.select(**r[1])
+    
+    def get_receiver_coordinates(receiver:str, inventory:Inventory):
+        """
+        Return a dictionary with the extracted coordinates of the receiver from the ~obspy.Inventory.
+        """
+        if receiver[-1] == 'R' or receiver[-1] == 'T':
+            receiver = receiver[:-1] + 'Z'
+        return inventory.get_coordinates(receiver)
 
     def get_pair_distance(pair, inventory:Inventory, ellipsoid:str = 'WGS84', poi:dict = None, km:bool = True):
         """
@@ -91,8 +99,8 @@ class Helpers:
         """
         g = Geod(ellps=ellipsoid)
 
-        r = Helpers.split_pair(pair)  
-        c = [inventory.get_coordinates(i) for i in r]
+        r = Helpers.split_pair(pair)
+        c = [Helpers.get_receiver_coordinates(i,inventory) for i in r]
 
         if poi:
             az12, az21, d0 = g.inv( 
