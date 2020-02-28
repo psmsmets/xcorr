@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from obspy import UTCDateTime, read_inventory
-from pathlib import Path
 import os
 import sys
 import getopt
@@ -32,8 +31,6 @@ def cc(start:datetime.datetime, debug:bool = None, hidebug:bool = None, test:boo
 
     # set output destination
     dest = '/ribarsko/data/smets/hydro/MVC.CC.RAW'
-    p = Path(dest)
-    p.touch()
 
     # stream preprocess operations (sequential!)
     preprocess = {
@@ -92,7 +89,7 @@ def cc(start:datetime.datetime, debug:bool = None, hidebug:bool = None, test:boo
         'IM.H03S3..EDH-IU.RAR.10.BHR',
         'IM.H10N3..EDH-IU.RAR.10.BHR',
     ]
-    if debug or test:
+    if debug or hidebug:
         print('pairs = ', pairs)
     start = start + pd.offsets.DateOffset(days=0,normalize=True)
     times = pd.date_range(
@@ -101,7 +98,7 @@ def cc(start:datetime.datetime, debug:bool = None, hidebug:bool = None, test:boo
         freq='1D',
         closed = 'left'
     )
-    if debug or test:
+    if debug or hidebug:
         print('times = ', times)
 
     # cross-correlate all pairs and periods
