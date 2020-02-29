@@ -76,18 +76,20 @@ def cc(start:datetime.datetime, debug:bool = None, hidebug:bool = None, test:boo
 
     inv = read_inventory('/ribarsko/data/smets/hydro/Monowai.xml')
     pairs = [
-        'IM.H03S1..EDH-IU.RAR.10.BHZ',
-        'IM.H10N1..EDH-IU.RAR.10.BHZ',
+        #'IM.H03S1..EDH-IU.RAR.10.BHZ',
+        #'IM.H10N1..EDH-IU.RAR.10.BHZ',
         'IM.H03S1..EDH-IU.RAR.10.BHR',
         'IM.H10N1..EDH-IU.RAR.10.BHR',
         'IM.H03S2..EDH-IU.RAR.10.BHZ',
         'IM.H10N2..EDH-IU.RAR.10.BHZ',
-        'IM.H03S2..EDH-IU.RAR.10.BHR',
-        'IM.H10N2..EDH-IU.RAR.10.BHR',
+        #'IM.H03S2..EDH-IU.RAR.10.BHR',
+        #'IM.H10N2..EDH-IU.RAR.10.BHR',
         'IM.H03S3..EDH-IU.RAR.10.BHZ',
         'IM.H10N3..EDH-IU.RAR.10.BHZ',
-        'IM.H03S3..EDH-IU.RAR.10.BHR',
-        'IM.H10N3..EDH-IU.RAR.10.BHR',
+        #'IM.H03S3..EDH-IU.RAR.10.BHR',
+        #'IM.H10N3..EDH-IU.RAR.10.BHR',
+        'IM.H03S1..EDH-AU.NIUE..BHZ',
+        'IM.H10N1..EDH-AU.NIUE..BHZ',
     ]
     if debug or hidebug:
         print('pairs = ', pairs)
