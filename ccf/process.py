@@ -7,6 +7,7 @@ import xarray as xr
 import pandas as pd
 import json
 from obspy import UTCDateTime, Trace, Stream, Inventory
+from scipy import signal
 from numpy.fft import fftshift, fftfreq
 try:
     from pyfftw.interfaces.numpy_fft import fft, ifft
@@ -422,3 +423,17 @@ class Postprocess:
         year_doy_idx = pd.MultiIndex.from_arrays([dataset['time.year'], dataset['time.dayofyear']])
         dataset.coords['year_dayofyear'] = ('time', year_doy_idx)
         return dataset[Postprocess.list_variables(dataset,**kwargs)].groupby('year_dayofyear').mean(dim='time',keep_attrs=True)
+        
+    def butterworth_filter(da:xr.DataArray, order:int, btype:str, frequency, **kwargs):
+        sos = signal.butter(N=order, Wn=frequency, btype=btype, output='sos', fs=da.lag.sampling_rate)        
+        fun = lambda x, sos: signal.sosfiltfilt(sos, x)
+        daf = xr.apply_ufunc(fun, da, sos, keep_attrs=True)
+        
+        daf.attrs['filtered'] = np.int8(True)
+        daf.attrs['filter_design'] = 'butterworth'
+        daf.attrs['filter_method'] = 'cascaded second-order sections (sos)'
+        daf.attrs['filter_zerophase'] = np.int8(True)
+        daf.attrs['filter_order'] = order
+        daf.attrs['filter_btype'] = btype
+        daf.attrs['filter_frequency'] = frequency
+        return daf
