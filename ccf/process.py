@@ -233,20 +233,20 @@ class Preprocess:
             ],
         }
 
-    def add_operations_to_dataarray(da:xr.DataArray, preprocess:dict, attribute:str = 'preprocess'):
+    def add_operations_to_DataArray(darray:xr.DataArray, preprocess:dict, attribute:str = 'preprocess'):
         """
-        Add the preprocess dict{ channel : [operations] } `dataarray`.
+        Add the preprocess dict{ channel : [operations] } `DataArray`.
         Optionally change the `attribute` name (default is `preprocess`).
         """
-        da.attrs[attribute] = json.dumps(preprocess)
+        darray.attrs[attribute] = json.dumps(preprocess)
 
-    def get_operations_from_dataarray(da:xr.DataArray, channel:str, attribute:str = 'preprocess'):
+    def get_operations_from_DataArray(darray:xr.DataArray, channel:str, attribute:str = 'preprocess'):
         """
-        Get the list of preprocess operations from the `dataarray` attribute given the `channel`.
+        Get the list of preprocess operations from the `DataArray` attribute given the `channel`.
         Optionally provide the `attribute` name (default is `preprocess`).
         """
-        assert attribute in da.attrs, 'Attribue "{}" not found in dataarray!'.format(attribute)
-        return json.loads(da.attrs[attribute][channel])
+        assert attribute in darray.attrs, 'Attribue "{}" not found in DataArray!'.format(attribute)
+        return json.loads(darray.attrs[attribute][channel])
     
     def running_rms(signal, **kwargs):
         """
@@ -372,25 +372,28 @@ class Postprocess:
                 var.append(v)
         return var
     
-    def lag_window(da:xr.DataArray, window, scalar=1., **kwargs):
+    def lag_window(darray:xr.DataArray, window, scalar=1., **kwargs):
+        """
+        Return the trimmed lag window of the given DataArray (with dim 'lag').
+        """
         assert isinstance(window,list) or isinstance(window,tuple), 'Window should be list or tuple of length 2!'
         assert len(window)==2, 'Window should be list or tuple of length 2!'
         assert window[1]*scalar > window[0]*scalar, 'Window start should be greater than window end!'
-        return da.where( (da.lag >= window[0]*scalar) & (da.lag <= window[1]*scalar), drop=True )
+        return darray.where( (darray.lag >= window[0]*scalar) & (darray.lag <= window[1]*scalar), drop=True )
     
-    def rms(da:xr.DataArray, dim:str='lag', keep_attrs=True):
+    def rms(darray:xr.DataArray, dim:str='lag', keep_attrs=True):
         """
-        Return the root-mean-square of the dataarray.
+        Return the root-mean-square of the DataArray.
         """
-        da = xr.ufuncs.square(da) # square
-        return xr.ufuncs.sqrt(da.mean(dim=dim,keep_attrs=keep_attrs,skipna=True)) # mean and root
+        darray = xr.ufuncs.square(darray) # square
+        return xr.ufuncs.sqrt(darray.mean(dim=dim,keep_attrs=keep_attrs,skipna=True)) # mean and root
     
-    def snr(da:xr.DataArray, signal_lag_window, noise_percentages = (.2, .8), **kwargs):
+    def snr(darray:xr.DataArray, signal_lag_window, noise_percentages = (.2, .8), **kwargs):
         """
-        Return the signal-to-noise ratio of the dataarray.
+        Return the signal-to-noise ratio of the DataArray.
         """
-        signal = Postprocess.lag_window(da, window=signal_lag_window)
-        noise = Postprocess.lag_window(da, window=noise_percentages, scalar=signal_lag_window[0])
+        signal = Postprocess.lag_window(darray, window=signal_lag_window)
+        noise = Postprocess.lag_window(darray, window=noise_percentages, scalar=signal_lag_window[0])
         
         snr = Postprocess.rms( signal ) / Postprocess.rms( noise )        
         snr.attrs = {
