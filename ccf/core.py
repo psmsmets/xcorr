@@ -42,9 +42,6 @@ def open_dataset(path:str, extract:bool = True, close:bool = False, debug:bool =
         ds.close()
         return False
     if extract:
-        ds = ds.where(ds.status == 1, drop=True )
-        ds = ds.drop_vars('status')
-    else:
         ds['cc'] = ds.cc.where(ds.status == 1 )
     if close:
         ds.close()
