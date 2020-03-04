@@ -26,4 +26,4 @@ from ccf.process import Postprocess as postprocess
 from ccf.clients import Clients as clients
 from ccf.core import write_dataset, open_dataset, init_dataset, cc_dataset, bias_correct_dataset, get_dataset_weights
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
