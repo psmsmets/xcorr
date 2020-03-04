@@ -37,18 +37,15 @@ def open_dataset(path:str, extract:bool = True, close:bool = False, debug:bool =
         return False
     ds = xr.open_dataset(path)
     if debug:
-        print(np.sum(ds.status.values == 1))
+        print(path, np.sum(ds.status.values == 1))
     if np.sum(ds.status.values == 1) == 0:
         ds.close()
         return False
-
     if extract:
-        ds['cc'] = ds.cc.where(ds.status == 1, drop=True )
+        ds = ds.where(ds.status == 1, drop=True )
         ds = ds.drop_vars('status')
-
     if close:
         ds.close()
-
     return ds
 
 def init_dataset(
