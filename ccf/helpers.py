@@ -11,8 +11,14 @@ from pyproj import Geod
 class Helpers:
     
     one_second = pd.to_timedelta( 1, unit = 's' )
+    
+    def to_seconds(datetime):
+        """
+        Convert datetime object to seconds
+        """
+        return datetime / Helpers.one_second
 
-    def toUTCDateTime(datetime):
+    def to_UTCDateTime(datetime):
         """
         Convert various datetime formats to `obspy.UTCDateTime`
         """

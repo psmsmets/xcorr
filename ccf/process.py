@@ -132,9 +132,9 @@ class Preprocess:
         if 'inventory' in Preprocess.__stream_operations__[operation]['inject']:
             parameters['inventory'] = inventory
         if 'starttime' in Preprocess.__stream_operations__[operation]['inject']:
-            parameters['starttime'] = Helpers.toUTCDateTime(starttime)
+            parameters['starttime'] = Helpers.to_UTCDateTime(starttime)
         if 'endtime' in Preprocess.__stream_operations__[operation]['inject']:
-            parameters['endtime'] = Helpers.toUTCDateTime(endtime)
+            parameters['endtime'] = Helpers.to_UTCDateTime(endtime)
         return parameters
     
     def apply_stream_operation(stream, operation:str, parameters:dict, verbose: bool = False):
@@ -424,16 +424,74 @@ class Postprocess:
         dataset.coords['year_dayofyear'] = ('time', year_doy_idx)
         return dataset[Postprocess.list_variables(dataset,**kwargs)].groupby('year_dayofyear').mean(dim='time',keep_attrs=True)
         
-    def butterworth_filter(da:xr.DataArray, order:int, btype:str, frequency, **kwargs):
-        sos = signal.butter(N=order, Wn=frequency, btype=btype, output='sos', fs=da.lag.sampling_rate)        
+    def butterworth_filter(darray:xr.DataArray, order:int, btype:str, frequency, **kwargs):
+        sos = signal.butter(N=order, Wn=frequency, btype=btype, output='sos', fs=darray.lag.sampling_rate)        
         fun = lambda x, sos: signal.sosfiltfilt(sos, x)
-        daf = xr.apply_ufunc(fun, da, sos, keep_attrs=True)
         
-        daf.attrs['filtered'] = np.int8(True)
-        daf.attrs['filter_design'] = 'butterworth'
-        daf.attrs['filter_method'] = 'cascaded second-order sections (sos)'
-        daf.attrs['filter_zerophase'] = np.int8(True)
-        daf.attrs['filter_order'] = order
-        daf.attrs['filter_btype'] = btype
-        daf.attrs['filter_frequency'] = frequency
-        return daf
+        darray_filt = xr.apply_ufunc(fun, darray, sos)
+        darray_filt.attrs = {
+            **darray.attrs,
+            'filtered': np.int8(True),
+            'filter_design': 'butterworth',
+            'filter_method': 'cascaded second-order sections (sos)',
+            'filter_zerophase': np.int8(True),
+            'filter_order': order,
+            'filter_btype': btype,
+            'filter_frequency': frequency,
+            
+        }
+        return darray_filt
+    
+    def psd(darray:xr.DataArray, duration:float = None, padding:int = None, overlap:float = None, **kwargs):
+        
+        padding = padding if padding and padding >= 2 else 2
+        duration = duration if duration and duration > darray.lag.delta else darray.lag.delta
+        overlap = overlap if overlap and (0. < overlap < 1.) else .9
+        
+        f, t, Sxx = signal.spectrogram(
+            x = darray.values,
+            fs = darray.lag.sampling_rate,
+            nperseg = int(duration * darray.lag.sampling_rate),
+            noverlap = int(duration * darray.lag.sampling_rate * overlap),
+            nfft = int(padding * duration * darray.lag.sampling_rate),
+            scaling = 'density',
+            mode = 'psd',
+            axis = darray.dims.index('lag'),
+            **kwargs
+        )
+        
+        t += Helpers.to_seconds(darray.lag.values[0])
+        
+        coords = {}
+        for dim in darray.dims:
+            if dim != 'lag':
+                coords[dim] = darray[dim]
+        coords['psd_f'] = (
+            'psd_f',
+            f,
+            {'long_name': 'Frequency', 'standard_name': 'frequency', 'units': 'Hz'}
+        )
+        coords['psd_t'] = (
+            'psd_t',
+            t, # pd.to_timedelta(t,unit='s'),
+            {'long_name': 'Time', 'standard_name': 'time'}
+        )        
+        
+        return xr.DataArray(
+            data = Sxx,
+            dims = coords.keys(),
+            coords = coords,
+            name = 'psd',
+            attrs = {
+                'long_name': 'Power Spectral Density',
+                'standard_name': 'power_spectral_density',
+                'units': 'Hz**-1',
+                'from_variable': darray.name,
+                'scaling': 'density',
+                'mode': 'psd',
+                'overlap': overlap,
+                'duration': duration,
+                'padding': padding,
+                **kwargs
+            },
+        )

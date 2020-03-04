@@ -189,7 +189,7 @@ class Clients:
         # check if receiver SEED-id is valid
         Helpers.verify_receiver(receiver, allow_wildcards = False, raise_error = True)
 
-        t0 = Helpers.toUTCDateTime(time) - duration/2
+        t0 = Helpers.to_UTCDateTime(time) - duration/2
         t1 = t0 + duration
         ch = receiver.split('.')[-1]
 
