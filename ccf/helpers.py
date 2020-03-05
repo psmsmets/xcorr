@@ -12,11 +12,11 @@ class Helpers:
     
     one_second = pd.to_timedelta( 1, unit = 's' )
     
-    def to_seconds(datetime):
+    def to_seconds(time):
         """
-        Convert datetime object to seconds
+        Convert timedelta64[ns] object to seconds
         """
-        return datetime / Helpers.one_second
+        return time / Helpers.one_second if time.dtype != np.dtype('timedelta64[ns]') else time
 
     def to_UTCDateTime(datetime):
         """
