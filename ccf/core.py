@@ -73,6 +73,7 @@ def init_dataset(
         'source' : 'CTBTO/IMS hydroacoustic data and IRIS/USGS seismic data', 
         'references' : 'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). Random data : analysis and measurement procedures. New York (N.Y.): Wiley-Interscience.',
         'comment' : 'n/a',
+        'ccf_version': ccf.__version__,
     }
 
     # time
