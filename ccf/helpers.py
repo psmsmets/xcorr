@@ -16,7 +16,7 @@ class Helpers:
         """
         Convert timedelta64[ns] object to seconds
         """
-        return time / Helpers.one_second if time.dtype != np.dtype('timedelta64[ns]') else time
+        return time / Helpers.one_second if time.dtype == np.dtype('timedelta64[ns]') else time
 
     def to_UTCDateTime(datetime):
         """
