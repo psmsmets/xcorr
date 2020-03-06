@@ -1,5 +1,7 @@
 
 ###> ignore python folders ###
+/.eggs
+/.ipynb_checkpoints
 /*.egg-info
 /ccf/__pycache__
 /ccf/version.py
