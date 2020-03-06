@@ -25,7 +25,6 @@ import os
 import sys
 from glob import glob
 from setuptools import setup, find_namespace_packages
-#from pkg_resources import parse_version
 
 
 SETUP_DIRECTORY = os.path.abspath('./')
@@ -51,21 +50,11 @@ ENTRY_POINTS = {
 INSTALL_SCRIPTS = [
 ]
 
-# get the package version from from the main __init__ file.
-package_version = None
-with open(os.path.join(SETUP_DIRECTORY, name, "__init__.py"), "r") as f:
-    for line in f.readlines():
-        line = line.strip()
-        if line.startswith("__version__"):
-            package_version = line.split("=")[-1].strip().strip("'").strip('"')
-            break
-
 def setup_package():
 
     # setup package
     setup(
         name=name,
-        version=package_version,
         python_requires='>3.5.2',
         description=DOCSTRING[1],
         long_description='\n'.join(DOCSTRING[3:]),
@@ -81,17 +70,12 @@ def setup_package():
         entry_points=ENTRY_POINTS,
         scripts=INSTALL_SCRIPTS,
         zip_safe=False,
-        classifiers=[
-            'Development Status :: 4 - Beta',
-            'Intended Audience :: Science/Research',
-            'Intended Audience :: Developers',
-            'License :: OSI Approved :: ' +
-                'GNU General Public License v3 (GPLv3)',
-            'Programming Language :: Python',
-            'Topic :: Software Development :: Libraries :: Python Modules',
-            'Topic :: Scientific/Engineering',
-            'Operating System :: OS Independent'
-        ],
+        use_scm_version={
+            'root': '.',
+            'relative_to': __file__,
+            'write_to': os.path.join(name, 'version.py'),
+        },
+        setup_requires=['setuptools_scm'],
     )
 
 
