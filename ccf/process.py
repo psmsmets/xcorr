@@ -6,23 +6,26 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import json
-from obspy import UTCDateTime, Trace, Stream, Inventory
+from obspy import Trace, Stream, Inventory
 from scipy import signal
 from numpy.fft import fftshift, fftfreq
 try:
     from pyfftw.interfaces.numpy_fft import fft, ifft
 except Exception as e:
     warnings.warn(
-        "Could not import fft and ifft from pyfftw. Fallback on numpy's (i)fft. Import error: " + e.strerror, 
+        "Could not import fft and ifft from pyfftw. "
+        "Fallback on numpy's (i)fft. Import error: " +
+        e.strerror,
         ImportWarning
     )
     from numpy.fft import fft, ifft
 
 from ccf.helpers import Helpers
 
-class CC:
-     
-    def cc(x:np.ndarray, y:np.ndarray, normalize:bool = True, pad:bool = True, unbiased:bool = True, dtype = np.float32):
+
+class CC: 
+
+    def cc(x: np.ndarray, y: np.ndarray, normalize: bool = True, pad: bool = True, unbiased: bool = True, dtype = np.float32):
         """
         Returns the cross-correlation estimate for vectors `x` and `y`. 
         Cross-correlation is performed in the frequency domain.
@@ -498,3 +501,4 @@ class Postprocess:
                 **kwargs
             },
         )
+
