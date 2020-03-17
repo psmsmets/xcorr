@@ -16,7 +16,7 @@ from obspy.clients.filesystem.sds import Client as sdsClient
 from ccf.datafetch import stream2SDS
 try:
     from nms_tools.nms_client import Client as nmsClient
-except ModuleNotFoundError:
+except ImportError:
     nmsClient = None  # make it work without nmsClient
 
 

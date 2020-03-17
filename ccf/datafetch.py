@@ -15,19 +15,14 @@ Python module for fetching waveform data and station metadata.
     GNU General Public License, Version 3
     (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
-#from __future__ import absolute_import, print_function, division
 
 import os
 import sys
 import warnings
 import numpy as np
-from glob import glob
 from fnmatch import fnmatch
 
-from obspy import (UTCDateTime, read, Stream)
-
-from obspy.clients.fdsn.header import FDSNException
-from obspy.clients.fdsn import Client as fdsnClient
+from obspy import read, Stream, Trace
 
 # Pattern of the SDS filesystem structure
 # year, network, station,  channel, julday
@@ -37,8 +32,12 @@ sdsPattern = os.path.join('*{}', '{}', '{}', '{}.*', '*.{}')
 one_day = 86400  # 24 * 60 * 60
 
 
-def stream2SDS(stream, sds_path, datatype='D', out_format='MSEED', force_steim2=False, 
-               force_override=False, extra_samples=10, sampling_precision=2, verbose=True):
+def stream2SDS(
+    stream: Stream, sds_path: str, datatype: str = 'D',
+    out_format: str = 'MSEED', force_steim2: bool = False,
+    force_override: bool = False, extra_samples: int = 10,
+    sampling_precision: int = 2, verbose: bool = True
+):
     """
     A convenient function to write a :class:`~obspy.Stream` object to a
     local SDS filesystem.
@@ -74,16 +73,16 @@ def stream2SDS(stream, sds_path, datatype='D', out_format='MSEED', force_steim2=
         of the new data extends the time span of the old data on file.
         Set to ``False`` to bypass this check and override the data on
         disk. **Use with caution**.
-        
+
     extra_samples : int
         Number of extra sample points at the end of each
         day. These will overlap with the subsequent day.
-        
+
     sampling_precision : int
         Number of decimal digets to validate sampling precision of traces.
         If sampling rate is not the same it will be rounded to the specified
         precision (default is 2) and give a warning.
-        
+
     force_steim2 : bool
         Force int32 as datatype and steim2 as encoding.
 
@@ -91,7 +90,7 @@ def stream2SDS(stream, sds_path, datatype='D', out_format='MSEED', force_steim2=
         By default, some information about the process is printed to the
         screen. Set to ``False`` to suppress output.
     """
-    stream = slice_days(stream, extra_samples, sampling_precision )
+    stream = slice_days(stream, extra_samples, sampling_precision)
     for tr in stream:
         if tr.stats.endtime - tr.stats.starttime < 60:
             continue
@@ -121,10 +120,10 @@ def stream2SDS(stream, sds_path, datatype='D', out_format='MSEED', force_steim2=
                     out_fn, out_format))
                 sys.stdout.flush()
 
-            tr.split().write(out_fn, format = out_format, flush=True)
+            tr.split().write(out_fn, format=out_format, flush=True)
 
 
-def slice_days(stream, extra=10, sampling_precision=2):
+def slice_days(stream: Stream, extra: int = 10, sampling_precision: int = 2):
     """
     Slice traces in ``stream`` into day segments starting at the first
     sample after midnight till ``extra`` samples after midnight
@@ -138,14 +137,14 @@ def slice_days(stream, extra=10, sampling_precision=2):
     extra : int
         Number of extra sample points at the end of each
         day. These will overlap with the subsequent day.
-        
+
     sampling_precision : int
         Number of decimal digets to validate sampling precision of traces.
         If sampling rate is not the same it will be rounded to the specified
         precision (default is 2) and give a warning.
 
     force_rounding: bool
-        Force sample rate rounding regardless if 
+        Force sample rate rounding regardless if
 
     Returns
     -------
@@ -158,9 +157,14 @@ def slice_days(stream, extra=10, sampling_precision=2):
     try:
         stream.merge(method=0)
     except Exception:
-        warnings.warn('Sampling rate was rounded to {} decimal digits precision.'.format(sampling_precision))
+        warnings.warn(
+            'Sampling rate was rounded to {} decimal digits precision.'
+            .format(sampling_precision)
+        )
         for trace in stream:
-            trace.stats.sampling_rate = round(trace.stats.sampling_rate, sampling_precision)
+            trace.stats.sampling_rate = round(
+                trace.stats.sampling_rate, sampling_precision
+            )
         stream.merge(method=0)
     for tr in stream:
         starttime = tr.stats.starttime
@@ -176,7 +180,7 @@ def slice_days(stream, extra=10, sampling_precision=2):
     return st
 
 
-def override(filename, trace, format='MSEED'):
+def override(filename: str, trace: Trace, format: str = 'MSEED'):
     """
     Check if data limits in trace are more than data limits of data in
     filename.
