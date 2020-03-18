@@ -1,5 +1,21 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Core python module of the ccf package to create, open, write and process
+an xarray/netCDF4 based ccf file.
+
+.. module:: core
+
+:author:
+    Pieter Smets (P.S.M.Smets@tudelft.nl)
+
+:copyright:
+    Pieter Smets
+
+:license:
+    This code is distributed under the terms of the
+    GNU General Public License, Version 3
+    (https://www.gnu.org/licenses/gpl-3.0.en.html)
+"""
 
 from obspy import Stream, Inventory
 from datetime import datetime

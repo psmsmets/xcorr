@@ -3,11 +3,11 @@
 ccf
 
 **ccf** is an open-source project containing tools to calculate
-crosscorrelation functions.
-Results and meta data are stored as xarray/netCDF4 following COARDS
-and CF standards.
-It contains pre- and postprocess routines and various clients to
-retrieve waveforms.
+crosscorrelation functions. Results and meta data are stored as
+xarray/netCDF4 following COARDS and CF standards.
+`ccf` contains waveform preprocessing and crosscorrelation postprocessing
+routines as well as a client wrapper to retrieve waveforms from local
+and remote services.
 
 :author:
     Pieter Smets (p.s.m.smets@tudelft.nl)

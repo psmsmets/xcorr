@@ -1,5 +1,20 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Python module with various crosscorrelation helper functions.
+
+.. module:: helpers 
+
+:author:
+    Pieter Smets (P.S.M.Smets@tudelft.nl)
+
+:copyright:
+    Pieter Smets
+
+:license:
+    This code is distributed under the terms of the
+    GNU General Public License, Version 3
+    (https://www.gnu.org/licenses/gpl-3.0.en.html)
+"""
 
 import numpy as np
 import xarray as xr

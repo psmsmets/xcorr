@@ -1,5 +1,21 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Python module with crosscorrelation processing, waveform preprocessing and
+crosscorrelation postprocessing routines.
+
+.. module:: process
+
+:author:
+    Pieter Smets (P.S.M.Smets@tudelft.nl)
+
+:copyright:
+    Pieter Smets
+
+:license:
+    This code is distributed under the terms of the
+    GNU General Public License, Version 3
+    (https://www.gnu.org/licenses/gpl-3.0.en.html)
+"""
 
 import warnings
 import numpy as np
