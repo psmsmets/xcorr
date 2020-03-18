@@ -3,11 +3,11 @@ r"""
 :mod:`utils` -- Utilites
 ========================
 
-Utilities for ``ccf`` such as time conversions and
-receiver (pair) checkes and operations.
-This module consists of two groups of functions:
-   1. Time
-   2. Receiver
+Utilities for ``ccf`` such as time conversions and receiver (pair) checks
+and operations.
+This module consists of two groups of functions in a single class:
+   1. Time related
+   2. Receiver related
 
 """
 
@@ -23,7 +23,7 @@ from pyproj import Geod
 
 class Utils:
 
-    # 1. Time
+    # 1. Time related
 
     _one_second = pd.to_timedelta(1, unit='s')
 
@@ -75,7 +75,7 @@ class Utils:
         elif isinstance(time, np.datetime64):
             return UTCDateTime(pd.to_datetime(time))
 
-    # 2. Receiver
+    # 2. Receiver related
 
     _regex_seed_id = (
         r'^([A-Z]{2})\.([A-Z,0-9]{3,5})\.([0-9]{0,2})\.([A-Z]{2}[0-9,A-Z]{1})'
