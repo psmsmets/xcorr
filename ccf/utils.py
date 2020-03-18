@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Python module with various crosscorrelation helper functions.
+Python module with various crosscorrelation utility functions.
 
-.. module:: helpers 
+.. module:: utils 
 
 :author:
     Pieter Smets (P.S.M.Smets@tudelft.nl)
@@ -24,7 +24,7 @@ from obspy import UTCDateTime, Inventory
 from pyproj import Geod
 
 
-class Helpers:
+class Utils:
 
     one_second = pd.to_timedelta(1, unit='s')
     regex_seed_id = (
@@ -40,7 +40,7 @@ class Helpers:
         Convert timedelta64[ns] object to seconds
         """
         if time.dtype == np.dtype('timedelta64[ns]'):
-            return time / Helpers.one_second
+            return time / Utils.one_second
         else:
             return time
 
@@ -70,7 +70,7 @@ class Helpers:
                         'Be specific.'
                     )
                 return False
-            if not re.match(Helpers.regex_seed_id, receiver):
+            if not re.match(Utils.regex_seed_id, receiver):
                 if raise_error:
                     raise ValueError(
                         'Receiver SEED-id is not of valid format '
@@ -78,7 +78,7 @@ class Helpers:
                     )
                 return False
         else:
-            if not re.match(Helpers.regex_seed_id_wildcards, receiver):
+            if not re.match(Utils.regex_seed_id_wildcards, receiver):
                 if raise_error:
                     raise ValueError(
                         'Receiver SEED-id is not of valid format '
@@ -101,7 +101,7 @@ class Helpers:
         )
 
         return (
-            [Helpers.split_seed_id(p) for p in pair.split(separator)]
+            [Utils.split_seed_id(p) for p in pair.split(separator)]
             if split_receiver else pair.split(separator)
         )
 
@@ -136,7 +136,7 @@ class Helpers:
             'Pair should be either a string or a xarray.DataArray'
         )
 
-        r = Helpers.split_pair(pair)
+        r = Utils.split_pair(pair)
         return inventory.select(**r[0]) + inventory.select(**r[1])
 
     def get_receiver_coordinates(receiver: str, inventory: Inventory):
@@ -160,8 +160,8 @@ class Helpers:
         """
         g = Geod(ellps=ellipsoid)
 
-        r = Helpers.split_pair(pair)
-        c = [Helpers.get_receiver_coordinates(i, inventory) for i in r]
+        r = Utils.split_pair(pair)
+        c = [Utils.get_receiver_coordinates(i, inventory) for i in r]
 
         if poi:
             az12, az21, d0 = g.inv(

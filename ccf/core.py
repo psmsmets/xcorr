@@ -159,8 +159,8 @@ def init_dataset(
                 'or ~pandas.TimedeltaIndex with length 2 '
                 'specifying start and end.'
             )
-        nmin = np.argmin(abs(lag - clip_lag[0] / ccf.helpers.one_second))
-        nmax = np.argmin(abs(lag - clip_lag[1] / ccf.helpers.one_second))
+        nmin = np.argmin(abs(lag - clip_lag[0] / ccf.utils.one_second))
+        nmax = np.argmin(abs(lag - clip_lag[1] / ccf.utils.one_second))
     else:
         nmin = 0
         nmax = 2*npts-1
@@ -174,7 +174,7 @@ def init_dataset(
         'pad': np.int8(1),
         'clip': np.int8(clip_lag is not None),
         'clip_lag': (
-            clip_lag.values / ccf.helpers.one_second
+            clip_lag.values / ccf.utils.one_second
             if clip_lag is not None else None
         ),
         'index_min': nmin,
@@ -184,7 +184,7 @@ def init_dataset(
     # pair distance
     dataset['distance'] = (
         ('pair'),
-        np.ones((1), dtype=np.float64) * ccf.helpers.get_pair_distance(
+        np.ones((1), dtype=np.float64) * ccf.utils.get_pair_distance(
             pair=pair,
             inventory=inventory,
             poi=stationary_poi,

@@ -36,7 +36,7 @@ except Exception as e:
     )
     from numpy.fft import fft, ifft
 
-from ccf.helpers import Helpers
+from ccf.utils import Utils
 
 
 class CC:
@@ -182,12 +182,12 @@ class Preprocess:
             'starttime' in
             Preprocess.__stream_operations__[operation]['inject']
         ):
-            parameters['starttime'] = Helpers.to_UTCDateTime(starttime)
+            parameters['starttime'] = Utils.to_UTCDateTime(starttime)
         if (
             'endtime' in
             Preprocess.__stream_operations__[operation]['inject']
         ):
-            parameters['endtime'] = Helpers.to_UTCDateTime(endtime)
+            parameters['endtime'] = Utils.to_UTCDateTime(endtime)
         return parameters
 
     def apply_stream_operation(
@@ -740,7 +740,7 @@ class Postprocess:
             **kwargs
         )
 
-        t += Helpers.to_seconds(darray.lag.values[0])
+        t += Utils.to_seconds(darray.lag.values[0])
 
         coords = {}
         for dim in darray.dims:

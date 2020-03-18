@@ -24,7 +24,7 @@ import json
 
 from obspy import UTCDateTime, Stream, Inventory
 from ccf.process import Preprocess
-from ccf.helpers import Helpers
+from ccf.utils import Utils
 
 from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
@@ -94,7 +94,7 @@ class Clients:
         Clients.check(raise_error=True)
 
         # check if receiver SEED-id is valid
-        Helpers.verify_receiver(
+        Utils.verify_receiver(
             receiver,
             allow_wildcards=allow_wildcards,
             raise_error=True
@@ -241,7 +241,7 @@ class Clients:
         Get the preprocessed `obspy.Stream` given the SEED-ids receiver
         `pair`, `time` and preprocess `operations`.
         """
-        rA, rB = Helpers.split_pair(pair)
+        rA, rB = Utils.split_pair(pair)
         return (
             Clients.get_preprocessed_stream(rA, time, operations, **kwargs) +
             Clients.get_preprocessed_stream(rB, time, operations, **kwargs)
@@ -259,11 +259,11 @@ class Clients:
         Optionally provide the `obspy.Inventory` and some other options.
         """
         # check if receiver SEED-id is valid
-        Helpers.verify_receiver(
+        Utils.verify_receiver(
             receiver, allow_wildcards=False, raise_error=True
         )
 
-        t0 = Helpers.to_UTCDateTime(time) - duration/2
+        t0 = Utils.to_UTCDateTime(time) - duration/2
         t1 = t0 + duration
         ch = receiver.split('.')[-1]
 
