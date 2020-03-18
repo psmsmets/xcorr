@@ -1,24 +1,21 @@
-# -*- coding: utf-8 -*-
-"""
-Python module with various crosscorrelation utility functions.
+r"""
 
-.. module:: utils 
+:mod:`utils` -- Utilites
+========================
 
-:author:
-    Pieter Smets (P.S.M.Smets@tudelft.nl)
+Utilities for ``ccf`` such as time conversions and
+receiver (pair) checkes and operations.
+This module consists of two groups of functions:
+   1. Time
+   2. Receiver
 
-:copyright:
-    Pieter Smets
-
-:license:
-    This code is distributed under the terms of the
-    GNU General Public License, Version 3
-    (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
+# Mandatory imports
 import numpy as np
 import xarray as xr
 import pandas as pd
+import datetime
 import re
 from obspy import UTCDateTime, Inventory
 from pyproj import Geod
@@ -26,41 +23,98 @@ from pyproj import Geod
 
 class Utils:
 
-    one_second = pd.to_timedelta(1, unit='s')
-    regex_seed_id = (
+    # 1. Time
+
+    _one_second = pd.to_timedelta(1, unit='s')
+
+    def to_seconds(time):
+        r"""Convert dtype timedelta64[ns] to float seconds
+
+        Parameters
+        ----------
+        time : any
+            Dtype timedelta64[ns].
+
+
+        Returns
+        -------
+
+        time : any
+            Dtype float seconds.
+
+        """
+        if time.dtype == np.dtype('timedelta64[ns]'):
+            return time / Utils._one_second
+        else:
+            return time
+
+    def to_UTCDateTime(time):
+        r"""Convert various datetime formats to obspy UTC-based datetime object.
+
+        Parameters
+        ----------
+        time : mixed
+            A string or various datetime object.
+
+
+        Returns
+        -------
+
+        time : :class:`obspy.UTCDateTime`
+            Obspy UTC-based datetime object.
+
+        """
+        if isinstance(time, UTCDateTime):
+            return time
+        elif (
+            isinstance(time, str) or
+            isinstance(time, datetime.datetime) or
+            isinstance(time, pd.datetime)
+        ):
+            return UTCDateTime(time)
+        elif isinstance(time, np.datetime64):
+            return UTCDateTime(pd.to_datetime(time))
+
+    # 2. Receiver
+
+    _regex_seed_id = (
         r'^([A-Z]{2})\.([A-Z,0-9]{3,5})\.([0-9]{0,2})\.([A-Z]{2}[0-9,A-Z]{1})'
     )
-    regex_seed_id_wildcards = (
+    _regex_seed_id_wildcards = (
         r'^([A-Z,?*]{1,2})\.([A-Z,0-9,?*]{1,5})\.'
         r'([0-9,?*]{0,2})\.([0-9,A-Z,?*]{1,3})'
     )
 
-    def to_seconds(time):
-        """
-        Convert timedelta64[ns] object to seconds
-        """
-        if time.dtype == np.dtype('timedelta64[ns]'):
-            return time / Utils.one_second
-        else:
-            return time
-
-    def to_UTCDateTime(datetime):
-        """
-        Convert various datetime formats to `obspy.UTCDateTime`
-        """
-        if isinstance(datetime, UTCDateTime):
-            return datetime
-        elif isinstance(datetime, str) or isinstance(datetime, pd.datetime):
-            return UTCDateTime(datetime)
-        elif isinstance(datetime, np.datetime64):
-            return UTCDateTime(pd.to_datetime(datetime))
-
-    def verify_receiver(
+    def check_receiver(
         receiver: str, allow_wildcards: bool = False, raise_error: bool = False
     ):
-        """
-        Verify if the receiver string matche the SEED-id regex pattern and
-        optionally verify if it contains wildcards (by default allowd).
+        r"""Check receiver SEED-id string.
+
+        Check if the receiver string matches the SEED-id regex pattern.
+
+        This check-function is called by routines in :mod:`clients`.
+
+        Parameters
+        ----------
+        receiver : str
+            Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
+
+        allow_wildcards : bool, optional
+            Allow * or ? wildcards in the SEED-id string, else wildcards are
+            not allowed (default).
+
+        raise_error : bool, optional
+            Raise a ValueError when failing the regular expression,
+            else return False (default).
+
+
+        Returns
+        -------
+
+        match : bool
+            True if the receiver string matches the SEED-id pattern,
+            else False.
+
         """
         if allow_wildcards is False:
             if '*' in receiver or '?' in receiver:
@@ -70,7 +124,7 @@ class Utils:
                         'Be specific.'
                     )
                 return False
-            if not re.match(Utils.regex_seed_id, receiver):
+            if not re.match(Utils._regex_seed_id, receiver):
                 if raise_error:
                     raise ValueError(
                         'Receiver SEED-id is not of valid format '
@@ -78,7 +132,7 @@ class Utils:
                     )
                 return False
         else:
-            if not re.match(Utils.regex_seed_id_wildcards, receiver):
+            if not re.match(Utils._regex_seed_id_wildcards, receiver):
                 if raise_error:
                     raise ValueError(
                         'Receiver SEED-id is not of valid format '
@@ -87,12 +141,34 @@ class Utils:
                 return False
         return True
 
-    def split_pair(pair, separator: str = '-', split_receiver: bool = False):
-        """
-        Split a receiver SEED-ids `pair` string.
+    def split_pair(pair, separator: str = '-', todict: bool = False):
+        r"""Split a receiver pair string into two SEED-id strings.
+
+        Parameters
+        ----------
+        pair : str or :mod:`~xarray.DataArray`
+            Receiver pair couple separated by `separator`.
+            Each receiver is specified by a SEED-id string:
+            '{network}.{station}.{location}.{channel}'.
+
+        separator : str, optional
+            Receiver pair separator: '-' (default).
+
+        todict : bool, optional
+            Return the SEED-id string if False (default), else split each
+            each receiver SEED-id string into a dict using :mod:.
+
+
+        Returns
+        -------
+
+        pair : list
+            Two-element list of SEED-id strings if `split_receiver` is
+            False (default), else a two-element list of SEED-id dictionaries.
+
         """
         if isinstance(pair, xr.DataArray):
-            pair = str(pair.values)
+            pair = pair.str
         elif isinstance(pair, np.ndarray):
             pair = str(pair)
         assert isinstance(pair, str), (
@@ -101,22 +177,48 @@ class Utils:
         )
 
         return (
-            [Utils.split_seed_id(p) for p in pair.split(separator)]
-            if split_receiver else pair.split(separator)
+            [Utils.receiver_todict(p) for p in pair.split(separator)]
+            if todict else pair.split(separator)
         )
 
-    def split_receiver(receiver: str):
-        """
-        Split a receiver SEED-id string to a dictionary.
+    def receiver_todict(receiver: str):
+        r"""Split a receiver SEED-id string into a dictionary.
+
+        Parameters
+        ----------
+        receiver : str
+            Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
+
+
+        Returns
+        -------
+
+        receiver : dict
+            Receiver dict with SEED-id keys:
+            ['network', 'station', 'location', 'channel'].
+
         """
         return dict(zip(
             ['network', 'station', 'location', 'channel'],
             receiver.split('.')
         ))
 
-    def merge_receiver(receiver: dict):
-        """
-        Merge a receiver SEED-id dictionary to a string.
+    def receiver_tostr(receiver: dict):
+        r"""Merge a receiver SEED-id dictionary into a string.
+
+        Parameters
+        ----------
+        receiver : dict
+            Receiver dict with SEED-id keys:
+            ['network', 'station', 'location', 'channel'].
+
+
+        Returns
+        -------
+
+        receiver : str
+            Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
+
         """
         return '{net}.{sta}.{loc}.{cha}'.format(
             net=receiver['network'],
@@ -125,24 +227,51 @@ class Utils:
             cha=receiver['channel'],
         )
 
-    def get_pair_inventory(pair, inventory: Inventory):
-        """
-        Return a filtered inventory given receiver SEED-ids `pair` and
-        `inventory`.
-        """
-        if isinstance(pair, xr.DataArray):
-            pair = str(pair.values)
-        assert isinstance(pair, str), (
-            'Pair should be either a string or a xarray.DataArray'
-        )
+    def get_pair_inventory(pair, inventory: Inventory, separator: str = '-'):
+        r"""Filter the obspy inventory object for a receiver pair.
 
-        r = Utils.split_pair(pair)
+        Parameters
+        ----------
+        pair : str or :class:`xarray.DataArray`
+            Receiver pair couple separated by `separator`.
+            Each receiver is specified by a SEED-id string:
+            '{network}.{station}.{location}.{channel}'.
+
+        inventory : :class:`obspy.Inventory`
+            Inventory object.
+
+            separator : str, optional
+            Receiver pair separator: '-' (default).
+
+
+        Returns
+        -------
+
+        inventory : :class:`obspy.Inventory`
+            Returns a new obspy inventory object for the receiver pair.
+
+        """
+        r = Utils.split_pair(pair, separator)
         return inventory.select(**r[0]) + inventory.select(**r[1])
 
     def get_receiver_coordinates(receiver: str, inventory: Inventory):
-        """
-        Return a dictionary with the extracted coordinates of the receiver from
-        the ~obspy.Inventory.
+        r"""Retrieve the receiver coordinates from the obspy inventory.
+
+        Parameters
+        ----------
+        receiver : str
+            Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
+
+        inventory : :class:`obspy.Inventory`
+            Inventory object.
+
+
+        Returns
+        -------
+
+        coordinates : dict
+            The extracted receiver coordinates from the inventory object.
+
         """
         if receiver[-1] == 'R' or receiver[-1] == 'T':
             receiver = receiver[:-1] + 'Z'
@@ -150,17 +279,46 @@ class Utils:
 
     def get_pair_distance(
         pair, inventory: Inventory, ellipsoid: str = 'WGS84', poi: dict = None,
-        km: bool = True
+        separator: str = '-', km: bool = True
     ):
-        """
-        Calculate the receiver pair distance. Optionally, specify the ellipsoid
-        (default = WGS84), or specify a point-of-interest (a dictionary with
-        longitude and latitude in decimal degrees) to obtain a relative
-        distance.
+        r"""Calculate the receiver pair geodetic distance.
+
+        Parameters
+        ----------
+        pair : str or :class:`xarray.DataArray`
+            Receiver pair couple separated by `separator`.
+            Each receiver is specified by a SEED-id string:
+            '{network}.{station}.{location}.{channel}'.
+
+        inventory : :class:`obspy.Inventory`
+            Inventory object.
+
+        ellipsoid : str, optional
+            Specify the ellipsoid for :class:`pyproj.Geod`:
+            `ellipsoid`='WGS84' (default).
+
+        poi : dict, optional
+            Specify a point-of-interest dict with keys ['longitude','latitude']
+            in decimal degrees to obtain a relative distance.
+
+        separator : str, optional
+            Receiver pair separator: '-' (default).
+
+        km : bool, optional
+            Return the geodetic distance in kilometre if True (default),
+            else in metre.
+
+
+        Returns
+        -------
+
+        d : float
+            Distance in kilometre if `km` is True (default), else in metre.
+
         """
         g = Geod(ellps=ellipsoid)
 
-        r = Utils.split_pair(pair)
+        r = Utils.split_pair(pair, separator)
         c = [Utils.get_receiver_coordinates(i, inventory) for i in r]
 
         if poi:
@@ -173,7 +331,6 @@ class Utils:
                 c[1]['longitude'], c[1]['latitude']
             )
             d = d0 - d1
-
         else:
             az12, az21, d = g.inv(
                 c[0]['longitude'], c[0]['latitude'],

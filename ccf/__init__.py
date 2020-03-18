@@ -21,7 +21,8 @@ and remote services.
     (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
-from ccf.utils import Utils as utils 
+# import all modules
+from ccf.utils import Utils as utils
 from ccf.process import CC as cc
 from ccf.process import Preprocess as preprocess
 from ccf.process import Postprocess as postprocess
