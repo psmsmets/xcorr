@@ -27,14 +27,13 @@ from scipy import signal
 from numpy.fft import fftshift, fftfreq
 try:
     from pyfftw.interfaces.numpy_fft import fft, ifft
-except Exception as e:
+except ImportError:
+    from numpy.fft import fft, ifft
     warnings.warn(
         "Could not import fft and ifft from pyfftw. "
-        "Fallback on numpy's (i)fft. Import error: " +
-        e.strerror,
+        "Fallback on numpy's (i)fft.",
         ImportWarning
     )
-    from numpy.fft import fft, ifft
 
 from ccf.utils import Utils
 
