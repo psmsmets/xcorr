@@ -536,7 +536,7 @@ class Postprocess:
         dataset: xr.Dataset
     ):
         """
-        Pair-wise demean the `xr.DataSet`.
+        Pair-wise demean the `xr.Dataset`.
         """
         dims = dataset.cc.dims
         if 'pair' in dims:
@@ -552,7 +552,7 @@ class Postprocess:
         dataset: xr.Dataset, dim: str = 'time'
     ):
         """
-        List all variables in `xr.DataSet` with dimension `dim`.
+        List all variables in `xr.Dataset` with dimension `dim`.
         """
         if isinstance(dim, str):
             d = dim
@@ -635,7 +635,7 @@ class Postprocess:
         dataset: xr.Dataset, dim: xr.DataArray = None, **kwargs
     ):
         """
-        Stack `xr.DataSet` over the dimension `dim` (default = time).
+        Stack `xr.Dataset` over the dimension `dim` (default = time).
         """
         ds = dataset.mean(
             dim='time' if dim is None else dim.name,
@@ -648,7 +648,7 @@ class Postprocess:
         dataset: xr.Dataset
     ):
         """
-        Stack `xr.DataSet` per year and month.
+        Stack `xr.Dataset` per year and month.
         """
         year_month_idx = pd.MultiIndex.from_arrays(
             [dataset['time.year'], dataset['time.month']]
@@ -671,10 +671,10 @@ class Postprocess:
         )
 
     def stack_year_dayofyear(
-        dataset: xr.DataSet, **kwargs
+        dataset: xr.Dataset, **kwargs
     ):
         """
-        Stack `xr.DataSet` per year and doy.
+        Stack `xr.Dataset` per year and doy.
         """
         year_doy_idx = pd.MultiIndex.from_arrays(
             [dataset['time.year'], dataset['time.dayofyear']]
