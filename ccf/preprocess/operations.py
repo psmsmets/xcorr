@@ -29,34 +29,67 @@ from ..preprocess import running_rms
 from ..utils import to_UTCDateTime
 
 
-__all__ = ['stream_operations', 'is_stream_operation', '_inject_parameters',
+__all__ = ['help', 'stream_operations', 'is_stream_operation',
            'apply_stream_operation', 'preprocess', 'example_operations',
            'add_operations_to_DataArray', 'get_operations_from_DataArray']
 
+_self = 'obspy.core.stream.Stream'
 
 _stream_operations = {
-    'decimate': {'method': 'self', 'inject': []},
-    'detrend': {'method': 'self', 'inject': []},
-    'filter': {'method': 'self', 'inject': []},
-    'interpolate': {'method': 'self', 'inject': []},
-    'merge': {'method': 'self', 'inject': []},
-    'normalize': {'method': 'self', 'inject': []},
-    'remove_response': {'method': 'self', 'inject': ['inventory']},
-    'remove_sensitivity': {'method': 'self', 'inject': ['inventory']},
-    'resample': {'method': 'self', 'inject': []},
-    'rotate': {'method': 'self', 'inject': ['inventory']},
-    'select': {'method': 'self', 'inject': []},
-    'taper': {'method': 'self', 'inject': []},
-    'trim': {'method': 'self', 'inject': ['starttime', 'endtime']},
-    'running_rms': {'method': 'running_rms', 'inject': []},
+    'decimate': {'method': _self, 'inject': []},
+    'detrend': {'method': _self, 'inject': []},
+    'filter': {'method': _self, 'inject': []},
+    'interpolate': {'method': _self, 'inject': []},
+    'merge': {'method': _self, 'inject': []},
+    'normalize': {'method': _self, 'inject': []},
+    'remove_response': {'method': _self, 'inject': ['inventory']},
+    'remove_sensitivity': {'method': _self, 'inject': ['inventory']},
+    'resample': {'method': _self, 'inject': []},
+    'rotate': {'method': _self, 'inject': ['inventory']},
+    'select': {'method': _self, 'inject': []},
+    'taper': {'method': _self, 'inject': []},
+    'trim': {'method': _self, 'inject': ['starttime', 'endtime']},
+    'running_rms': {'method': running_rms, 'inject': []},
 }
 
 
 def stream_operations():
     r"""
-    Returns a list with all implemented stream operations.
+    Returns a list of implemented stream operations.
     """
-    return _stream_operations
+    return list(_stream_operations.keys())
+
+
+def help(operation: str = None):
+    r"""
+    Print a more extensive help for a given operation.
+    """
+    if operation is None:
+        operations = list(_stream_operations.keys())
+    elif operation in _stream_operations:
+        operations = [operation]
+    else:
+        msg = (
+            "Operation '{}' not available as stream operation."
+            .format(operation)
+        )
+        raise ValueError(msg)
+
+    msg = []
+    for operation in operations:
+        method = _stream_operations[operation]['method']
+        inject = _stream_operations[operation]['inject']
+
+        msg.append("Operation '{}'".format(operation))
+        msg.append("          method : {}".format(
+            method + '.' + operation if method == _self else method.__module__
+        ))
+        msg.append("   injected args : {}".format(
+            ', '.join(inject)
+        ))
+        msg.append('')
+
+    print("\n".join(msg))
 
 
 def is_stream_operation(operation: str):
@@ -114,10 +147,11 @@ def apply_stream_operation(
     method = _stream_operations[operation]['method']
     if verbose:
         print(operation, ': ', parameters)
-    if method == 'self':
+    if method == _self:
         return eval(f'stream.{operation}(**parameters)')
     else:
-        return eval(f'{method}(stream,**parameters)')
+        return method(stream, **parameters)
+        # return eval(f'{method}(stream, **parameters)')
 
 
 def preprocess(

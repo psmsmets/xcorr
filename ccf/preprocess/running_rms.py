@@ -27,15 +27,18 @@ __all__ = ['running_rms', 'running_rms_stream', 'running_rms_trace']
 
 def running_rms(signal, **kwargs):
     """
-    Returns a new :class:`obspy.Stream` or :class:`obpsy.Trace` with the running
-    root-mean-square amplitude per `window` (seconds).
+    Returns a new :class:`obspy.Stream` or :class:`obpsy.Trace` with the
+    running root-mean-square amplitude per `window` (seconds).
     """
     if isinstance(signal, Stream):
         return running_rms_stream(signal, **kwargs)
     elif isinstance(signal, Trace):
         return running_rms_trace(signal, **kwargs)
     else:
-        raise TypeError('Signal should be of type obspy.Trace or obspy.Stream!')
+        raise TypeError(
+            'Signal should be of type :class:`obspy.Trace` or '
+            ':class:`obspy.Stream!`'
+        )
 
 
 def running_rms_stream(stream: Stream, **kwargs):

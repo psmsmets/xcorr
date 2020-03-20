@@ -117,7 +117,12 @@ def init_dataset(
         'title': (
             (attrs['title'] if 'title' in attrs else '') +
             ' Crosscorrelations - {}'
-            .format(starttime.strftime('%B %Y'))
+            .format(
+                starttime.strftime('%Y.%j'),
+                ' to {}'.format(endtime.strftime('%Y.%j'))
+                if starttime.strftime('%Y.%j') != endtime.strftime('%Y.%j')
+                else ''
+            )
         ).strip(),
         'history': 'Created @ {}'.format(pd.to_datetime('now')),
         'conventions': 'CF-1.7',
@@ -318,8 +323,6 @@ def cc_dataset(
                 dataset.time.loc[{'time': t}].values
             )
             print('CC', end='. ')
-            # Todo:
-            # - store noise window outside of the valid domain when clipping!
             dataset.cc.loc[{'pair': p, 'time': t}] = cc.cc(
                 x=st[0].data[:dataset.lag.npts],
                 y=st[1].data[:dataset.lag.npts],
