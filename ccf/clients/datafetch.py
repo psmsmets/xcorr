@@ -16,20 +16,24 @@ Python module for fetching waveform data and station metadata.
     (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
+
+# Mandatory imports
 import os
 import sys
 import warnings
 import numpy as np
 from fnmatch import fnmatch
-
 from obspy import read, Stream, Trace
+
+
+__all__ = ['stream2SDS', 'slice_days', 'override', 'exists']
 
 # Pattern of the SDS filesystem structure
 # year, network, station,  channel, julday
-sdsPattern = os.path.join('*{}', '{}', '{}', '{}.*', '*.{}')
+_sdsPattern = os.path.join('*{}', '{}', '{}', '{}.*', '*.{}')
 
 # number of seconds per day
-one_day = 86400  # 24 * 60 * 60
+_one_day = 86400  # 24 * 60 * 60
 
 
 def stream2SDS(
@@ -171,10 +175,10 @@ def slice_days(stream: Stream, extra: int = 10, sampling_precision: int = 2):
         endtime = tr.stats.endtime
         delta = tr.stats.delta
 
-        days = int(1 + (endtime - starttime) / one_day)
+        days = int(1 + (endtime - starttime) / _one_day)
         for i in range(days):
-            ti = starttime + i * one_day - extra * delta
-            tf = ti + one_day + extra * delta
+            ti = starttime + i * _one_day - extra * delta
+            tf = ti + _one_day + extra * delta
             st += tr.slice(ti, tf, nearest_sample=False)
 
     return st
@@ -231,7 +235,7 @@ def exists(sds_path, starttime, net, sta, channels, channel_, ):
             continue
 
         for f in files:
-            if fnmatch(f, sdsPattern.format(
+            if fnmatch(f, _sdsPattern.format(
                     starttime.year, net, sta,
                     ch.code, starttime.julday)):
 

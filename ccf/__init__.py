@@ -22,15 +22,22 @@ and remote services.
 """
 
 # import all modules
-from ccf.utils import Utils as utils
-from ccf.process import CC as cc
-from ccf.process import Preprocess as preprocess
-from ccf.process import Postprocess as postprocess
-from ccf.clients import Clients as clients
-from ccf.core import (
-    write_dataset, open_dataset, init_dataset, cc_dataset,
-    bias_correct_dataset, get_dataset_weights
-)
+from ccf import utils
+from ccf import clients
+from ccf import cc 
+from ccf import preprocess 
+from ccf import postprocess 
+from ccf import core
+
+# Import all functions
+from ccf.core import *
+
+# Import some classes
+from ccf.clients.clients import Client
+
+# Make only a selection available to __all__ to not clutter the namespace
+# Maybe also to discourage the use of `from ccf import *`.
+__all__ = ['Client', 'core', 'postprocess']
 
 # Version
 try:

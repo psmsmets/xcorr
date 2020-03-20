@@ -17,6 +17,7 @@ an xarray/netCDF4 based ccf file.
     (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
+# Absolute imports
 from obspy import Stream, Inventory
 from datetime import datetime
 import numpy as np
@@ -25,7 +26,15 @@ import pandas as pd
 import json
 import os
 
-import ccf
+# Relative imports
+from ..version import version as __version__
+from ..clients import Client
+from .. import cc
+from .. import utils
+
+
+__all__ = ['write_dataset', 'open_dataset', 'init_dataset', 'cc_dataset',
+           'bias_correct_dataset', 'get_dataset_weights']
 
 
 def write_dataset(
@@ -78,7 +87,7 @@ def init_dataset(
     pair: str, starttime: datetime, endtime: datetime, preprocess: dict,
     sampling_rate: float, attrs: dict,
     window_length: float = 86400., window_overlap: float = 0.875,
-    clip_lag=None, unbiased: bool = False, title_prefix: str = '',
+    clip_lag=None, unbiased: bool = False,
     closed: str = 'left', dtype: np.dtype = np.float32,
     inventory: Inventory = None, stationary_poi: dict = None,
 ):
@@ -106,7 +115,7 @@ def init_dataset(
     # global attributes
     dataset.attrs = {
         'title': (
-            title_prefix +
+            (attrs['title'] if 'title' in attrs else '') +
             ' Crosscorrelations - {}'
             .format(starttime.strftime('%B %Y'))
         ).strip(),
@@ -121,7 +130,7 @@ def init_dataset(
              'New York (N.Y.): Wiley-Interscience.'
         ),
         'comment': attrs['comment'] if 'comment' in attrs else 'n/a',
-        'ccf_version': ccf.__version__,
+        'ccf_version': __version__,
     }
 
     # pair
@@ -147,7 +156,7 @@ def init_dataset(
     }
 
     # lag
-    lag = ccf.cc.lag(npts, delta, pad=True)
+    lag = cc.lag(npts, delta, pad=True)
     if clip_lag is not None:
         if isinstance(clip_lag, pd.Timedelta):
             clip_lag = pd.to_timedelta((-np.abs(clip_lag), np.abs(clip_lag)))
@@ -159,8 +168,8 @@ def init_dataset(
                 'or ~pandas.TimedeltaIndex with length 2 '
                 'specifying start and end.'
             )
-        nmin = np.argmin(abs(lag - clip_lag[0] / ccf.utils.one_second))
-        nmax = np.argmin(abs(lag - clip_lag[1] / ccf.utils.one_second))
+        nmin = np.argmin(abs(lag - clip_lag[0] / utils._one_second))
+        nmax = np.argmin(abs(lag - clip_lag[1] / utils._one_second))
     else:
         nmin = 0
         nmax = 2*npts-1
@@ -174,7 +183,7 @@ def init_dataset(
         'pad': np.int8(1),
         'clip': np.int8(clip_lag is not None),
         'clip_lag': (
-            clip_lag.values / ccf.utils.one_second
+            clip_lag.values / utils._one_second
             if clip_lag is not None else None
         ),
         'index_min': nmin,
@@ -184,7 +193,7 @@ def init_dataset(
     # pair distance
     dataset['distance'] = (
         ('pair'),
-        np.ones((1), dtype=np.float64) * ccf.utils.get_pair_distance(
+        np.ones((1), dtype=np.float64) * utils.get_pair_distance(
             pair=pair,
             inventory=inventory,
             poi=stationary_poi,
@@ -254,19 +263,18 @@ def init_dataset(
     )
 
     if unbiased:
-        dataset['w'] = ccf.get_dataset_weights(dataset, dtype=dtype)
+        dataset['w'] = get_dataset_weights(dataset, dtype=dtype)
 
     return dataset
 
 
 def cc_dataset(
-    dataset: xr.Dataset, inventory: Inventory = None, test: bool = False,
-    retry_missing: bool = False, **kwargs
+    dataset: xr.Dataset, client: Client, inventory: Inventory = None,
+    test_run: bool = False, retry_missing: bool = False, **kwargs
 ):
     """
     Process a dataset.
     """
-    ccf.clients.check(raise_error=True)
     for p in dataset.pair:
         o = json.loads(p.preprocess)
         for t in dataset.time:
@@ -284,7 +292,7 @@ def cc_dataset(
                     )
                     continue
             print('Waveforms', end='. ')
-            stream = ccf.clients.get_preprocessed_pair_stream(
+            st = client.get_pair_preprocessed_waveforms(
                 pair=p.values,
                 time=t.values,
                 operations=o,
@@ -294,37 +302,37 @@ def cc_dataset(
                 operations_from_json=False,
                 **kwargs
             )
-            if not isinstance(stream, Stream) or len(stream) != 2:
+            if not isinstance(st, Stream) or len(st) != 2:
                 print('Missing data. Set status = -1 and skip.')
                 dataset.status.loc[{'pair': p, 'time': t}] = -1
-                if test:
+                if test_run:
                     break
                 continue
             dataset.pair_offset.loc[{'pair': p, 'time': t}] = (
-                pd.to_datetime(stream[0].stats.starttime.datetime) -
-                pd.to_datetime(stream[1].stats.starttime.datetime)
+                pd.to_datetime(st[0].stats.starttime.datetime) -
+                pd.to_datetime(st[1].stats.starttime.datetime)
             )
             dataset.time_offset.loc[{'pair': p, 'time': t}] = (
-                pd.to_datetime(stream[0].stats.starttime.datetime) +
+                pd.to_datetime(st[0].stats.starttime.datetime) +
                 pd.to_timedelta(dataset.time.window_length / 2, unit='s') -
                 dataset.time.loc[{'time': t}].values
             )
             print('CC', end='. ')
             # Todo:
             # - store noise window outside of the valid domain when clipping!
-            dataset.cc.loc[{'pair': p, 'time': t}] = ccf.cc.cc(
-                x=stream[0].data[:dataset.lag.npts],
-                y=stream[1].data[:dataset.lag.npts],
+            dataset.cc.loc[{'pair': p, 'time': t}] = cc.cc(
+                x=st[0].data[:dataset.lag.npts],
+                y=st[1].data[:dataset.lag.npts],
                 normalize=dataset.cc.normalize == 1,
                 pad=dataset.lag.pad == 1,
                 unbiased=False,  # apply correction for full dataset!
             )[dataset.lag.index_min:dataset.lag.index_max]
             dataset.status.loc[{'pair': p, 'time': t}] = 1
             print('Done.')
-            if test:
+            if test_run:
                 break
     if dataset.cc.bias_correct == 1:
-        dataset = ccf.bias_correct_dataset(dataset)
+        dataset = bias_correct_dataset(dataset)
 
 
 def bias_correct_dataset(
@@ -361,7 +369,7 @@ def get_dataset_weights(
     dataset: xr.Dataset, name: str = 'w'
 ):
     return xr.DataArray(
-        data=ccf.cc.weight(
+        data=cc.weight(
             dataset.lag.npts, pad=True
         )[dataset.lag.index_min:dataset.lag.index_max],
         dims=('lag'),
