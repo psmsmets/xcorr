@@ -22,16 +22,19 @@ import warnings
 import xarray as xr
 import json
 from obspy import Inventory
+from hashlib import sha256
 
 
 # Relative imports
-from ..preprocess import running_rms
+from ..preprocess.running_rms import running_rms
 from ..utils import to_UTCDateTime
 
 
 __all__ = ['help', 'stream_operations', 'is_stream_operation',
            'apply_stream_operation', 'preprocess', 'example_operations',
-           'add_operations_to_DataArray', 'get_operations_from_DataArray']
+           'filter_operations', 'hash_operations', 'check_operations_hash',
+           'operations_to_dict', 'operations_to_json',
+           'preprocess_operations_to_json', 'preprocess_operations_to_dict']
 
 _self = 'obspy.core.stream.Stream'
 
@@ -103,8 +106,8 @@ def is_stream_operation(operation: str):
 
     Returns
     -------
-        Returns True of the `operation` is part of the implemented stream
-        operations. Otherwise returns False.
+        Returns `True` of the ``operation`` is part of the implemented
+        stream operations, `False` otherwise.
 
     """
     return operation in _stream_operations
@@ -118,22 +121,23 @@ def _inject_parameters(
     Inject starttime, endtime and inventory to the parameters dictionary
     when needed.
     """
+    params = parameters.copy()
     if (
         'inventory' in
         _stream_operations[operation]['inject']
     ):
-        parameters['inventory'] = inventory
+        params['inventory'] = inventory
     if (
         'starttime' in
         _stream_operations[operation]['inject']
     ):
-        parameters['starttime'] = to_UTCDateTime(starttime)
+        params['starttime'] = to_UTCDateTime(starttime)
     if (
         'endtime' in
         _stream_operations[operation]['inject']
     ):
-        parameters['endtime'] = to_UTCDateTime(endtime)
-    return parameters
+        params['endtime'] = to_UTCDateTime(endtime)
+    return params
 
 
 def apply_stream_operation(
@@ -333,37 +337,145 @@ def example_operations(to_json: bool = False):
     return json.dumps(operations) if to_json else operations
 
 
-def add_operations_to_DataArray(
-    darray: xr.DataArray, operations, channel: str = None,
-    attribute: str = 'preprocess'
-):
-    """
-    Add the preprocess dict{ channel : [operations] } `DataArray`.
-    Optionally change the `attribute` name (default is `preprocess`).
-    """
-    if not (isinstance(operations, dict) or isinstance(operations, list)):
-        raise TypeError('`operations` should be of type dict or list!')
-    if isinstance(operations, list):
-        if channel is None:
-            raise ValueError('`channel` is not defined!')
-        dops = dict()
-        if attribute in darray.attrs:
-            dops = json.loads(darray.attrs[attribute])
-        dops[channel] = operations
-        darray.attrs[attribute] = json.dumps(dops)
-    else:
-        darray.attrs[attribute] = json.dumps(operations)
+_channel_band_codes = 'FGDCESHBMLVURPTQ'
 
 
-def get_operations_from_DataArray(
-    darray: xr.DataArray, channel: str, attribute: str = 'preprocess'
+def filter_operations(
+    operations: dict
 ):
     """
-    Get the list of preprocess operations from the `DataArray`
-    attribute given the `channel`.
-    Optionally provide the `attribute` name (default is `preprocess`).
+    Only keep keys with 3 character channel codes starting with the known
+    SEED channel band codes 'FGDCESHBMLVURPTQ'.
+    """  
+    channels = [chan for chan in operations.keys() if (len(chan) == 3 and chan[0] in _channel_band_codes)]
+    return { chan: operations[chan] for chan in channels }
+
+
+def _generate_sha256_hash(
+    var
+):
+    r"""Generate the sha256 hash on a :func:`json.dumps`.
+
+    Parameters
+    ----------
+    var : str, list, tuple or dict
+        Input variable to compute the sha256 hash.
+
+    Returns
+    -------
+    hash : str
+        Hexdigested hash object. `var` is dumped to json before hashing.
+ 
     """
-    assert attribute in darray.attrs, (
-        'Attribue "{}" not found in DataArray!'.format(attribute)
-    )
-    return json.loads(darray.attrs[attribute][channel])
+    hash_obj = sha256(str(json.dumps(var, indent=4)).encode('ascii'))
+    return hash_obj.hexdigest()
+
+
+def hash_operations(
+    operations: dict
+):
+    r"""
+    Add a sha256 hash to the operations `dict`. ``operations`` are filtered
+    before hashing using :func:`filter_operations`.
+    """
+    operations = filter_operations(operations)
+    operations['sha256'] = _generate_sha256_hash(operations) 
+    return operations
+
+
+def check_operations_hash(
+    operations: dict, raise_error: bool = False
+):
+    r"""
+    Returns `True` if the operations hash is valid and `False` otherwise
+    if ``raise_error`` is `False` (default). Otherwise an error is raised.
+    """
+    if 'sha256' not in operations:
+        raise ValueError(
+            'Preprocess operations does not contain a hash!'
+        )
+    sha256 = _generate_sha256_hash(filter_operations(operations))
+    if raise_error and operations['sha256'] != sha256:
+        raise ValueError(
+            'Preprocess operations `str` contains an invalid hash!'
+        )
+    return operations['sha256'] == sha256
+
+
+def operations_to_dict(operations: str):
+    r"""Load preprocess operations `dict` from a JSON-encoded attribute `str`.
+    The sha256 hash is validated and ``operations`` keys are filtered for valid
+    SEED channel codes.
+    """
+    operations = json.loads(operations)
+    if 'sha256' not in operations:
+        raise ValueError(
+            'Preprocess operations does not contain a hash!'
+        )
+    sha256 = operations['sha256']
+    operations = hash_operations(operations)
+    if operations['sha256'] != sha256:
+        raise ValueError(
+            'Preprocess operations `str` contains an invalid hash!'
+        )
+    return operations
+
+
+def operations_to_json(operations: dict):
+    r"""Convert preprocess operations from `dict` to a JSON `str`.
+    ``operations`` keys are filtered for valid SEED channel codes and a
+    sha256 hash is added or updated.
+    """
+    return json.dumps(hash_operations(operations))
+
+
+def preprocess_operations_to_dict(pair: xr.DataArray, attribute: str = None):
+    r"""Convert ``pair`` preprocess operations attribute inplace from a
+    JSON `str` to a `dict`. The operations hash is verified after loading
+    the json SEED channel codes and hashed.
+
+    Parameters
+    ----------
+    pair : :class:`xarray.DataArray`
+        Receiver pair couple separated by `separator`.
+        Each receiver is specified by a SEED-id string:
+        '{network}.{station}.{location}.{channel}'.
+
+    attribute : str, optional
+        Specify the operations attribute name. If None, ``attribute`` is
+        'preprocess' (default).
+
+    Returns
+    -------
+    None
+
+    """
+    attribute = attribute or 'preprocess'
+    if isinstance(pair.attrs[attribute], str):
+        pair.attrs[attribute] = operations_to_dict(pair.attrs[attribute])
+
+
+def preprocess_operations_to_json(pair: xr.DataArray, attribute: str = None):
+    r"""Convert ``pair`` preprocess operations attribute inplace from a `dict`
+    to a netCDF4 safe JSON `str`. Operations channels are first filtered for
+    valid SEED channel codes and hashed.
+
+    Parameters
+    ----------
+    pair : :class:`xarray.DataArray`
+        Receiver pair couple separated by `separator`.
+        Each receiver is specified by a SEED-id string:
+        '{network}.{station}.{location}.{channel}'.
+
+    attribute : str, optional
+        Specify the operations attribute name. If None, ``attribute`` is
+        'preprocess' (default).
+
+    Returns
+    -------
+    None
+
+    """
+    attribute = attribute or 'preprocess'
+    if isinstance(pair.attrs[attribute], dict):
+        pair.attrs[attribute] = operations_to_json(pair.attrs[attribute])

@@ -31,6 +31,13 @@ from ..version import version as __version__
 from ..clients import Client
 from .. import cc
 from .. import utils
+from ..preprocess import (
+    hash_operations,
+    check_operations_hash,
+    operations_to_dict,
+    preprocess_operations_to_dict,
+    preprocess_operations_to_json
+)
 
 
 __all__ = ['write_dataset', 'open_dataset', 'init_dataset', 'cc_dataset',
@@ -54,6 +61,10 @@ def write_dataset(
     if close:
         print('Close', end='. ')
         dataset.close()
+
+    # convert preprocess operations
+    preprocess_operations_to_json(dataset.pair)
+
     print('To temporary netcdf', end='. ')
     dataset.to_netcdf(path=tmp, mode='w', **kwargs)
     print('Replace', end='. ')
@@ -80,6 +91,10 @@ def open_dataset(
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
     if load_and_close:
         dataset.load().close()
+
+    # convert preprocess operations
+    preprocess_operations_to_dict(dataset.pair)
+
     return dataset
 
 
@@ -144,7 +159,7 @@ def init_dataset(
         'long_name': 'Cross-correlation receiver pair',
         'standard_name': 'receiver_pair',
         'units': '-',
-        'preprocess': json.dumps(preprocess)
+        'preprocess': hash_operations(preprocess),
     }
 
     # time
@@ -280,8 +295,15 @@ def cc_dataset(
     """
     Process a dataset.
     """
+    # extract and validate preprocess operations
+    if isinstance(dataset.pair.preprocess, dict):
+        o = dataset.pair.preprocess
+        check_operations_hash(o, raise_error=True)
+    else:
+        o = operations_to_dict(dataset.pair.preprocess)
+
+    # process each pair per time step 
     for p in dataset.pair:
-        o = json.loads(p.preprocess)
         for t in dataset.time:
             print(str(p.values), str(t.values)[:19], end='. ')
             if dataset.status.loc[{'pair': p, 'time': t}].values != 0:
@@ -302,7 +324,7 @@ def cc_dataset(
                 time=t.values,
                 operations=o,
                 duration=t.window_length,
-                buffer=t.window_length / 4,
+                buffer=t.window_length/10,
                 inventory=inventory,
                 operations_from_json=False,
                 **kwargs

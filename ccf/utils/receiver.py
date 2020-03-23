@@ -1,7 +1,7 @@
 r"""
 
-:mod:`util.receiver` -- Receiver Utilities
-==========================================
+:mod:`utils.receiver` -- Receiver Utilities
+===========================================
 
 Receiver utilities for ``ccf`` such as checks, type conversions,
 and receiver pair geodetic operations.
@@ -166,6 +166,29 @@ def receiver_to_str(receiver: dict):
         loc=receiver['location'] if receiver['location'] else '',
         cha=receiver['channel'],
     )
+
+
+def get_receiver_channel(receiver):
+    r"""Split a receiver SEED-id string into a dictionary.
+
+    Parameters
+    ----------
+    receiver : str or dict
+        Receiver SEED-id string '{network}.{station}.{location}.{channel}'
+        or dict with keys ['network', 'station', 'location', 'channel'].
+
+    Returns
+    -------
+    channel : str 
+        Receiver channel code.
+
+    """
+    if isinstance(receiver, dict):
+        return receiver['channel']
+    elif isinstance(receiver, str):
+        return receiver.split('.')[3]
+    else:
+        raise TypeError('Receiver should be of type `str` or `dict`!')
 
 
 def get_pair_inventory(pair, inventory: Inventory, separator: str = '-'):

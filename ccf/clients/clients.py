@@ -211,7 +211,7 @@ class Client(object):
         network, station, location, channel = receiver.split('.')
 
         # center time of 24h window -12h
-        t0 = time
+        t0 = pd.to_datetime(time)
         if centered:
             t0 -= pd.offsets.DateOffset(seconds=duration/2)
         t1 = t0 + pd.offsets.DateOffset(seconds=duration) 
