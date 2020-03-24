@@ -33,7 +33,7 @@ from ccf import core
 from ccf.core import *
 
 # Import some classes
-from ccf.clients.clients import Client
+from ccf.clients.client import Client
 
 # Make only a selection available to __all__ to not clutter the namespace
 # Maybe also to discourage the use of `from ccf import *`.
