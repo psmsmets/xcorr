@@ -23,11 +23,11 @@ and remote services.
 
 # import all modules
 from ..clients import datafetch
-from ..clients import clients
+from ..clients import client
 
 # Import all functions
 from ..clients.datafetch import *
-from ..clients.clients import *
+from ..clients.client import *
 
 # Import some classes
-from ..clients.clients import Client
+from ..clients.client import Client
