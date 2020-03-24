@@ -22,7 +22,7 @@ and remote services.
 """
 
 # import all modules
-from ccf import utils
+from ccf import util
 from ccf import clients
 from ccf import cc 
 from ccf import preprocess 

@@ -18,6 +18,7 @@ an xarray/netCDF4 based ccf file.
 """
 
 # Absolute imports
+import warnings
 from obspy import Stream, Inventory
 from datetime import datetime
 import numpy as np
@@ -30,7 +31,7 @@ import os
 from ..version import version as __version__
 from ..clients import Client
 from .. import cc
-from .. import utils
+from .. import util
 from ..preprocess import (
     hash_operations,
     check_operations_hash,
@@ -40,8 +41,9 @@ from ..preprocess import (
 )
 
 
-__all__ = ['write_dataset', 'open_dataset', 'init_dataset', 'cc_dataset',
-           'bias_correct_dataset', 'get_dataset_weights']
+__all__ = ['write_dataset', 'open_dataset', 'merge_datasets',
+           'init_dataset', 'cc_dataset', 'bias_correct_dataset',
+           'get_dataset_weights']
 
 
 def write_dataset(
@@ -50,31 +52,42 @@ def write_dataset(
     """
     Write a dataset to netCDF using a tmp file and replacing the destination.
     """
-    print('Write dataset as {}'.format(path), end='. ')
+    print("Write dataset as '{}'".format(path), end='. ')
     abspath, file = os.path.split(os.path.abspath(path))
     if not os.path.exists(abspath):
         os.makedirs(abspath)
+
     tmp = os.path.join(
         abspath,
         '{f}.{t}'.format(f=file, t=int(datetime.now().timestamp()*1e3))
     )
+
     if close:
         print('Close', end='. ')
         dataset.close()
+
+    # calculate dataset hash
+    print('Hash', end='. ')
+    dataset.attrs['sha256_hash'] = (
+        util.hasher.sha256_hash_Dataset(dataset)
+    )
 
     # convert preprocess operations
     preprocess_operations_to_json(dataset.pair)
 
     print('To temporary netcdf', end='. ')
-    dataset.to_netcdf(path=tmp, mode='w', **kwargs)
+    dataset.to_netcdf(path=tmp, mode='w', format='NETCDF4', **kwargs)
     print('Replace', end='. ')
     os.replace(tmp, os.path.join(abspath, file))
     print('Done.')
 
+    # convert preprocess operations
+    preprocess_operations_to_dict(dataset.pair)
+
 
 def open_dataset(
-    path: str, extract: bool = True, load_and_close: bool = False,
-    debug: bool = False
+    path: str, extract: bool = False, load_and_close: bool = False,
+    fast: bool = False, quick_and_dirty: bool = False, debug: bool = False
 ):
     """
     Open a netCDF dataset with cc while checking the data availability.
@@ -82,27 +95,152 @@ def open_dataset(
     if not os.path.isfile(path):
         return False
     dataset = xr.open_dataset(path)
-    if debug:
-        print(path, np.sum(dataset.status.values == 1))
-    if np.sum(dataset.status.values == 1) == 0:
-        dataset.close()
+    if not 'ccf_version' in dataset.attrs:
         return False
-    if extract:
-        dataset['cc'] = dataset.cc.where(dataset.status == 1)
-    if load_and_close:
-        dataset.load().close()
 
     # convert preprocess operations
     preprocess_operations_to_dict(dataset.pair)
 
+    # calculate some hashes
+    if not quick_and_dirty:
+        sha256_hash_metadata = (
+            util.hasher.sha256_hash_Dataset_metadata(dataset)
+        )
+        if sha256_hash_metadata != dataset.sha256_hash_metadata:
+            warnings.warn(
+                'Dataset metadata sha256 hash is invalid.',
+                UserWarning
+            )
+    if not (quick_and_dirty or fast):
+        sha256_hash = util.hasher.sha256_hash_Dataset(dataset)
+        if sha256_hash != dataset.sha256_hash:
+            warnings.warn(
+                'Dataset sha256 hash is invalid.',
+                UserWarning
+            )
+
+    if debug:
+        print(path, '#(status==1): {} of {}'.format(
+            np.sum(dataset.status.values == 1), dataset.time.size
+        ))
+
+    if np.sum(dataset.status.values == 1) == 0 and not debug:
+        dataset.close()
+        return False
+
+    if extract:
+        dataset['cc'] = dataset.cc.where(dataset.status == 1)
+
+    if load_and_close:
+        dataset.load().close()
+
     return dataset
+
+
+def merge_datasets(
+    datasets: list, extract: bool = True, merge_versions: bool = False,
+    debug: bool = False, **kwargs
+):
+    """
+    Merge a list of datasets by specifying either the path as a `str`
+    or the :class:`xarray.DataSet` objects.
+    """
+    dsets = None
+    for ds in datasets:
+        if isinstance(ds, str):
+            if not os.path.isfile(ds):
+                warnings.warn(
+                    'Datasets item "{}" does not exists. Item skipped.'
+                    .format(ds),
+                    UserWarning
+                )
+                continue
+            ds = open_dataset(ds, extract=False, **kwargs)
+        elif isinstance(dataset, xr.Dataset):
+            preprocess_operations_to_dict(dataset.pair)
+        else:
+            warnings.warn(
+                (
+                    'Datasets item should be of type `str` '
+                    'or :class:`xarray.DataSet`! Item skipped.'
+                ),
+                UserWarning
+            )
+            continue
+        if debug:
+            print("\n# Open and inspect ccf dataset:\n\n", ds, "\n")
+        if ds is False:
+            continue
+        if not isinstance(dsets, xr.Dataset):
+            dsets = ds.copy()
+            continue
+        if (
+            dsets.pair.preprocess['sha256_hash'] !=
+            ds.pair.preprocess['sha256_hash']
+        ):
+            warnings.warn(
+                'Dataset preprocess hash does not match. Item skipped.',
+                UserWarning
+            )
+            continue
+        if dsets.sha256_hash_metadata != ds.sha256_hash_metadata:
+            warnings.warn(
+                'Dataset metadata hash does not match. Item skipped.',
+                UserWarning
+            )
+            continue
+        if dsets.ccf_version != ds.ccf_version:
+            if merge_versions:
+                warnings.warn(
+                    'Dataset ccf_version does not match.',
+                    UserWarning
+                )
+            else:
+                warnings.warn(
+                    'Dataset ccf_version does not match. Item skipped.',
+                    UserWarning
+                )
+                continue
+        try:
+            dsets = dsets.merge(ds, join='outer')
+        except xr.MergeError:
+            warnings.warn(
+                'Dataset could not be merged. Item skipped.',
+                RuntimeWarning
+            )
+            if debug:
+                print('Error:', e)
+            continue
+
+    # fix status dtype change
+    dsets['status'] = dsets.status.astype(np.int8)
+
+    # extract valid data
+    if extract:
+        dsets['cc'] = dsets.cc.where(dsets.status == 1)
+
+    # update some global attrs
+    del dsets.attrs['sha256_hash']
+
+    strt0 = pd.to_datetime(dsets.time.values[0]).strftime('%Y.%j')
+    strt1 = pd.to_datetime(dsets.time.values[-1]).strftime('%Y.%j')
+    dsets.attrs['title'] = (
+        (dsets.attrs['title']).split(' - ')[0] +
+        ' - ' +
+        strt0 +
+        ' to {}'.format(strt1) if strt0 != strt1 else ''
+    ).strip()
+
+    dsets.attrs['history'] = 'Merged @ {}'.format(pd.to_datetime('now'))
+
+    return dsets
 
 
 def init_dataset(
     pair: str, starttime: datetime, endtime: datetime, preprocess: dict,
     sampling_rate: float, attrs: dict,
     window_length: float = 86400., window_overlap: float = 0.875,
-    clip_lag=None, unbiased: bool = False,
+    clip_lag=None, unbiased_cc: bool = False,
     closed: str = 'left', dtype: np.dtype = np.float32,
     inventory: Inventory = None, stationary_poi: dict = None,
 ):
@@ -154,9 +292,9 @@ def init_dataset(
     }
 
     # pair
-    dataset.coords['pair'] = [pair]
+    dataset.coords['pair'] = np.array([pair], dtype=object)
     dataset.pair.attrs = {
-        'long_name': 'Cross-correlation receiver pair',
+        'long_name': 'Crosscorrelation receiver pair',
         'standard_name': 'receiver_pair',
         'units': '-',
         'preprocess': hash_operations(preprocess),
@@ -188,8 +326,8 @@ def init_dataset(
                 'or ~pandas.TimedeltaIndex with length 2 '
                 'specifying start and end.'
             )
-        nmin = np.argmin(abs(lag - clip_lag[0] / utils._one_second))
-        nmax = np.argmin(abs(lag - clip_lag[1] / utils._one_second))
+        nmin = np.argmin(abs(lag - clip_lag[0] / util._one_second))
+        nmax = np.argmin(abs(lag - clip_lag[1] / util._one_second))
     else:
         nmin = 0
         nmax = 2*npts-1
@@ -197,23 +335,23 @@ def init_dataset(
     dataset.lag.attrs = {
         'long_name': 'Lag time',
         'standard_name': 'lag_time',
-        'sampling_rate': sampling_rate,
-        'delta': delta,
-        'npts': npts,
+        'sampling_rate': float(sampling_rate),
+        'delta': float(delta),
+        'npts': int(npts),
         'pad': np.int8(1),
-        'clip': np.int8(clip_lag is not None),
+        'clip': int(clip_lag is not None),
         'clip_lag': (
-            clip_lag.values / utils._one_second
+            clip_lag.values / util._one_second
             if clip_lag is not None else None
         ),
-        'index_min': nmin,
-        'index_max': nmax,
+        'index_min': int(nmin),
+        'index_max': int(nmax),
     }
 
     # pair distance
     dataset['distance'] = (
         ('pair'),
-        np.ones((1), dtype=np.float64) * utils.get_pair_distance(
+        np.ones((1), dtype=np.float64) * util.get_pair_distance(
             pair=pair,
             inventory=inventory,
             poi=stationary_poi,
@@ -269,21 +407,26 @@ def init_dataset(
         ('pair', 'time', 'lag'),
         np.zeros((1, len(dataset.time), len(dataset.lag)), dtype=dtype),
         {
-            'long_name': 'Cross-Correlation Estimate',
-            'standard_name': 'cross_correlation_estimate',
+            'long_name': 'Crosscorrelation Estimate',
+            'standard_name': 'crosscorrelation_estimate',
             'units': '-',
             'add_offset': dtype(0),
             'scale_factor': dtype(1),
             'valid_range': dtype([-1., 1.]),
-            'normalize': np.int8(1),
-            'bias_correct': np.int8(unbiased),
-            'unbiased': np.int8(0),
+            'normalize': int(1),
+            'bias_correct': int(unbiased_cc),
+            'unbiased': int(0),
         },
         encoding
     )
 
-    if unbiased:
+    if unbiased_cc:
         dataset['w'] = get_dataset_weights(dataset, dtype=dtype)
+
+    # add metadata hash
+    dataset.attrs['sha256_hash_metadata'] = (
+        util.hasher.sha256_hash_Dataset_metadata(dataset)
+    )
 
     return dataset
 
@@ -358,6 +501,11 @@ def cc_dataset(
                 break
     if dataset.cc.bias_correct == 1:
         dataset = bias_correct_dataset(dataset)
+
+    # update metadata hash
+    dataset.attrs['sha256_hash_metadata'] = (
+        util.hasher.sha256_hash_Dataset_metadata(dataset)
+    )
 
 
 def bias_correct_dataset(

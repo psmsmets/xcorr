@@ -23,7 +23,7 @@ import pandas as pd
 
 
 # Relative imports
-from ..utils import get_dpm
+from ..util import get_dpm
 
 
 __all__ = ['list_dim_variables', 'stack_all', 'stack_year_month', 'stack_year_dayofyear']

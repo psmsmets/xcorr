@@ -35,8 +35,8 @@ except ImportError:
 # Relative imports
 from ..clients.datafetch import stream2SDS
 from ..preprocess import preprocess
-from ..utils.receiver import check_receiver, split_pair
-from ..utils.time import to_UTCDateTime
+from ..util.receiver import check_receiver, split_pair
+from ..util.time import to_UTCDateTime
 
 
 __all__ = []

@@ -1,7 +1,7 @@
 r"""
 
-:mod:`utils.receiver` -- Receiver Utilities
-===========================================
+:mod:`util.receiver` -- Receiver Utilities
+==========================================
 
 Receiver utilities for ``ccf`` such as checks, type conversions,
 and receiver pair geodetic operations.

@@ -22,12 +22,11 @@ import warnings
 import xarray as xr
 import json
 from obspy import Inventory
-from hashlib import sha256
 
 
 # Relative imports
 from ..preprocess.running_rms import running_rms
-from ..utils import to_UTCDateTime
+from ..util import to_UTCDateTime, sha256_hash_obj
 
 
 __all__ = ['help', 'stream_operations', 'is_stream_operation',
@@ -351,26 +350,6 @@ def filter_operations(
     return { chan: operations[chan] for chan in channels }
 
 
-def _generate_sha256_hash(
-    var
-):
-    r"""Generate the sha256 hash on a :func:`json.dumps`.
-
-    Parameters
-    ----------
-    var : str, list, tuple or dict
-        Input variable to compute the sha256 hash.
-
-    Returns
-    -------
-    hash : str
-        Hexdigested hash object. `var` is dumped to json before hashing.
- 
-    """
-    hash_obj = sha256(str(json.dumps(var, indent=4)).encode('ascii'))
-    return hash_obj.hexdigest()
-
-
 def hash_operations(
     operations: dict
 ):
@@ -379,7 +358,7 @@ def hash_operations(
     before hashing using :func:`filter_operations`.
     """
     operations = filter_operations(operations)
-    operations['sha256'] = _generate_sha256_hash(operations) 
+    operations['sha256_hash'] = sha256_hash_obj(operations) 
     return operations
 
 
@@ -390,16 +369,17 @@ def check_operations_hash(
     Returns `True` if the operations hash is valid and `False` otherwise
     if ``raise_error`` is `False` (default). Otherwise an error is raised.
     """
-    if 'sha256' not in operations:
+    if 'sha256_hash' not in operations:
         raise ValueError(
             'Preprocess operations does not contain a hash!'
         )
-    sha256 = _generate_sha256_hash(filter_operations(operations))
-    if raise_error and operations['sha256'] != sha256:
+    sha256 = sha256_hash_obj(filter_operations(operations))
+    if raise_error and operations['sha256_hash'] != sha256:
         raise ValueError(
-            'Preprocess operations `str` contains an invalid hash!'
+            "Preprocess operations hash '{}' does not match the computed "
+            "hash '{}'!".format(sha256, operations['sha256_hash'])
         )
-    return operations['sha256'] == sha256
+    return operations['sha256_hash'] == sha256
 
 
 def operations_to_dict(operations: str):
@@ -408,15 +388,16 @@ def operations_to_dict(operations: str):
     SEED channel codes.
     """
     operations = json.loads(operations)
-    if 'sha256' not in operations:
+    if 'sha256_hash' not in operations:
         raise ValueError(
             'Preprocess operations does not contain a hash!'
         )
-    sha256 = operations['sha256']
+    sha256 = operations['sha256_hash']
     operations = hash_operations(operations)
-    if operations['sha256'] != sha256:
+    if operations['sha256_hash'] != sha256:
         raise ValueError(
-            'Preprocess operations `str` contains an invalid hash!'
+            "Preprocess operations hash '{}' does not match the computed "
+            "hash '{}'!".format(sha256, operations['sha256_hash'])
         )
     return operations
 

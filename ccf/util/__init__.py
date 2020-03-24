@@ -22,9 +22,11 @@ and remote services.
 """
 
 # import all modules
-from ..utils import time
-from ..utils import receiver
+from ..util import time
+from ..util import receiver
+from ..util import hasher
 
 # Import all functions
-from ..utils.time import *
-from ..utils.receiver import *
+from ..util.time import *
+from ..util.receiver import *
+from ..util.hasher import *
