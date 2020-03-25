@@ -52,7 +52,7 @@ def write_dataset(
     """
     Write a dataset to netCDF using a tmp file and replacing the destination.
     """
-    print("Write dataset as '{}'".format(path), end='. ')
+    print("Write dataset as '{}'".format(path), end=': ')
     abspath, file = os.path.split(os.path.abspath(path))
     if not os.path.exists(abspath):
         os.makedirs(abspath)
@@ -213,7 +213,7 @@ def merge_datasets(
             continue
 
     # fix status dtype change
-    dsets['status'] = dsets.status.astype(np.int8)
+    dsets['status'] = dsets.status.astype(np.byte)
 
     # extract valid data
     if extract:
@@ -267,6 +267,7 @@ def init_dataset(
 
     # global attributes
     dataset.attrs = {
+        'Conventions': 'CF-1.9',
         'title': (
             (attrs['title'] if 'title' in attrs else '') +
             ' Crosscorrelations - {}'
@@ -277,11 +278,10 @@ def init_dataset(
                 else ''
             )
         ).strip(),
-        'history': 'Created @ {}'.format(pd.to_datetime('now')),
-        'conventions': 'CF-1.7',
         'institution': attrs['institution'],
         'author': attrs['author'],
         'source': attrs['source'],
+        'history': 'Created @ {}'.format(pd.to_datetime('now')),
         'references': (
              'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). '
              'Random data : analysis and measurement procedures. '
@@ -338,7 +338,7 @@ def init_dataset(
         'sampling_rate': float(sampling_rate),
         'delta': float(delta),
         'npts': int(npts),
-        'pad': np.int8(1),
+        'pad': np.byte(True),
         'clip': int(clip_lag is not None),
         'clip_lag': (
             clip_lag.values / util._one_second
@@ -355,24 +355,34 @@ def init_dataset(
             pair=pair,
             inventory=inventory,
             poi=stationary_poi,
+            ellipsoid='WGS84',
             km=True,
         ),
         {
             'long_name': 'receiver pair distance',
             'standard_name': 'receiver_pair_distance',
             'units': 'km',
-            'relative_to': json.dumps(stationary_poi),
+            'description': (
+                ('relative to poi' if stationary_poi else 'absolute') +
+                ' WGS84 geodetic distance'
+            ),
+            'relative_to_poi': (
+                json.dumps(stationary_poi) if stationary_poi else 'n/a'
+            ),
         },
     )
 
     # status
     dataset['status'] = (
         ('pair', 'time'),
-        np.zeros((1, len(dataset.time)), dtype=np.int8),
+        np.zeros((1, len(dataset.time)), dtype=np.byte),
         {
             'long_name': 'processing status',
             'standard_name': 'processing_status',
             'units': '-',
+            'valid_range': np.byte([-1, 1]),
+            'flag_values': np.byte([-1, 0, 1]),
+            'flag_meanings': 'missing_data not_processed processed',
         },
     )
 
@@ -410,12 +420,12 @@ def init_dataset(
             'long_name': 'Crosscorrelation Estimate',
             'standard_name': 'crosscorrelation_estimate',
             'units': '-',
-            'add_offset': dtype(0),
-            'scale_factor': dtype(1),
+            'add_offset': dtype(0.),
+            'scale_factor': dtype(1.),
             'valid_range': dtype([-1., 1.]),
-            'normalize': int(1),
-            'bias_correct': int(unbiased_cc),
-            'unbiased': int(0),
+            'normalize': np.byte(1),
+            'bias_correct': np.byte(unbiased_cc),
+            'unbiased': np.byte(0),
         },
         encoding
     )
@@ -438,6 +448,9 @@ def cc_dataset(
     """
     Process a dataset.
     """
+    dataset.attrs['history'] += (
+        ', CC process started @ {}'.format(pd.to_datetime('now'))
+    )
     # extract and validate preprocess operations
     if isinstance(dataset.pair.preprocess, dict):
         o = dataset.pair.preprocess
@@ -448,14 +461,14 @@ def cc_dataset(
     # process each pair per time step 
     for p in dataset.pair:
         for t in dataset.time:
-            print(str(p.values), str(t.values)[:19], end='. ')
+            print(str(p.values), str(t.values)[:19], end=': ')
             if dataset.status.loc[{'pair': p, 'time': t}].values != 0:
                 if not (
                     retry_missing and
                     dataset.status.loc[{'pair': p, 'time': t}].values == -1
                 ):
                     print(
-                        'Has status = {}. Skip.'
+                        'Has status "{}". Skip.'
                         .format(
                             dataset.status.loc[{'pair': p, 'time': t}].values
                         )
@@ -473,7 +486,7 @@ def cc_dataset(
                 **kwargs
             )
             if not isinstance(st, Stream) or len(st) != 2:
-                print('Missing data. Set status = -1 and skip.')
+                print('Missing data. Set status "-1" and skip.')
                 dataset.status.loc[{'pair': p, 'time': t}] = -1
                 if test_run:
                     break
@@ -507,6 +520,10 @@ def cc_dataset(
         util.hasher.sha256_hash_Dataset_metadata(dataset)
     )
 
+    dataset.attrs['history'] += (
+        ', CC process ended @ {}'.format(pd.to_datetime('now'))
+    )
+
 
 def bias_correct_dataset(
     dataset: xr.Dataset, biased_var: str = 'cc', unbiased_var: str = None,
@@ -529,12 +546,17 @@ def bias_correct_dataset(
     )
 
     # update attributes
-    dataset[unbiased_var].attrs['unbiased'] = np.int8(True)
+    dataset[unbiased_var].attrs['unbiased'] = np.byte(True)
     dataset[unbiased_var].attrs['long_name'] = (
         'Unbiased ' + dataset[unbiased_var].attrs['long_name']
     )
     dataset[unbiased_var].attrs['standard_name'] = (
         'unbiased_' + dataset[unbiased_var].attrs['standard_name']
+    )
+
+    # update metadata hash
+    dataset.attrs['sha256_hash_metadata'] = (
+        util.hasher.sha256_hash_Dataset_metadata(dataset)
     )
 
 
