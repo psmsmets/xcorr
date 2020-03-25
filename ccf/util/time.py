@@ -85,35 +85,34 @@ _dpm = {
 }
 
 
-def leap_year(year: int, calendar: str = 'standard'):
+def leap_year(year: int, cal: str = 'standard'):
     r"""Determine if year is a leap year
 
     Parameters
     ----------
-    year : int
+    year : `int`
         Integer year.
 
-    calendar : str, {'standard', 'gregorian', 'proleptic_gregorian', 'julian'}
-        Type of calendar specifying the leap year rule. If empty,
-        `calendar` = 'standard' (default).
+    cal : `str`, {'standard', 'gregorian', 'proleptic_gregorian', 'julian'}
+        Type of calendar specifying the leap year rule. Defaults to 'standard'.
 
     Returns
     -------
-    leap : bool
-        True if year is a leap year, else False.
+    leap : `bool`
+        `True` if year is a leap year, otherwise `False`.
 
     """
     leap = False
-    if (calendar in _calendars) and (year % 4 == 0):
+    if (cal in _calendars) and (year % 4 == 0):
         leap = True
         if (
-            (calendar == 'proleptic_gregorian') and
+            (cal == 'proleptic_gregorian') and
             (year % 100 == 0) and
             (year % 400 != 0)
         ):
             leap = False
         elif (
-            (calendar in ['standard', 'gregorian']) and
+            (cal in ['standard', 'gregorian']) and
             (year % 100 == 0) and (year % 400 != 0) and
             (year < 1583)
         ):
@@ -121,51 +120,57 @@ def leap_year(year: int, calendar: str = 'standard'):
     return leap
 
 
-def get_dpm(time: DataArray, calendar: str = 'standard'):
-    r"""Determine if year is a leap year
+def get_dpm(time: DataArray, cal: str = 'standard'):
+    r"""Return the number of days per month.
 
     Parameters
     ----------
-    year : int
-        Integer year.
+    time : :class:`xarray.DataArray`
+        Input time object.
 
-    calendar : str, {'standard', 'gregorian', 'proleptic_gregorian', 'julian'}
-        Type of calendar specifying the leap year rule. If empty,
-        `calendar` = 'standard' (default).
+    cal : `str`, {'standard', 'gregorian', 'proleptic_gregorian', 'julian'}
+        Type of calendar specifying the leap year rule. Defaults to 'standard'.
 
     Returns
     -------
-    leap : bool
-        True if year is a leap year, else False.
+    dpm : :class:`xarray.DataArray`
+        Days per month for each element in ``time``.
 
-    """
-
-    """
-    Return an array of days per month corresponding to the months
-    provided in `months`
     """
     month_length = np.zeros(len(time), dtype=np.int)
 
-    cal_days = _dpm[calendar]
+    cal_days = _dpm[cal]
 
     for i, (month, year) in enumerate(zip(time.month, time.year)):
         month_length[i] = cal_days[month]
-        if leap_year(year, calendar=calendar):
+        if leap_year(year, calendar=cal):
             month_length[i] += 1
     return month_length
 
 
 def get_dpy(
-    time: DataArray, calendar: str = 'standard'
+    time: DataArray, cal: str = 'standard'
 ):
-    """
-    Return an array of days per year corresponding to the years
-    provided in `years`
+    r"""Return the number of days per year.
+
+    Parameters
+    ----------
+    time : :class:`xarray.DataArray`
+        Input time object.
+
+    cal : `str`, {'standard', 'gregorian', 'proleptic_gregorian', 'julian'}
+        Type of calendar specifying the leap year rule. Defaults to 'standard'.
+
+    Returns
+    -------
+    dpy : :class:`xarray.DataArray`
+        Days per year for each element in ``time``.
+
     """
     year_length = np.zeros(len(time), dtype=np.int)
 
     for i, year in enumerate(time.year):
         year_length[i] = 365
-        if leap_year(year, calendar=calendar):
+        if leap_year(year, calendar=cal):
             year_length[i] += 1
     return year_length

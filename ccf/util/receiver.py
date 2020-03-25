@@ -41,22 +41,22 @@ def check_receiver(
 
     Parameters
     ----------
-    receiver : str
+    receiver : `str`
         Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
 
-    allow_wildcards : bool, optional
+    allow_wildcards : `bool`, optional
         Allow * or ? wildcards in the SEED-id string, else wildcards are
         not allowed (default).
 
-    raise_error : bool, optional
-        Raise a ValueError when failing the regular expression,
-        else return False (default).
+    raise_error : `bool`, optional
+        Raise a `ValueError` when failing the regular expression,
+        else returns `False` (default).
 
     Returns
     -------
-    match : bool
-        True if the receiver string matches the SEED-id pattern,
-        else False.
+    match : `bool`
+        `True` if the receiver string matches the SEED-id pattern,
+        else `False`.
 
     """
     if allow_wildcards is False:
@@ -91,22 +91,23 @@ def split_pair(pair, separator: str = '-', to_dict: bool = False):
     Parameters
     ----------
     pair : str or :mod:`~xarray.DataArray`
-        Receiver pair couple separated by `separator`.
-        Each receiver is specified by a SEED-id string:
+        Receiver couple separated by `separator`. Each receiver is
+        specified by a SEED-id string:
         '{network}.{station}.{location}.{channel}'.
 
-    separator : str, optional
-        Receiver pair separator: '-' (default).
+    separator : `str`, optional
+        Receiver pair separator:, defaults to '-'.
 
-    to_dict : bool, optional
-        Return the SEED-id string if False (default), else split each
-        each receiver SEED-id string into a dict using :mod:.
+    to_dict : `bool`, optional
+        Return the SEED-id string if `False` (default). If `True`
+        each receiver SEED-id string is converted into a dictionary using
+        :func:`receiver_to_dict`.
 
     Returns
     -------
-    pair : list
+    pair : `list`
         Two-element list of SEED-id strings if `split_receiver` is
-        False (default), else a two-element list of SEED-id dictionaries.
+        `False` (default), else a two-element list of SEED-id dictionaries.
 
     """
     if isinstance(pair, DataArray):
@@ -129,12 +130,12 @@ def receiver_to_dict(receiver: str):
 
     Parameters
     ----------
-    receiver : str
+    receiver : `str`
         Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
 
     Returns
     -------
-    receiver : dict
+    receiver : `dict`
         Receiver dict with SEED-id keys:
         ['network', 'station', 'location', 'channel'].
 
@@ -150,13 +151,13 @@ def receiver_to_str(receiver: dict):
 
     Parameters
     ----------
-    receiver : dict
-        Receiver dict with SEED-id keys:
+    receiver : `dict`
+        Receiver dictionary with SEED-id keys:
         ['network', 'station', 'location', 'channel'].
 
     Returns
     -------
-    receiver : str
+    receiver : `str`
         Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
 
     """
@@ -173,13 +174,13 @@ def get_receiver_channel(receiver):
 
     Parameters
     ----------
-    receiver : str or dict
+    receiver : `str` or `dict`
         Receiver SEED-id string '{network}.{station}.{location}.{channel}'
-        or dict with keys ['network', 'station', 'location', 'channel'].
+        or dictionary with keys ['network', 'station', 'location', 'channel'].
 
     Returns
     -------
-    channel : str 
+    channel : `str`
         Receiver channel code.
 
     """
@@ -196,7 +197,7 @@ def get_pair_inventory(pair, inventory: Inventory, separator: str = '-'):
 
     Parameters
     ----------
-    pair : str or :class:`xarray.DataArray`
+    pair : `str` or :class:`xarray.DataArray`
         Receiver pair couple separated by `separator`.
         Each receiver is specified by a SEED-id string:
         '{network}.{station}.{location}.{channel}'.
@@ -204,13 +205,14 @@ def get_pair_inventory(pair, inventory: Inventory, separator: str = '-'):
     inventory : :class:`obspy.Inventory`
         Inventory object.
 
-        separator : str, optional
-        Receiver pair separator: '-' (default).
+    separator : `str`, optional
+        Receiver pair separator:, defaults to '-'.
 
     Returns
     -------
     inventory : :class:`obspy.Inventory`
-        Returns a new obspy inventory object for the receiver pair.
+        Returns a new obspy inventory object filtered for the
+        receiver ``pair``.
 
     """
     r = split_pair(pair, separator)
@@ -222,7 +224,7 @@ def get_receiver_coordinates(receiver: str, inventory: Inventory):
 
     Parameters
     ----------
-    receiver : str
+    receiver : `str`
         Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
 
     inventory : :class:`obspy.Inventory`
@@ -230,8 +232,8 @@ def get_receiver_coordinates(receiver: str, inventory: Inventory):
 
     Returns
     -------
-    coordinates : dict
-        The extracted receiver coordinates from the inventory object.
+    coordinates : `dict`
+        The extracted receiver coordinates from the ``inventory`` object.
 
     """
     if receiver[-1] == 'R' or receiver[-1] == 'T':
@@ -247,33 +249,32 @@ def get_pair_distance(
 
     Parameters
     ----------
-    pair : str or :class:`xarray.DataArray`
-        Receiver pair couple separated by `separator`.
+    pair : `str` or :class:`xarray.DataArray`
+        Receiver pair couple separated by ``separator``.
         Each receiver is specified by a SEED-id string:
         '{network}.{station}.{location}.{channel}'.
 
     inventory : :class:`obspy.Inventory`
         Inventory object.
 
-    ellipsoid : str, optional
-        Specify the ellipsoid for :class:`pyproj.Geod`:
-        `ellipsoid`='WGS84' (default).
+    ellipsoid : `str`, optional
+        Specify the ellipsoid for :class:`pyproj.Geod`. Defaults to 'WGS84'.
 
-    poi : dict, optional
-        Specify a point-of-interest dict with keys ['longitude','latitude']
+    poi : `dict`, optional
+        Specify a point-of-interest `dict` with keys ['longitude','latitude']
         in decimal degrees to obtain a relative distance.
 
-    separator : str, optional
-        Receiver pair separator: '-' (default).
+    separator : `str`, optional
+        Receiver pair separator, defaults to '-'.
 
-    km : bool, optional
-        Return the geodetic distance in kilometre if True (default),
+    km : `bool`, optional
+        Return the geodetic distance in kilometre if `True` (default),
         else in metre.
 
     Returns
     -------
-    d : float
-        Distance in kilometre if `km` is True (default), else in metre.
+    d : `float`
+        Distance in kilometre if ``km`` is `True` (default), else in metre.
 
     """
     g = Geod(ellps=ellipsoid)

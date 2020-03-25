@@ -9,7 +9,6 @@ Utilities for ``ccf`` to generate hashes, preferrably sha256.
 
 
 # Mandatory imports
-import warnings
 import xarray as xr
 import numpy as np
 import json
@@ -27,7 +26,7 @@ def _filter_obj(obj):
     r"""Exclude some keys from a dictionary.
     """
     keys = [key for key in obj.keys() if key not in _ignore_keys]
-    return { key: obj[key] for key in keys }
+    return {key: obj[key] for key in keys}
 
 
 def _to_json(obj):
@@ -47,15 +46,15 @@ def _to_serializable(obj):
     """Used by :func:`_to_json` to serialize non-standard dtypes.
     """
     if (
-        isinstance(obj,np.int8) or
-        isinstance(obj,np.int16) or
-        isinstance(obj,np.int32) or
-        isinstance(obj,np.int64)
+        isinstance(obj, np.int8) or
+        isinstance(obj, np.int16) or
+        isinstance(obj, np.int32) or
+        isinstance(obj, np.int64)
     ):
         return int(obj)
     elif (
-        isinstance(obj,np.float32) or
-        isinstance(obj,np.float64)
+        isinstance(obj, np.float32) or
+        isinstance(obj, np.float64)
     ):
         return float(obj)
     else:
@@ -84,11 +83,11 @@ def hash_it(it, **kwargs):
     hash : `str` or `None`
         Hexdigested hash of ``it`` (default). If a ``hashlib_obj``
         is a provided ``None`` is returned.
- 
+
     """
-    if isinstance(it, xarray.DataArray):
+    if isinstance(it, xr.DataArray):
         return hash_DataArray(it, **kwargs)
-    elif isinstance(it, xarray.Dataset):
+    elif isinstance(it, xr.Dataset):
         return hash_Dataset(it, **kwargs)
     else:
         return hash_obj(it, **kwargs)
@@ -121,7 +120,7 @@ def hash_obj(
     hash : `str` or `None`
         Hexdigested hash of ``it`` (default). If a ``hashlib_obj``
         is a provided `None` is returned.
- 
+
     """
     h = hashlib_obj or hashlib.sha256()
     h.update(_to_json(obj).encode(_enc))
@@ -161,7 +160,7 @@ def hash_Dataset(
     -------
     hash : `str`
         Hexdigested sha256 hash of ``obj``.
- 
+
     """
     h = hashlib_obj or hashlib.sha256()
     if not metadata_only:
@@ -216,7 +215,7 @@ def hash_DataArray(
     -------
     hash : str
         Hexdigested sha256 hash of ``obj``.
- 
+
     """
     h = hashlib_obj or hashlib.sha256()
     h.update(darray.name.encode(_enc))
