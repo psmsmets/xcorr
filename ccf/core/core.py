@@ -63,7 +63,7 @@ def write_dataset(
             UserWarning
         )
 
-    print("Write dataset as '{}'".format(path), end=': ')
+    print('Write dataset as "{}"'.format(path), end=': ')
     abspath, file = os.path.split(os.path.abspath(path))
     if not os.path.exists(abspath):
         os.makedirs(abspath)
@@ -278,7 +278,6 @@ def init_dataset(
 
     # global attributes
     dataset.attrs = {
-        'Conventions': 'CF-1.9',
         'title': (
             (attrs['title'] if 'title' in attrs else '') +
             ' Crosscorrelations - {}'
@@ -299,6 +298,7 @@ def init_dataset(
              'New York (N.Y.): Wiley-Interscience.'
         ),
         'comment': attrs['comment'] if 'comment' in attrs else 'n/a',
+        'Conventions': 'CF-1.9',
         'ccf_version': __version__,
     }
 
