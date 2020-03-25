@@ -1,13 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-ccf - Cross-Correlation Functions
+xcorr - xarray crosscorrelations -
 
-**ccf** is an open-source project containing tools to calculate and store cross-correlation functions
-automatically with proper documentation. Results, parameters and meta data are stored as xarray dataset
-and stored to disk as a netCDF4 file, following COARDS and CF-1.7 conventions.
-It contains pre- and postprocess routines and various clients to retrieve waveforms, all based on
-the xarray dataset metadata.
+**xcorr** is an open-source project containing tools to crosscorrelate
+waveform timeseries  (`obspy.Stream` objects)  and store all output and
+metadata as a self-describing N-D labeled  `xarray.Dataset` following
+CF-1.9 Conventions and FAIR data guidelines. Data can be stored as
+`netCDF4` and opened/postprocessed in other languages, packages,
+machines or platforms.
+
+**xcorr** contains various modules such as waveform preprocessing, a client
+waterfall-based wrapping various getters from local archives as well as
+remote services, frequency domain crosscorrelationm and postprocessing/
+analysis tools.
 
 :author:
     Pieter Smets (p.s.m.smets@tudelft.nl)
@@ -28,12 +34,13 @@ from setuptools import setup, find_namespace_packages
 
 
 SETUP_DIRECTORY = os.path.abspath('./')
-name = 'ccf'
+name = 'xcorr'
 
 DOCSTRING = __doc__.split('\n')
 
 KEYWORDS = [
-    'ccf', 'cross-correlation', 'signal-processing', 'waveform', 'stacking', 'preprocess', 'postprocess'
+    'xcorr', 'crosscorrelation', 'signal-processing', 'waveform', 'stacking',
+    'preprocess', 'postprocess'
 ]
 
 INSTALL_REQUIRES = [
@@ -62,11 +69,11 @@ def setup_package():
             'Pieter Smets'
         ],
         author_email='p.s.m.smets@tudelft.nl',
-        url='https://gitlab.com/psmsmets/ccf',
-        download_url='https://gitlab.com/psmsmets/ccf.git',
+        url='https://gitlab.com/psmsmets/xcorr',
+        download_url='https://gitlab.com/psmsmets/xcorr.git',
         install_requires=INSTALL_REQUIRES,
         keywords=KEYWORDS,
-        packages=find_namespace_packages(include=['ccf.*']),
+        packages=find_namespace_packages(include=['xcorr.*']),
         entry_points=ENTRY_POINTS,
         scripts=INSTALL_SCRIPTS,
         zip_safe=False,
