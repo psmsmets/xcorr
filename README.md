@@ -1,24 +1,29 @@
-# CCF - CrossCorrelation Functions -
+# XCORR - Xarray based CORRelation -
 
-**ccf** is an open-source project containing tools to calculate and store
-crosscorrelation functions automatically with proper documentation. Results,
-parameters and meta data are stored as xarray dataset and stored to disk as a
-netCDF4 file, following COARDS and CF-1.7 standards.
-It contains pre- and postprocess routines and various clients to retrieve
-waveforms, all based on the xarray dataset metadata.
+**xcorr** is an open-source project containing tools to crosscorrelate
+waveform timeseries as `obspy.Stream` and stored as a self describing
+`xarray.Dataset`.
+
+Results and metadata are stored netCDF4 following CF-1.9 Conventions and
+FAIR data guidelines.
+
+**xcorr** contains various modules such as waveform preprocessing, a client
+waterfall-based wrapping various getters from local archives as well as
+remote services, frequency domain crosscorrelationm and postprocessing/
+analysis tools.
 
 ## Installation
 
 ### Clone
-Create a clone, or copy of the **ccf** repository
+Create a clone, or copy of the **xcorr** repository
 ```shell
-$ git clone https://github.com/psmsmets/ccf.git
+$ git clone https://github.com/psmsmets/xcorr.git
 ```
 Run `git pull` to update the local repository to this master repository.
 
 ### Install
 ```shell
-$ cd ccf/
+$ cd xcorr/
 $ pip install -e .
 ```
 
@@ -27,7 +32,7 @@ Obspy, numpy and some other packages tend to cause problems which kills the
 `remove_response` function of `obspy`. Create a working (non-conflicting)
 Python 3.7 environment in conda as follows:
 ```shell
-conda env create -f ccf.yml
+conda env create -f xcorr.yml
 ```
 
 ## More info

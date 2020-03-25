@@ -1,4 +1,4 @@
-name: ccf
+name: xcorr
 channels:
   - conda-forge
   - defaults
