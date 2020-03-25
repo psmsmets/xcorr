@@ -9,13 +9,15 @@ Utilities for ``xcorr`` to generate hashes, preferrably sha256.
 
 
 # Mandatory imports
+from obspy import Stream, Trace
 import xarray as xr
 import numpy as np
 import json
 import hashlib
 
 
-__all__ = ['hash_it', 'hash_obj', 'hash_DataArray', 'hash_Dataset']
+__all__ = ['hash', 'hash_obj', 'hash_Trace', 'hash_Stream',
+           'hash_DataArray', 'hash_Dataset']
 
 _ignore_keys = ['sha256_hash', 'sha256_hash_metadata',
                 'add_offset', 'scale_factor']
@@ -61,18 +63,18 @@ def _to_serializable(obj):
         return repr(obj)
 
 
-def hash_it(it, **kwargs):
-    r"""Hash ``it`` using serialization.
+def hash(var, **kwargs):
+    r"""Hash ``var`` using serialization.
 
     Parameters
     ----------
-    it : various
+    var : various
         Variable to compute or update the hash for.
 
-    hashlib_obj : :class:`hashlib`, optional
+    hashlib_obj : :class:`hashlib._hashlib.HASH`, optional
         Hashlib algorithm class. If `None` (default),
-        :class:`hashlib.sha256()` is used for hashing and the hexdigested
-        hash is returned.
+        :func:`hashlib.sha256()` is used for hashing and the
+        hexdigested hash is returned.
 
     debug : `bool`, optional
         Defaults `False`. When `True` the updated hexdigested hash
@@ -85,12 +87,16 @@ def hash_it(it, **kwargs):
         is a provided ``None`` is returned.
 
     """
-    if isinstance(it, xr.DataArray):
-        return hash_DataArray(it, **kwargs)
-    elif isinstance(it, xr.Dataset):
-        return hash_Dataset(it, **kwargs)
+    if isinstance(var, xr.DataArray):
+        return hash_DataArray(var, **kwargs)
+    elif isinstance(var, xr.Dataset):
+        return hash_Dataset(var, **kwargs)
+    elif isinstance(var, Stream):
+        return hash_Stream(var, **kwargs)
+    elif isinstance(var, Trace):
+        return hash_Trace(var, **kwargs)
     else:
-        return hash_obj(it, **kwargs)
+        return hash_obj(var, **kwargs)
 
 
 def hash_obj(
@@ -106,10 +112,10 @@ def hash_obj(
     obj : `str`, `list`, `tuple` or `dict`
         Variable to compute or update the hash for.
 
-    hashlib_obj : :class:`hashlib`, optional
+    hashlib_obj : :class:`hashlib._hashlib.HASH`, optional
         Hashlib algorithm class. If `None` (default),
-        :class:`hashlib.sha256()` is used for hashing and the hexdigested
-        hash is returned.
+        :func:`hashlib.sha256()` is used for hashing and the
+        hexdigested hash is returned.
 
     debug : `bool`, optional
         Defaults `False`. When `True` the updated hexdigested hash
@@ -119,13 +125,91 @@ def hash_obj(
     -------
     hash : `str` or `None`
         Hexdigested hash of ``it`` (default). If a ``hashlib_obj``
-        is a provided `None` is returned.
+        is provided `None` is returned.
 
     """
     h = hashlib_obj or hashlib.sha256()
     h.update(_to_json(obj).encode(_enc))
     if debug:
         print('Obj {} hash'.format(type(obj)), h.hexdigest())
+    return None if hashlib_obj else h.hexdigest()
+
+
+def hash_Trace(
+    trace: Trace, hashlib_obj=None, debug: bool = False
+):
+    r"""Hash a :class:`obspy.Trace`.
+
+    The hash is calculated on the following `obspy.Trace.stats` keys:
+    ['network', 'station', 'location', 'channel', 'starttime', 'endtime',
+     'sampling_rate', 'delta', 'npts'], sorted and dumped to json with
+    4 character space indentation and separators ',' and ':', followed by
+    the hash of each sample byte representation.
+
+    Parameters
+    ----------
+    trace : :class:`obspy.Trace`
+        Trace to compute or update the hash for.
+
+    hashlib_obj : :class:`hashlib._hashlib.HASH`, optional
+        Hashlib algorithm class. If `None` (default),
+        :func:`hashlib.sha256()` is used for hashing and the
+        hexdigested hash is returned.
+
+    debug : `bool`, optional
+        Defaults `False`. When `True` the updated hexdigested hash
+        of ``obj`` is printed.
+
+    Returns
+    -------
+    hash : `str` or `None`
+        Hexdigested hash of ``trace`` (default). If a ``hashlib_obj``
+        is provided `None` is returned.
+
+    """
+    h = hashlib_obj or hashlib.sha256()
+    keys = ['network', 'station', 'location', 'channel', 'starttime',
+            'endtime', 'sampling_rate', 'delta', 'npts']
+    stats = dict(zip(keys, [trace.stats[key] for key in keys]))
+    h.update(_to_json(stats).encode(_enc))
+    for d in trace.data:
+        h.update(d.tobytes())
+    if debug:
+        print('Trace {} hash'.format(trace.id), h.hexdigest())
+    return None if hashlib_obj else h.hexdigest()
+
+
+def hash_Stream(
+    stream: Stream, hashlib_obj=None, debug: bool = False
+):
+    r"""Hash a :class:`obspy.Stream`.
+
+    Parameters
+    ----------
+    stream : :class:`obspy.Stream`
+        Stream to compute or update the hash for.
+
+    hashlib_obj : :class:`hashlib._hashlib.HASH`, optional
+        Hashlib algorithm class. If `None` (default),
+        :func:`hashlib.sha256()` is used for hashing and the
+        hexdigested hash is returned.
+
+    debug : `bool`, optional
+        Defaults `False`. When `True` the updated hexdigested hash
+        of ``obj`` is printed.
+
+    Returns
+    -------
+    hash : `str` or `None`
+        Hexdigested hash of ``stream`` (default). If a ``hashlib_obj``
+        is provided `None` is returned.
+
+    """
+    h = hashlib_obj or hashlib.sha256()
+    for trace in stream:
+        hash_Trace(trace, hashlib_obj=h, debug=debug)
+    if debug:
+        print('Stream hash', h.hexdigest())
     return None if hashlib_obj else h.hexdigest()
 
 
@@ -147,10 +231,10 @@ def hash_Dataset(
         metrics are hashed (min(), max(), sum(), cumsum(dim[-1]).sum(),
         diff(dim[-1]).sum(), std(), and median()).
 
-    hashlib_obj : :class:`hashlib`, optional
+    hashlib_obj : :class:`hashlib._hashlib.HASH`, optional
         Hashlib algorithm class. If `None` (default),
-        :class:`hashlib.sha256()` is used for hashing and the hexdigested
-        hash is returned.
+        :func:`hashlib.sha256()` is used for hashing and the
+        hexdigested hash is returned.
 
     debug : `bool`, optional
         Defaults `False`. When `True` the updated hexdigested hash
@@ -158,8 +242,9 @@ def hash_Dataset(
 
     Returns
     -------
-    hash : `str`
-        Hexdigested sha256 hash of ``obj``.
+    hash : `str` or `None`
+        Hexdigested hash of ``stream`` (default). If a ``hashlib_obj``
+        is provided `None` is returned.
 
     """
     h = hashlib_obj or hashlib.sha256()
@@ -198,14 +283,12 @@ def hash_DataArray(
     metadata_only : bool, optional
         If `True` (default), only hash the variable name, dimensions and
         attributes are hashed. When `False` the data is also hashed (which
-        can take some time!). For multidimensional arrays only available
-        metrics are hashed (min(), max(), sum(), cumsum(dim[-1]).sum(),
-        diff(dim[-1]).sum(), std(), and median()).
+        can take some time!).
 
-    hashlib_obj : :class:`hashlib`, optional
+    hashlib_obj : :class:`hashlib._hashlib.HASH`, optional
         Hashlib algorithm class. If `None` (default),
-        :class:`hashlib.sha256()` is used for hashing and the hexdigested
-        hash is returned.
+        :func:`hashlib.sha256()` is used for hashing and the
+        hexdigested hash is returned.
 
     debug : bool, optional
         Defaults `False`. When `True` the updated hexdigested hash
@@ -213,8 +296,9 @@ def hash_DataArray(
 
     Returns
     -------
-    hash : str
-        Hexdigested sha256 hash of ``obj``.
+    hash : `str` or `None`
+        Hexdigested hash of ``stream`` (default). If a ``hashlib_obj``
+        is provided `None` is returned.
 
     """
     h = hashlib_obj or hashlib.sha256()
@@ -222,33 +306,12 @@ def hash_DataArray(
     h.update(repr(darray.dims).encode(_enc))
     h.update(_to_json(darray.attrs).encode(_enc))
     if not metadata_only:
-        if len(darray.dims) == 1:
-            for val in darray.values:
-                h.update((
-                    val.data.tobytes() if getattr(val, "data", False)
-                    else val.encode(_enc)
-                ))
+        if darray.dtype == np.dtype(object):
+            for d in np.nditer(darray, flags=['refs_ok']):
+                h.update(str(d).encode(_enc))
         else:
-            try:
-                h.update(darray.min().data.tobytes())
-                h.update(darray.max().data.tobytes())
-                h.update(darray.sum().data.tobytes())
-                h.update(
-                    darray.cumsum(dim=darray.dims[-1]).sum().data.tobytes()
-                )
-                h.update(
-                    darray.diff(dim=darray.dims[-1]).sum().data.tobytes()
-                )
-                if 'float' in repr(darray.dtype):
-                    h.update(darray.std().data.tobytes())
-                    h.update(darray.median().data.tobytes())
-            except NotImplementedError:
-                if debug:
-                    print('Fallback')
-                h.update((
-                    darray.data.tobytes() if getattr(darray, "data", False)
-                    else darray.encode(_enc)
-                ))
+            for d in np.nditer(darray, flags=['refs_ok']):
+                h.update(d.tobytes())
     if debug:
         print(darray.name, h.hexdigest())
     return None if hashlib_obj else h.hexdigest()

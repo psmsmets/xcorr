@@ -18,14 +18,15 @@ an xarray/netCDF4 based `xcorr` file.
 """
 
 # Absolute imports
-import warnings
-from obspy import Stream, Inventory
-from datetime import datetime
 import numpy as np
 import xarray as xr
 import pandas as pd
+import obspy
+import scipy
 import json
+import warnings
 import os
+from datetime import datetime
 
 # Relative imports
 from ..version import version as __version__
@@ -123,6 +124,15 @@ def open_dataset(
                 'Dataset metadata sha256 hash is inconsistent.',
                 UserWarning
             )
+            if debug:
+                print(
+                    'sha256 hash metadata in ncfile :',
+                    dataset.sha256_hash_metadata
+                )
+                print(
+                    'sha256 hash metadata computed  :',
+                    sha256_hash_metadata
+                )
     if not (quick_and_dirty or fast):
         sha256_hash = util.hasher.hash_Dataset(
             dataset,
@@ -133,10 +143,15 @@ def open_dataset(
                 'Dataset sha256 hash is inconsistent.',
                 UserWarning
             )
+            if debug:
+                print('sha256 hash in ncfile :', dataset.sha256_hash)
+                print('sha256 hash computed  :', sha256_hash)
 
     if debug:
-        print(path, '#(status==1): {} of {}'.format(
-            np.sum(dataset.status.values == 1), dataset.time.size
+        print('{p} #(status==1): {n} of {m}'.format(
+            p=path,
+            n=np.sum(dataset.status.values == 1),
+            m=dataset.time.size,
         ))
 
     if np.sum(dataset.status.values == 1) == 0 and not debug:
@@ -257,7 +272,7 @@ def init_dataset(
     window_length: float = 86400., window_overlap: float = 0.875,
     clip_lag=None, unbiased_cc: bool = False,
     closed: str = 'left', dtype: np.dtype = np.float32,
-    inventory: Inventory = None, stationary_poi: dict = None,
+    inventory: obspy.Inventory = None, stationary_poi: dict = None,
 ):
     """
     Initiate a xcorr xarray.Dataset.
@@ -304,6 +319,7 @@ def init_dataset(
         'comment': attrs['comment'] if 'comment' in attrs else 'n/a',
         'Conventions': 'CF-1.9',
         'xcorr_version': __version__,
+        'dependency_versions': dependency_versions(as_str=True),
     }
 
     # pair
@@ -401,6 +417,28 @@ def init_dataset(
         },
     )
 
+    # status
+    dataset['hash'] = (
+        ('pair', 'time'),
+        np.array([['n/a']*len(dataset.time)], dtype=object),
+        {
+            'long_name': 'pair preprocessed stream hash',
+            'standard_name': 'pair_preprocessed_stream_hash',
+            'units': '-',
+            'description': (
+                "Openssl SHA256 hash of the pair preprocessed waveform "
+                "stream. Be aware that stream/pair order matters! "
+                "The hash is updated per `obspy.Trace` and includes the "
+                "stats with keys=['network', 'station', 'location', "
+                "'channel', 'starttime', 'endtime', 'sampling_rate', 'delta', "
+                "'npts'], sorted and dumped to json with 4 character space "
+                "indentation and separators ',' and ':', followed by the hash "
+                "of each sample byte representation."
+            ),
+        },
+    )
+
+
     # pair offset
     dataset['pair_offset'] = (
         ('pair', 'time'),
@@ -458,7 +496,7 @@ def init_dataset(
 
 
 def cc_dataset(
-    dataset: xr.Dataset, client: Client, inventory: Inventory = None,
+    dataset: xr.Dataset, client: Client, inventory: obspy.Inventory = None,
     test_run: bool = False, retry_missing: bool = False, **kwargs
 ):
     """
@@ -501,7 +539,7 @@ def cc_dataset(
                 operations_from_json=False,
                 **kwargs
             )
-            if not isinstance(st, Stream) or len(st) != 2:
+            if not isinstance(st, obspy.Stream) or len(st) != 2:
                 print('Missing data. Set status "-1" and skip.')
                 dataset.status.loc[{'pair': p, 'time': t}] = -1
                 if test_run:
@@ -516,6 +554,8 @@ def cc_dataset(
                 pd.to_timedelta(dataset.time.window_length / 2, unit='s') -
                 dataset.time.loc[{'time': t}].values
             )
+            print('Hash', end='. ')
+            dataset.hash.loc[{'pair': p, 'time': t}] = util.hash_Stream(st)
             print('CC', end='. ')
             dataset.cc.loc[{'pair': p, 'time': t}] = cc.cc(
                 x=st[0].data[:dataset.lag.npts],
@@ -591,6 +631,22 @@ def bias_correct_dataset(
 def get_dataset_weights(
     dataset: xr.Dataset, name: str = 'w'
 ):
+    r"""Construct the unbiased crosscorrelation weight array.
+
+    Parameters
+    ----------
+    dataset: :class:`xarray.Dataset`
+        `xcorr` dataset.
+
+    name : `str`, optional
+        DataArray variable name.
+
+    Returns
+    -------
+       w : :class:`DataArray`
+           Unbiased crosscorrelation weight vector.
+
+    """
     return xr.DataArray(
         data=cc.weight(
             dataset.lag.npts, pad=True
@@ -603,3 +659,20 @@ def get_dataset_weights(
             'units': '-',
         }
     )
+
+
+def dependency_versions(as_str: bool=False):
+    r"""Returns a `dict` with core dependencies and its version.
+    """
+    versions = {
+        json.__name__: json.__version__,
+        np.__name__: np.__version__,
+        obspy.__name__: obspy.__version__,
+        pd.__name__: pd.__version__,
+        scipy.__name__: scipy.__version__,
+        xr.__name__: xr.__version__,
+    }
+    if as_str:
+        return ', '.join(['-'.join(item) for item in versions.items()])
+    else:
+        return versions
