@@ -52,6 +52,17 @@ def write_dataset(
     """
     Write a dataset to netCDF using a tmp file and replacing the destination.
     """
+
+    # Verify metadata hash
+    sha256_hash_metadata = (
+        util.hasher.sha256_hash_Dataset_metadata(dataset)
+    )
+    if sha256_hash_metadata != dataset.sha256_hash_metadata:
+        warnings.warn(
+            'Dataset metadata sha256 hash is inconsistent',
+            UserWarning
+        )
+
     print("Write dataset as '{}'".format(path), end=': ')
     abspath, file = os.path.split(os.path.abspath(path))
     if not os.path.exists(abspath):
@@ -108,14 +119,14 @@ def open_dataset(
         )
         if sha256_hash_metadata != dataset.sha256_hash_metadata:
             warnings.warn(
-                'Dataset metadata sha256 hash is invalid.',
+                'Dataset metadata sha256 hash is inconsistent.',
                 UserWarning
             )
     if not (quick_and_dirty or fast):
         sha256_hash = util.hasher.sha256_hash_Dataset(dataset)
         if sha256_hash != dataset.sha256_hash:
             warnings.warn(
-                'Dataset sha256 hash is invalid.',
+                'Dataset sha256 hash is inconsistent.',
                 UserWarning
             )
 
