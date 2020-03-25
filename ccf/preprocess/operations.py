@@ -26,7 +26,7 @@ from obspy import Inventory
 
 # Relative imports
 from ..preprocess.running_rms import running_rms
-from ..util import to_UTCDateTime, sha256_hash_obj
+from ..util import to_UTCDateTime, hash_obj
 
 
 __all__ = ['help', 'stream_operations', 'is_stream_operation',
@@ -358,7 +358,7 @@ def hash_operations(
     before hashing using :func:`filter_operations`.
     """
     operations = filter_operations(operations)
-    operations['sha256_hash'] = sha256_hash_obj(operations) 
+    operations['sha256_hash'] = hash_obj(operations) 
     return operations
 
 
@@ -373,7 +373,7 @@ def check_operations_hash(
         raise ValueError(
             'Preprocess operations does not contain a hash!'
         )
-    sha256 = sha256_hash_obj(filter_operations(operations))
+    sha256 = hash_obj(filter_operations(operations))
     if raise_error and operations['sha256_hash'] != sha256:
         raise ValueError(
             "Preprocess operations hash '{}' does not match the computed "

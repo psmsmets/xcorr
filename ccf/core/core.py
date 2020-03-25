@@ -55,7 +55,7 @@ def write_dataset(
 
     # Verify metadata hash
     sha256_hash_metadata = (
-        util.hasher.sha256_hash_Dataset_metadata(dataset)
+        util.hasher.hash_Dataset(dataset, metadata_only=True)
     )
     if sha256_hash_metadata != dataset.sha256_hash_metadata:
         warnings.warn(
@@ -80,7 +80,7 @@ def write_dataset(
     # calculate dataset hash
     print('Hash', end='. ')
     dataset.attrs['sha256_hash'] = (
-        util.hasher.sha256_hash_Dataset(dataset)
+        util.hasher.hash_Dataset(dataset, metadata_only=False)
     )
 
     # convert preprocess operations
@@ -114,8 +114,9 @@ def open_dataset(
 
     # calculate some hashes
     if not quick_and_dirty:
-        sha256_hash_metadata = (
-            util.hasher.sha256_hash_Dataset_metadata(dataset)
+        sha256_hash_metadata = util.hasher.hash_Dataset(
+            dataset,
+            metadata_only=True
         )
         if sha256_hash_metadata != dataset.sha256_hash_metadata:
             warnings.warn(
@@ -123,7 +124,10 @@ def open_dataset(
                 UserWarning
             )
     if not (quick_and_dirty or fast):
-        sha256_hash = util.hasher.sha256_hash_Dataset(dataset)
+        sha256_hash = util.hasher.hash_Dataset(
+            dataset,
+            metadata_only=False
+        )
         if sha256_hash != dataset.sha256_hash:
             warnings.warn(
                 'Dataset sha256 hash is inconsistent.',
@@ -445,8 +449,9 @@ def init_dataset(
         dataset['w'] = get_dataset_weights(dataset, dtype=dtype)
 
     # add metadata hash
-    dataset.attrs['sha256_hash_metadata'] = (
-        util.hasher.sha256_hash_Dataset_metadata(dataset)
+    dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
+        dataset,
+        metadata_only=True,
     )
 
     return dataset
@@ -537,8 +542,9 @@ def cc_dataset(
         )
 
     # update metadata hash
-    dataset.attrs['sha256_hash_metadata'] = (
-        util.hasher.sha256_hash_Dataset_metadata(dataset)
+    dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
+        dataset,
+        metadata_only=True
     )
 
 def bias_correct_dataset(
@@ -576,8 +582,9 @@ def bias_correct_dataset(
     )
 
     # update metadata hash
-    dataset.attrs['sha256_hash_metadata'] = (
-        util.hasher.sha256_hash_Dataset_metadata(dataset)
+    dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
+        dataset,
+        metadata_only=True
     )
 
 
