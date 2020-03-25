@@ -12,14 +12,14 @@ import os
 import sys
 import getopt
 import datetime
-import ccf
+import xcorr
     
 def filename(pair:str,time:pd.datetime):
     return '{pair}.{y:04d}.{d:03d}.nc'.format(pair=pair,y=time.year,d=time.dayofyear)
 
 def cc(start:datetime.datetime, debug:bool = None, hidebug:bool = None, test:bool = None):
     # local clients
-    ccf.clients.set(sds_root='/vardim/home/smets/Hydro')
+    xcorr.clients.set(sds_root='/vardim/home/smets/Hydro')
 
     # general parameters
     sampling_rate = 50.
@@ -118,7 +118,7 @@ def cc(start:datetime.datetime, debug:bool = None, hidebug:bool = None, test:boo
                     ds.close()
                     continue
             else:
-                ds = ccf.init_dataset(
+                ds = xcorr.init_dataset(
                     pair=pair, 
                     starttime = time, 
                     endtime = time + pd.offsets.DateOffset(days=1), 
@@ -133,7 +133,7 @@ def cc(start:datetime.datetime, debug:bool = None, hidebug:bool = None, test:boo
                     stationary_poi = poi,
                 )
             try:
-                ccf.cc_dataset(
+                xcorr.cc_dataset(
                     ds,
                     inventory = inv.select(
                         starttime = UTCDateTime(time),
@@ -149,7 +149,7 @@ def cc(start:datetime.datetime, debug:bool = None, hidebug:bool = None, test:boo
                 print('An error occurred. Save and continue next timestep.')
                 print('Error:')
                 print(e)
-            ccf.write_dataset(ds,ncfile)
+            xcorr.write_dataset(ds,ncfile)
             if test:
                 sys.exit(0)
 
@@ -160,7 +160,7 @@ def usage():
     print("{} -s<year-month> [-h -v]".format(sys.argv[0]))
     print("Arguments:")
     print("-s,--start=   Set the start year and month (fmt \"yyyy-mm\").")
-    print("-v,--version  Print the ccf library version.")
+    print("-v,--version  Print the xcorr library version.")
     print("-h,--help     Show this help.")
     print("   --debug    General debugging messages.")
     print("   --hidebug  Far more detailed debugging messages.")
@@ -189,7 +189,7 @@ def main():
         if opt in  ("-h", "--help"):
             usage()
         if opt in  ("-v", "--version"):
-            print(ccf.__version__)
+            print(xcorr.__version__)
             sys.exit()
         elif opt in ("-s", "--start"):
             time = arg

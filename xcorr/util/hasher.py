@@ -3,7 +3,7 @@ r"""
 :mod:`util.hasher` -- Hash Utilities
 ====================================
 
-Utilities for ``ccf`` to generate hashes, preferrably sha256.
+Utilities for ``xcorr`` to generate hashes, preferrably sha256.
 
 """
 

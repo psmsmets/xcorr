@@ -3,7 +3,7 @@ r"""
 :mod:`util.time` -- Time Utilities
 ==================================
 
-Utilities for ``ccf`` for time conversions.
+Utilities for ``xcorr`` for time conversions.
 
 """
 

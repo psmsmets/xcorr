@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-ccf
+xcorr
 
-**ccf** is an open-source project containing tools to calculate
-crosscorrelation functions. Results and meta data are stored as
-xarray/netCDF4 following COARDS and CF standards.
-`ccf` contains waveform preprocessing and crosscorrelation postprocessing
-routines as well as a client wrapper to retrieve waveforms from local
-and remote services.
+**xcorr** is an open-source project containing tools to crosscorrelate
+waveform timeseries as :class:`obspy.Stream` and stored as a self describing
+`xarray.Dataset`.
+
+Results and metadata are stored netCDF4 following CF-1.9 Conventions and
+FAIR data guidelines.
+
+`xcorr` contains various modules such as waveform preprocessing, a client
+waterfall-based wrapping various getters from local archives as well as
+remote services, frequency domain crosscorrelationm and postprocessing/
+analysis tools.
 
 :author:
     Pieter Smets (p.s.m.smets@tudelft.nl)
@@ -22,21 +27,21 @@ and remote services.
 """
 
 # import all modules
-from ccf import util
-from ccf import clients
-from ccf import cc 
-from ccf import preprocess 
-from ccf import postprocess 
-from ccf import core
+from xcorr import util
+from xcorr import clients
+from xcorr import cc 
+from xcorr import preprocess 
+from xcorr import postprocess 
+from xcorr import core
 
 # Import all functions
-from ccf.core import *
+from xcorr.core import *
 
 # Import some classes
-from ccf.clients.client import Client
+from xcorr.clients.client import Client
 
 # Make only a selection available to __all__ to not clutter the namespace
-# Maybe also to discourage the use of `from ccf import *`.
+# Maybe also to discourage the use of `from xcorr import *`.
 __all__ = ['Client', 'core', 'postprocess']
 
 # Version
@@ -44,7 +49,7 @@ try:
     # - Released versions just tags:       1.10.0
     # - GitHub commits add .dev#+hash:     1.10.1.dev3+g973038c
     # - Uncom. changes add timestamp: 1.10.1.dev3+g973038c.d20191022
-    from ccf.version import version as __version__
+    from xcorr.version import version as __version__
 except ImportError:
     # If it was not installed, then we don't know the version.
     # We could throw a warning here, but this case *should* be

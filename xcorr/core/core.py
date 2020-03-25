@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Core python module of the ccf package to create, open, write and process
-an xarray/netCDF4 based ccf file.
+Core python module of the `xcorr` package to create, open, write and process
+an xarray/netCDF4 based `xcorr` file.
 
 .. module:: core
 
@@ -106,7 +106,7 @@ def open_dataset(
     if not os.path.isfile(path):
         return False
     dataset = xr.open_dataset(path)
-    if not 'ccf_version' in dataset.attrs:
+    if not 'xcorr_version' in dataset.attrs:
         return False
 
     # convert preprocess operations
@@ -183,7 +183,7 @@ def merge_datasets(
             )
             continue
         if debug:
-            print("\n# Open and inspect ccf dataset:\n\n", ds, "\n")
+            print("\n# Open and inspect xcorr dataset:\n\n", ds, "\n")
         if ds is False:
             continue
         if not isinstance(dsets, xr.Dataset):
@@ -204,15 +204,15 @@ def merge_datasets(
                 UserWarning
             )
             continue
-        if dsets.ccf_version != ds.ccf_version:
+        if dsets.xcorr_version != ds.xcorr_version:
             if merge_versions:
                 warnings.warn(
-                    'Dataset ccf_version does not match.',
+                    'Dataset xcorr_version does not match.',
                     UserWarning
                 )
             else:
                 warnings.warn(
-                    'Dataset ccf_version does not match. Item skipped.',
+                    'Dataset xcorr_version does not match. Item skipped.',
                     UserWarning
                 )
                 continue
@@ -260,7 +260,7 @@ def init_dataset(
     inventory: Inventory = None, stationary_poi: dict = None,
 ):
     """
-    Initiate a ccf xarray.Dataset.
+    Initiate a xcorr xarray.Dataset.
     """
     # check metadata
     assert 'institution' in attrs, (
@@ -303,7 +303,7 @@ def init_dataset(
         ),
         'comment': attrs['comment'] if 'comment' in attrs else 'n/a',
         'Conventions': 'CF-1.9',
-        'ccf_version': __version__,
+        'xcorr_version': __version__,
     }
 
     # pair

@@ -1,9 +1,9 @@
 r"""
 
 :mod:`cc.cc` -- Crosscorrelation
-==========================================
+================================
 
-Crosscorrelation functions for ``ccf``.
+Crosscorrelation functions for ``xcorr``.
 
 """
 

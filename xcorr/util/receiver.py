@@ -3,7 +3,7 @@ r"""
 :mod:`util.receiver` -- Receiver Utilities
 ==========================================
 
-Receiver utilities for ``ccf`` such as checks, type conversions,
+Receiver utilities for ``xcorr`` such as checks, type conversions,
 and receiver pair geodetic operations.
 
 """

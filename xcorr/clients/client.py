@@ -51,8 +51,8 @@ _msg_added_archive = 'Waveform data for downloaded and added to archive.'
 
 class Client(object):
     """
-    CCF waveform request client.
-    For details see the :meth:`~ccf.clients.client.Client.__init__()`
+    `xcorr` waveform request client.
+    For details see the :meth:`~xcorr.clients.client.Client.__init__()`
     method.
     """
     def __init__(
@@ -60,7 +60,7 @@ class Client(object):
         sds_root_read: list = None, fdsn_service='IRIS',
         nms_service: bool = True, max_gap: float = None
     ):
-        r"""Initialize a CCF waveform request client.
+        r"""Initialize a `xcorr` waveform request client.
 
         >>> client = Client('/tmp')
 
