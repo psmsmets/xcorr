@@ -512,18 +512,23 @@ def cc_dataset(
             print('Done.')
             if test_run:
                 break
+
+    # update history
+    dataset.attrs['history'] += (
+        ', CC process ended @ {}'.format(pd.to_datetime('now'))
+    )
+
+    # bias correct?
     if dataset.cc.bias_correct == 1:
         dataset = bias_correct_dataset(dataset)
+        dataset.attrs['history'] += (
+            ', Bias corrected CC @ {}'.format(pd.to_datetime('now'))
+        )
 
     # update metadata hash
     dataset.attrs['sha256_hash_metadata'] = (
         util.hasher.sha256_hash_Dataset_metadata(dataset)
     )
-
-    dataset.attrs['history'] += (
-        ', CC process ended @ {}'.format(pd.to_datetime('now'))
-    )
-
 
 def bias_correct_dataset(
     dataset: xr.Dataset, biased_var: str = 'cc', unbiased_var: str = None,
@@ -552,6 +557,11 @@ def bias_correct_dataset(
     )
     dataset[unbiased_var].attrs['standard_name'] = (
         'unbiased_' + dataset[unbiased_var].attrs['standard_name']
+    )
+
+    # update history
+    dataset.attrs['history'] += (
+        ', Bias corrected CC @ {}'.format(pd.to_datetime('now'))
     )
 
     # update metadata hash
