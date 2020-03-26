@@ -29,12 +29,12 @@ from scipy import signal
 from ..util import to_seconds
 
 
-__all__ = ['psd']
+__all__ = ['psd', 'psd_f_t']
 
 
 def psd(
     darray: xr.DataArray, duration: float = None, padding: int = None,
-    **kwargs
+    lag_to_seconds: bool = False, **kwargs
 ):
     """
     PSD of a `xr.DataArray`.
@@ -98,13 +98,21 @@ def psd(
             **kwargs
         },
     )
+
+    # fill accordingly
     edge = int(np.rint(win_len/2-1))
+
+    darray.data.fill(np.nan)
     darray.loc[{'lag':darray.lag[edge:-1-edge]}] = Sxx
+
+    if lag_to_seconds:
+        darray.lag.data = to_seconds(darray.lag.data)
+        darray.lag.attrs['units'] = 's'
 
     return darray
 
 
-def psd_old(
+def psd_f_t(
     darray: xr.DataArray, duration: float = None, padding: int = None,
     overlap: float = None, **kwargs
 ):
