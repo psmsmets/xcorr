@@ -21,6 +21,7 @@ crosscorrelation postprocessing routines.
 # Mandatory imports
 import xarray as xr
 import pandas as pd
+import numpy as np
 from scipy import signal
 
 
@@ -32,6 +33,78 @@ __all__ = ['psd']
 
 
 def psd(
+    darray: xr.DataArray, duration: float = None, padding: int = None,
+    **kwargs
+):
+    """
+    PSD of a `xr.DataArray`.
+    """
+    padding = padding if padding and padding >= 2 else 2
+    duration = duration if (
+        duration and duration > darray.lag.delta
+    ) else darray.lag.delta
+
+    win_len = int(duration * darray.lag.sampling_rate)
+
+    f, t, Sxx = signal.spectrogram(
+        x=darray.values,
+        fs=darray.lag.sampling_rate,
+        nperseg=win_len,
+        noverlap=win_len-1,
+        nfft=int(padding*win_len),
+        scaling='density',
+        mode='psd',
+        axis=darray.dims.index('lag'),
+        **kwargs
+    )
+
+    # construct coordinates (lag last!)
+    coords = {}
+    for dim in darray.dims:
+        if dim != 'lag':
+            coords[dim] = darray[dim]
+    coords['freq'] = xr.DataArray(
+        data=f,
+        name='freq',
+        dims=('freq'),
+        coords=[f],
+        attrs={
+            'long_name': 'Frequency',
+            'standard_name': 'frequency',
+            'units': 'Hz',
+        }
+    )
+    coords['lag'] = darray['lag']  # should be last dim!
+
+    # construct output
+    darray = xr.DataArray(
+        data=np.zeros(
+            [len(coord) for name, coord in coords.items()],
+            dtype=np.dtype(darray.dtype)
+        ),
+        dims=coords.keys(),
+        coords=coords,
+        name='psd',
+        attrs={
+            'long_name': 'Power Spectral Density',
+            'standard_name': 'power_spectral_density',
+            'units': 'Hz**-1',
+            'from_variable': darray.name,
+            'scaling': 'density',
+            'mode': 'psd',
+            'duration': duration,
+            'padding': padding,
+            'centered': np.byte(True),
+            **kwargs
+        },
+    )
+    edge = int(np.rint(win_len/2-1))
+    darray.loc[{'lag':darray.lag[edge:-1-edge]}] = Sxx
+
+    return darray
+
+
+def psd_old(
     darray: xr.DataArray, duration: float = None, padding: int = None,
     overlap: float = None, **kwargs
 ):
