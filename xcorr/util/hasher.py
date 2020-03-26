@@ -21,6 +21,10 @@ __all__ = ['hash', 'hash_obj', 'hash_Trace', 'hash_Stream',
 
 _ignore_keys = ['sha256_hash', 'sha256_hash_metadata',
                 'add_offset', 'scale_factor']
+
+_trace_keys = ['network', 'station', 'location', 'channel', 'starttime',
+               'endtime', 'sampling_rate', 'delta', 'npts']
+
 _enc = 'utf-8'
 
 
@@ -168,9 +172,7 @@ def hash_Trace(
 
     """
     h = hashlib_obj or hashlib.sha256()
-    keys = ['network', 'station', 'location', 'channel', 'starttime',
-            'endtime', 'sampling_rate', 'delta', 'npts']
-    stats = dict(zip(keys, [trace.stats[key] for key in keys]))
+    stats = dict(zip(_trace_keys, [trace.stats[key] for key in _trace_keys]))
     h.update(_to_json(stats).encode(_enc))
     for d in trace.data:
         h.update(d.tobytes())

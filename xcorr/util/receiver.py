@@ -9,15 +9,20 @@ and receiver pair geodetic operations.
 """
 
 # Mandatory imports
-from xarray import DataArray
-from numpy import ndarray
+import numpy as np
+import pandas as pd
+import xarray as xr
 from re import match
 from obspy import Inventory
 from pyproj import Geod
 
 
+# Relative imports
+from ..util.time import to_UTCDateTime
+
+
 __all__ = ['check_receiver', 'split_pair', 'receiver_to_dict',
-           'receiver_to_str', 'get_pair_inventory',
+           'receiver_to_str', 'get_receiver_channel', 'get_pair_inventory',
            'get_receiver_coordinates', 'get_pair_distance']
 
 
@@ -110,9 +115,9 @@ def split_pair(pair, separator: str = '-', to_dict: bool = False):
         `False` (default), else a two-element list of SEED-id dictionaries.
 
     """
-    if isinstance(pair, DataArray):
-        pair = pair.str
-    elif isinstance(pair, ndarray):
+    if isinstance(pair, xr.DataArray):
+        pair = str(pair.values)
+    elif isinstance(pair, np.ndarray):
         pair = str(pair)
     assert isinstance(pair, str), (
         'Pair should be either a string, numpy.ndarray or '
@@ -189,10 +194,12 @@ def get_receiver_channel(receiver):
     elif isinstance(receiver, str):
         return receiver.split('.')[3]
     else:
-        raise TypeError('Receiver should be of type `str` or `dict`!')
+        raise TypeError('``receiver`` should be of type `str` or `dict`!')
 
 
-def get_pair_inventory(pair, inventory: Inventory, separator: str = '-'):
+def get_pair_inventory(
+    pair, inventory: Inventory, times=None, separator: str = '-'
+):
     r"""Filter the obspy inventory object for a receiver pair.
 
     Parameters
@@ -205,6 +212,8 @@ def get_pair_inventory(pair, inventory: Inventory, separator: str = '-'):
     inventory : :class:`obspy.Inventory`
         Inventory object.
 
+    times : `pd.DatetimeIndex` or `xarray.DataArray`
+
     separator : `str`, optional
         Receiver pair separator:, defaults to '-'.
 
@@ -215,8 +224,38 @@ def get_pair_inventory(pair, inventory: Inventory, separator: str = '-'):
         receiver ``pair``.
 
     """
-    r = split_pair(pair, separator)
-    return inventory.select(**r[0]) + inventory.select(**r[1])
+    if times is not None:
+        if not (
+            isinstance(times, pd.DatetimeIndex) or
+            isinstance(times, xr.DataArray)
+        ):
+            raise TypeError(
+                '``time`` should be of type `pandas.DatetimeIndex` '
+                'or `xarray.DataArray`!'
+            )
+        t0 = to_UTCDateTime(times[0])
+        t1 = to_UTCDateTime(times[-1])
+    else:
+        t0 = None
+        t1 = None
+    if isinstance(pair, list) or isinstance(pair, xr.DataArray):
+        inv = Inventory([], [])
+        rr = []
+        for p in pair:
+            rr += split_pair(p, separator, to_dict=False)
+        for r in set(rr):
+            inv += inventory.select(
+                **receiver_to_dict(r),
+                starttime=t0,
+                endtime=t1
+            )
+        return inv
+    else:
+        r = split_pair(pair, separator, to_dict=True)
+        return (
+            inventory.select(**r[0], starttime=t0, endtime=t1) +
+            inventory.select(**r[1], starttime=t0, endtime=t1)
+        )
 
 
 def get_receiver_coordinates(receiver: str, inventory: Inventory):
