@@ -25,7 +25,7 @@ from scipy import signal
 
 
 # Relative import
-from .. import util
+from ..util import to_seconds
 
 
 __all__ = ['psd']
@@ -56,7 +56,7 @@ def psd(
         **kwargs
     )
 
-    t += Util.to_seconds(darray.lag.values[0])
+    t += to_seconds(darray.lag.values[0])
 
     coords = {}
     for dim in darray.dims:

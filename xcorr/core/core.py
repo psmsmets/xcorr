@@ -48,11 +48,22 @@ __all__ = ['write_dataset', 'open_dataset', 'merge_datasets',
 
 
 def write_dataset(
-    dataset: xr.Dataset, path: str, close: bool = True, **kwargs
+    dataset: xr.Dataset, path: str, close: bool = True,
+    force_write: bool = False, **kwargs
 ):
     """
     Write a dataset to netCDF using a tmp file and replacing the destination.
     """
+
+    if (
+        np.sum(dataset.status.values == 1) == 0 or
+        (np.sum(dataset.status.values == -1) == 0 and force_write)
+    ):
+        warnings.warn(
+            'Dataset contains no data. No need to save it.',
+            UserWarning
+        )
+        return
 
     # Verify metadata hash
     sha256_hash_metadata = (

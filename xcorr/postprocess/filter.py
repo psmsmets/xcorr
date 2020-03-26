@@ -21,6 +21,7 @@ crosscorrelation postprocessing routines.
 # Mandatory imports
 import numpy as np
 import xarray as xr
+from scipy import signal
 
 
 __all__ = ['butterworth_filter']

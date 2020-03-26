@@ -244,11 +244,15 @@ def get_pair_inventory(
         for p in pair:
             rr += split_pair(p, separator, to_dict=False)
         for r in set(rr):
-            inv += inventory.select(
-                **receiver_to_dict(r),
-                starttime=t0,
-                endtime=t1
-            )
+            d = receiver_to_dict(r)
+            if d['channel'][-1] == 'R':
+                for h in ['1','2','N','E']:
+                    c = d['channel'][:-1] + h
+                    inv += inventory.select(
+                        **{**d, 'channel': c}, starttime=t0, endtime=t1
+                    )
+            else:
+                inv += inventory.select(**d, starttime=t0, endtime=t1)
         return inv
     else:
         r = split_pair(pair, separator, to_dict=True)
