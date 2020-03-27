@@ -5,7 +5,7 @@ from setuptools import setup, find_namespace_packages
 
 # Get README and remove badges.
 README = open('README.rst').read()
-README = re.sub('----.*marker', '----', readme, flags=re.DOTALL)
+README = re.sub('----.*marker', '----', README, flags=re.DOTALL)
 
 DESCRIPTION = 'Correlate timeseries in a self-describing N-D labeled dataset'
 
@@ -43,7 +43,7 @@ setup(
     use_scm_version={
         'root': '.',
         'relative_to': __file__,
-        'write_to': os.path.join('empymod', 'version.py'),
+        'write_to': os.path.join('xcorr', 'version.py'),
     },
     setup_requires=['setuptools_scm'],
 )
