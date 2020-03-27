@@ -1,20 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Core python module of the `xcorr` package to create, open, write and process
-an xarray/netCDF4 based `xcorr` file.
-
-.. module:: core
-
-:author:
-    Pieter Smets (P.S.M.Smets@tudelft.nl)
-
-:copyright:
-    Pieter Smets
-
-:license:
-    This code is distributed under the terms of the
-    GNU General Public License, Version 3
-    (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
 # Absolute imports
@@ -42,242 +27,10 @@ from ..preprocess import (
 )
 
 
-__all__ = ['write_dataset', 'open_dataset', 'merge_datasets',
-           'init_dataset', 'cc_dataset', 'bias_correct_dataset',
-           'get_dataset_weights']
+__all__ = ['init', 'read', 'write', 'merge', 'process', 'bias_correct']
 
 
-def write_dataset(
-    dataset: xr.Dataset, path: str, close: bool = True,
-    force_write: bool = False, **kwargs
-):
-    """
-    Write a dataset to netCDF using a tmp file and replacing the destination.
-    """
-
-    if (
-        np.sum(dataset.status.values == 1) == 0 or
-        (np.sum(dataset.status.values == -1) == 0 and force_write)
-    ):
-        warnings.warn(
-            'Dataset contains no data. No need to save it.',
-            UserWarning
-        )
-        return
-
-    # Verify metadata hash
-    sha256_hash_metadata = (
-        util.hasher.hash_Dataset(dataset, metadata_only=True)
-    )
-    if sha256_hash_metadata != dataset.sha256_hash_metadata:
-        warnings.warn(
-            'Dataset metadata sha256 hash is inconsistent',
-            UserWarning
-        )
-
-    print('Write dataset as "{}"'.format(path), end=': ')
-    abspath, file = os.path.split(os.path.abspath(path))
-    if not os.path.exists(abspath):
-        os.makedirs(abspath)
-
-    tmp = os.path.join(
-        abspath,
-        '{f}.{t}'.format(f=file, t=int(datetime.now().timestamp()*1e3))
-    )
-
-    if close:
-        print('Close', end='. ')
-        dataset.close()
-
-    # calculate dataset hash
-    print('Hash', end='. ')
-    dataset.attrs['sha256_hash'] = (
-        util.hasher.hash_Dataset(dataset, metadata_only=False)
-    )
-
-    # convert preprocess operations
-    preprocess_operations_to_json(dataset.pair)
-
-    print('To temporary netcdf', end='. ')
-    dataset.to_netcdf(path=tmp, mode='w', format='NETCDF4', **kwargs)
-    print('Replace', end='. ')
-    os.replace(tmp, os.path.join(abspath, file))
-    print('Done.')
-
-    # convert preprocess operations
-    preprocess_operations_to_dict(dataset.pair)
-
-
-def open_dataset(
-    path: str, extract: bool = False, load_and_close: bool = False,
-    fast: bool = False, quick_and_dirty: bool = False, debug: bool = False
-):
-    """
-    Open a netCDF dataset with cc while checking the data availability.
-    """
-    if not os.path.isfile(path):
-        return False
-    dataset = xr.open_dataset(path)
-    if not 'xcorr_version' in dataset.attrs:
-        return False
-
-    # convert preprocess operations
-    preprocess_operations_to_dict(dataset.pair)
-
-    # calculate some hashes
-    if not quick_and_dirty:
-        sha256_hash_metadata = util.hasher.hash_Dataset(
-            dataset,
-            metadata_only=True
-        )
-        if sha256_hash_metadata != dataset.sha256_hash_metadata:
-            warnings.warn(
-                'Dataset metadata sha256 hash is inconsistent.',
-                UserWarning
-            )
-            if debug:
-                print(
-                    'sha256 hash metadata in ncfile :',
-                    dataset.sha256_hash_metadata
-                )
-                print(
-                    'sha256 hash metadata computed  :',
-                    sha256_hash_metadata
-                )
-    if not (quick_and_dirty or fast):
-        sha256_hash = util.hasher.hash_Dataset(
-            dataset,
-            metadata_only=False
-        )
-        if sha256_hash != dataset.sha256_hash:
-            warnings.warn(
-                'Dataset sha256 hash is inconsistent.',
-                UserWarning
-            )
-            if debug:
-                print('sha256 hash in ncfile :', dataset.sha256_hash)
-                print('sha256 hash computed  :', sha256_hash)
-
-    if debug:
-        print('{p} #(status==1): {n} of {m}'.format(
-            p=path,
-            n=np.sum(dataset.status.values == 1),
-            m=dataset.time.size,
-        ))
-
-    if np.sum(dataset.status.values == 1) == 0 and not debug:
-        dataset.close()
-        return False
-
-    if extract:
-        dataset['cc'] = dataset.cc.where(dataset.status == 1)
-
-    if load_and_close:
-        dataset.load().close()
-
-    return dataset
-
-
-def merge_datasets(
-    datasets: list, extract: bool = True, merge_versions: bool = False,
-    debug: bool = False, **kwargs
-):
-    """
-    Merge a list of datasets by specifying either the path as a `str`
-    or the :class:`xarray.DataSet` objects.
-    """
-    dsets = None
-    for ds in datasets:
-        if isinstance(ds, str):
-            if not os.path.isfile(ds):
-                warnings.warn(
-                    'Datasets item "{}" does not exists. Item skipped.'
-                    .format(ds),
-                    UserWarning
-                )
-                continue
-            ds = open_dataset(ds, extract=False, **kwargs)
-        elif isinstance(dataset, xr.Dataset):
-            preprocess_operations_to_dict(dataset.pair)
-        else:
-            warnings.warn(
-                (
-                    'Datasets item should be of type `str` '
-                    'or :class:`xarray.DataSet`! Item skipped.'
-                ),
-                UserWarning
-            )
-            continue
-        if debug:
-            print("\n# Open and inspect xcorr dataset:\n\n", ds, "\n")
-        if ds is False:
-            continue
-        if not isinstance(dsets, xr.Dataset):
-            dsets = ds.copy()
-            continue
-        if (
-            dsets.pair.preprocess['sha256_hash'] !=
-            ds.pair.preprocess['sha256_hash']
-        ):
-            warnings.warn(
-                'Dataset preprocess hash does not match. Item skipped.',
-                UserWarning
-            )
-            continue
-        if dsets.sha256_hash_metadata != ds.sha256_hash_metadata:
-            warnings.warn(
-                'Dataset metadata hash does not match. Item skipped.',
-                UserWarning
-            )
-            continue
-        if dsets.xcorr_version != ds.xcorr_version:
-            if merge_versions:
-                warnings.warn(
-                    'Dataset xcorr_version does not match.',
-                    UserWarning
-                )
-            else:
-                warnings.warn(
-                    'Dataset xcorr_version does not match. Item skipped.',
-                    UserWarning
-                )
-                continue
-        try:
-            dsets = dsets.merge(ds, join='outer')
-        except xr.MergeError:
-            warnings.warn(
-                'Dataset could not be merged. Item skipped.',
-                RuntimeWarning
-            )
-            if debug:
-                print('Error:', e)
-            continue
-
-    # fix status dtype change
-    dsets['status'] = dsets.status.astype(np.byte)
-
-    # extract valid data
-    if extract:
-        dsets['cc'] = dsets.cc.where(dsets.status == 1)
-
-    # update some global attrs
-    del dsets.attrs['sha256_hash']
-
-    strt0 = pd.to_datetime(dsets.time.values[0]).strftime('%Y.%j')
-    strt1 = pd.to_datetime(dsets.time.values[-1]).strftime('%Y.%j')
-    dsets.attrs['title'] = (
-        (dsets.attrs['title']).split(' - ')[0] +
-        ' - ' +
-        strt0 +
-        ' to {}'.format(strt1) if strt0 != strt1 else ''
-    ).strip()
-
-    dsets.attrs['history'] = 'Merged @ {}'.format(pd.to_datetime('now'))
-
-    return dsets
-
-
-def init_dataset(
+def init(
     pair: str, starttime: datetime, endtime: datetime, preprocess: dict,
     sampling_rate: float, attrs: dict,
     window_length: float = 86400., window_overlap: float = 0.875,
@@ -286,7 +39,7 @@ def init_dataset(
     inventory: obspy.Inventory = None, stationary_poi: dict = None,
 ):
     """
-    Initiate a xcorr xarray.Dataset.
+    Initiate an xcorr xarray.Dataset.
     """
     # check metadata
     assert 'institution' in attrs, (
@@ -449,7 +202,6 @@ def init_dataset(
         },
     )
 
-
     # pair offset
     dataset['pair_offset'] = (
         ('pair', 'time'),
@@ -495,7 +247,7 @@ def init_dataset(
     )
 
     if unbiased_cc:
-        dataset['w'] = get_dataset_weights(dataset, dtype=dtype)
+        dataset['w'] = get_weights(dataset.lag, dtype=dtype)
 
     # add metadata hash
     dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
@@ -506,36 +258,283 @@ def init_dataset(
     return dataset
 
 
-def cc_dataset(
-    dataset: xr.Dataset, client: Client, inventory: obspy.Inventory = None,
-    test_run: bool = False, retry_missing: bool = False, **kwargs
+def read(
+    path: str, extract: bool = False, load_and_close: bool = False,
+    fast: bool = False, quick_and_dirty: bool = False, debug: bool = False
 ):
     """
-    Process a dataset.
+    Read a netCDF dataset with cc while checking the data availability.
     """
-    dataset.attrs['history'] += (
-        ', CC process started @ {}'.format(pd.to_datetime('now'))
+    if not os.path.isfile(path):
+        return False
+    dataset = xr.open_dataset(path)
+    if 'xcorr_version' not in dataset.attrs:
+        return False
+
+    # convert preprocess operations
+    preprocess_operations_to_dict(dataset.pair)
+
+    # calculate some hashes
+    if not quick_and_dirty:
+        sha256_hash_metadata = util.hasher.hash_Dataset(
+            dataset,
+            metadata_only=True
+        )
+        if sha256_hash_metadata != dataset.sha256_hash_metadata:
+            warnings.warn(
+                'Dataset metadata sha256 hash is inconsistent.',
+                UserWarning
+            )
+            if debug:
+                print(
+                    'sha256 hash metadata in ncfile :',
+                    dataset.sha256_hash_metadata
+                )
+                print(
+                    'sha256 hash metadata computed  :',
+                    sha256_hash_metadata
+                )
+    if not (quick_and_dirty or fast):
+        sha256_hash = util.hasher.hash_Dataset(
+            dataset,
+            metadata_only=False
+        )
+        if sha256_hash != dataset.sha256_hash:
+            warnings.warn(
+                'Dataset sha256 hash is inconsistent.',
+                UserWarning
+            )
+            if debug:
+                print('sha256 hash in ncfile :', dataset.sha256_hash)
+                print('sha256 hash computed  :', sha256_hash)
+
+    if debug:
+        print('{p} #(status==1): {n} of {m}'.format(
+            p=path,
+            n=np.sum(dataset.status.values == 1),
+            m=dataset.time.size,
+        ))
+
+    if np.sum(dataset.status.values == 1) == 0 and not debug:
+        dataset.close()
+        return False
+
+    if extract:
+        dataset['cc'] = dataset.cc.where(dataset.status == 1)
+
+    if load_and_close:
+        dataset.load().close()
+
+    return dataset
+
+
+def write(
+    dataset: xr.Dataset, path: str, close: bool = True,
+    force_write: bool = False, **kwargs
+):
+    """
+    Write a dataset to netCDF using a tmp file and replacing the destination.
+    """
+
+    if (
+        np.sum(dataset.status.values == 1) == 0 or
+        (np.sum(dataset.status.values == -1) == 0 and force_write)
+    ):
+        warnings.warn(
+            'Dataset contains no data. No need to save it.',
+            UserWarning
+        )
+        return
+
+    # Verify metadata hash
+    sha256_hash_metadata = (
+        util.hasher.hash_Dataset(dataset, metadata_only=True)
+    )
+    if sha256_hash_metadata != dataset.sha256_hash_metadata:
+        warnings.warn(
+            'Dataset metadata sha256 hash is inconsistent',
+            UserWarning
+        )
+
+    print('Write dataset as "{}"'.format(path), end=': ')
+    abspath, file = os.path.split(os.path.abspath(path))
+    if not os.path.exists(abspath):
+        os.makedirs(abspath)
+
+    tmp = os.path.join(
+        abspath,
+        '{f}.{t}'.format(f=file, t=int(datetime.now().timestamp()*1e3))
+    )
+
+    if close:
+        print('Close', end='. ')
+        dataset.close()
+
+    # calculate dataset hash
+    print('Hash', end='. ')
+    dataset.attrs['sha256_hash'] = (
+        util.hasher.hash_Dataset(dataset, metadata_only=False)
+    )
+
+    # convert preprocess operations
+    preprocess_operations_to_json(dataset.pair)
+
+    print('To temporary netcdf', end='. ')
+    dataset.to_netcdf(path=tmp, mode='w', format='NETCDF4', **kwargs)
+    print('Replace', end='. ')
+    os.replace(tmp, os.path.join(abspath, file))
+    print('Done.')
+
+    # convert preprocess operations
+    preprocess_operations_to_dict(dataset.pair)
+
+
+def merge(
+    datasets: list, extract: bool = True, merge_versions: bool = False,
+    debug: bool = False, **kwargs
+):
+    """
+    Merge a list of datasets by specifying either the path as a `str`
+    or the :class:`xarray.DataSet` objects.
+    """
+    dsets = None
+    for ds in datasets:
+        if isinstance(ds, str):
+            if not os.path.isfile(ds):
+                warnings.warn(
+                    'Datasets item "{}" does not exists. Item skipped.'
+                    .format(ds),
+                    UserWarning
+                )
+                continue
+            ds = read(ds, extract=False, **kwargs)
+        elif isinstance(ds, xr.Dataset):
+            preprocess_operations_to_dict(ds.pair)
+        else:
+            warnings.warn(
+                (
+                    'Datasets item should be of type `str` '
+                    'or :class:`xarray.DataSet`! Item skipped.'
+                ),
+                UserWarning
+            )
+            continue
+        if debug:
+            print("\n# Open and inspect xcorr dataset:\n\n", ds, "\n")
+        if ds is False:
+            continue
+        if not isinstance(dsets, xr.Dataset):
+            dsets = ds.copy()
+            continue
+        if (
+            dsets.pair.preprocess['sha256_hash'] !=
+            ds.pair.preprocess['sha256_hash']
+        ):
+            warnings.warn(
+                'Dataset preprocess hash does not match. Item skipped.',
+                UserWarning
+            )
+            continue
+        if dsets.sha256_hash_metadata != ds.sha256_hash_metadata:
+            warnings.warn(
+                'Dataset metadata hash does not match. Item skipped.',
+                UserWarning
+            )
+            continue
+        if dsets.xcorr_version != ds.xcorr_version:
+            if merge_versions:
+                warnings.warn(
+                    'Dataset xcorr_version does not match.',
+                    UserWarning
+                )
+            else:
+                warnings.warn(
+                    'Dataset xcorr_version does not match. Item skipped.',
+                    UserWarning
+                )
+                continue
+        try:
+            dsets = dsets.merge(ds, join='outer')
+        except xr.MergeError:
+            warnings.warn(
+                'Dataset could not be merged. Item skipped.',
+                RuntimeWarning
+            )
+            continue
+
+    # fix status dtype change
+    dsets['status'] = dsets.status.astype(np.byte)
+
+    # extract valid data
+    if extract:
+        dsets['cc'] = dsets.cc.where(dsets.status == 1)
+
+    # update some global attrs
+    del dsets.attrs['sha256_hash']
+
+    strt0 = pd.to_datetime(dsets.time.values[0]).strftime('%Y.%j')
+    strt1 = pd.to_datetime(dsets.time.values[-1]).strftime('%Y.%j')
+    dsets.attrs['title'] = (
+        (dsets.attrs['title']).split(' - ')[0] +
+        ' - ' +
+        strt0 +
+        ' to {}'.format(strt1) if strt0 != strt1 else ''
+    ).strip()
+
+    dsets.attrs['history'] = 'Merged @ {}'.format(pd.to_datetime('now'))
+
+    return dsets
+
+
+def process(
+    x: xr.Dataset, client: Client, inventory: obspy.Inventory = None,
+    retry_missing: bool = False, test_run: bool = False,  **kwargs
+):
+    r"""Process the xcorr dataset in-place.
+
+    Parameters
+    ----------
+    x: :class:`xarray.Dataset`
+        The data array to process.
+
+    client : :class:`xcorr.Client`
+        The initiated client to the local and remote archives.
+
+    inventory : :class:`obspy.Inventory`
+        The inventory object with instrument responses.
+
+    retry_missing : `bool`, optional
+        If `True`, ``x.status`` with flag "-1" are reprocessed, otherwise only
+        flag "0". Defaults is `False`.
+
+    test_run : `bool`, optional
+        If `True` the function is aborted after the first iteration.
+        Default is `False`.
+
+    """
+    x.attrs['history'] += (
+        ', Process started @ {}'.format(pd.to_datetime('now'))
     )
     # extract and validate preprocess operations
-    if isinstance(dataset.pair.preprocess, dict):
-        o = dataset.pair.preprocess
+    if isinstance(x.pair.preprocess, dict):
+        o = x.pair.preprocess
         check_operations_hash(o, raise_error=True)
     else:
-        o = operations_to_dict(dataset.pair.preprocess)
+        o = operations_to_dict(x.pair.preprocess)
 
-    # process each pair per time step 
-    for p in dataset.pair:
-        for t in dataset.time:
+    # process each pair per time step
+    for p in x.pair:
+        for t in x.time:
             print(str(p.values), str(t.values)[:19], end=': ')
-            if dataset.status.loc[{'pair': p, 'time': t}].values != 0:
+            if x.status.loc[{'pair': p, 'time': t}].values != 0:
                 if not (
                     retry_missing and
-                    dataset.status.loc[{'pair': p, 'time': t}].values == -1
+                    x.status.loc[{'pair': p, 'time': t}].values == -1
                 ):
                     print(
                         'Has status "{}". Skip.'
                         .format(
-                            dataset.status.loc[{'pair': p, 'time': t}].values
+                            x.status.loc[{'pair': p, 'time': t}].values
                         )
                     )
                     continue
@@ -552,105 +551,123 @@ def cc_dataset(
             )
             if not isinstance(st, obspy.Stream) or len(st) != 2:
                 print('Missing data. Set status "-1" and skip.')
-                dataset.status.loc[{'pair': p, 'time': t}] = -1
+                x.status.loc[{'pair': p, 'time': t}] = -1
                 if test_run:
                     break
                 continue
-            dataset.pair_offset.loc[{'pair': p, 'time': t}] = (
+            x.pair_offset.loc[{'pair': p, 'time': t}] = (
                 pd.to_datetime(st[0].stats.starttime.datetime) -
                 pd.to_datetime(st[1].stats.starttime.datetime)
             )
-            dataset.time_offset.loc[{'pair': p, 'time': t}] = (
+            x.time_offset.loc[{'pair': p, 'time': t}] = (
                 pd.to_datetime(st[0].stats.starttime.datetime) +
-                pd.to_timedelta(dataset.time.window_length / 2, unit='s') -
-                dataset.time.loc[{'time': t}].values
+                pd.to_timedelta(x.time.window_length / 2, unit='s') -
+                x.time.loc[{'time': t}].values
             )
             print('Hash', end='. ')
-            dataset.hash.loc[{'pair': p, 'time': t}] = util.hash_Stream(st)
+            x.hash.loc[{'pair': p, 'time': t}] = util.hash_Stream(st)
             print('CC', end='. ')
-            dataset.cc.loc[{'pair': p, 'time': t}] = cc.cc(
-                x=st[0].data[:dataset.lag.npts],
-                y=st[1].data[:dataset.lag.npts],
-                normalize=dataset.cc.normalize == 1,
-                pad=dataset.lag.pad == 1,
+            x.cc.loc[{'pair': p, 'time': t}] = cc.cc(
+                x=st[0].data[:x.lag.npts],
+                y=st[1].data[:x.lag.npts],
+                normalize=x.cc.normalize == 1,
+                pad=x.lag.pad == 1,
                 unbiased=False,  # apply correction for full dataset!
-            )[dataset.lag.index_min:dataset.lag.index_max]
-            dataset.status.loc[{'pair': p, 'time': t}] = 1
+            )[x.lag.index_min:x.lag.index_max]
+            x.status.loc[{'pair': p, 'time': t}] = 1
             print('Done.')
             if test_run:
                 break
 
     # update history
-    dataset.attrs['history'] += (
-        ', CC process ended @ {}'.format(pd.to_datetime('now'))
+    x.attrs['history'] += (
+        ', Process ended @ {}'.format(pd.to_datetime('now'))
     )
 
     # bias correct?
-    if dataset.cc.bias_correct == 1:
-        dataset = bias_correct_dataset(dataset)
-        dataset.attrs['history'] += (
-            ', Bias corrected CC @ {}'.format(pd.to_datetime('now'))
+    if x.cc.bias_correct == 1:
+        x = bias_correct(x)
+        x.attrs['history'] += (
+            ', Bias corrected @ {}'.format(pd.to_datetime('now'))
         )
 
     # update metadata hash
-    dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
-        dataset,
+    x.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
+        x,
         metadata_only=True
     )
 
-def bias_correct_dataset(
-    dataset: xr.Dataset, biased_var: str = 'cc', unbiased_var: str = None,
+
+def bias_correct(
+    x: xr.Dataset, biased_var: str = 'cc', unbiased_var: str = None,
     weight_var: str = 'w'
 ):
-    if dataset[biased_var].unbiased != 0:
+    r"""Bias correct the xcorr dataset in-place.
+
+    Parameters
+    ----------
+    x: :class:`xarray.Dataset`
+        The data array to process.
+
+    biased_var : `str`, optional
+        The name of the biased correlation variable. Defaults to 'cc'.
+
+    unbiased_var : `str`, optional
+        The name of the biased correlation variable. If `None`,
+        `unbiased_var` = `biased_var`. Defaults to `None`.
+
+    weight_var: `str`, optional
+        The name of unbiased correlation weight variable. Defaults to 'w'.
+    """
+    if x[biased_var].unbiased != 0:
         print('No need to bias correct again.')
         return
     unbiased_var = unbiased_var or biased_var
 
-    if weight_var not in dataset.data_vars:
-        dataset[weight_var] = get_dataset_weights(dataset, name=weight_var)
+    if weight_var not in x.data_vars:
+        x[weight_var] = get_weights(x.lag, name=weight_var)
 
     # create unbiased_var in dataset
     if biased_var != unbiased_var:
-        dataset[unbiased_var] = dataset[biased_var].copy()
-    dataset[unbiased_var].data = (
-        dataset[unbiased_var] *
-        dataset[weight_var].astype(dataset[unbiased_var].dtype)
+        x[unbiased_var] = x[biased_var].copy()
+    x[unbiased_var].data = (
+        x[unbiased_var] *
+        x[weight_var].astype(x[unbiased_var].dtype)
     )
 
     # update attributes
-    dataset[unbiased_var].attrs['unbiased'] = np.byte(True)
-    dataset[unbiased_var].attrs['long_name'] = (
-        'Unbiased ' + dataset[unbiased_var].attrs['long_name']
+    x[unbiased_var].attrs['unbiased'] = np.byte(True)
+    x[unbiased_var].attrs['long_name'] = (
+        'Unbiased ' + x[unbiased_var].attrs['long_name']
     )
-    dataset[unbiased_var].attrs['standard_name'] = (
-        'unbiased_' + dataset[unbiased_var].attrs['standard_name']
+    x[unbiased_var].attrs['standard_name'] = (
+        'unbiased_' + x[unbiased_var].attrs['standard_name']
     )
 
     # update history
-    dataset.attrs['history'] += (
+    x.attrs['history'] += (
         ', Bias corrected CC @ {}'.format(pd.to_datetime('now'))
     )
 
     # update metadata hash
-    dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
-        dataset,
+    x.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
+        x,
         metadata_only=True
     )
 
 
-def get_dataset_weights(
-    dataset: xr.Dataset, name: str = 'w'
+def get_weights(
+    lag: xr.DataArray, name: str = 'w'
 ):
-    r"""Construct the unbiased crosscorrelation weight array.
+    r"""Construct the unbiased crosscorrelation weight vector from the lag vector.
 
     Parameters
     ----------
-    dataset: :class:`xarray.Dataset`
-        `xcorr` dataset.
+    lag: :class:`xarray.DataArray`
+        The lag coordinate.
 
     name : `str`, optional
-        DataArray variable name.
+        Weight variable name. Defaults to 'w'.
 
     Returns
     -------
@@ -660,10 +677,10 @@ def get_dataset_weights(
     """
     return xr.DataArray(
         data=cc.weight(
-            dataset.lag.npts, pad=True
-        )[dataset.lag.index_min:dataset.lag.index_max],
+            lag.npts, pad=True
+        )[lag.index_min:lag.index_max],
         dims=('lag'),
-        coords={'lag': dataset.lag},
+        coords={'lag': lag},
         name=name,
         attrs={
             'long_name': 'Unbiased CC estimate scale factor',
@@ -672,7 +689,7 @@ def get_dataset_weights(
     )
 
 
-def dependency_versions(as_str: bool=False):
+def dependency_versions(as_str: bool = False):
     r"""Returns a `dict` with core dependencies and its version.
     """
     versions = {

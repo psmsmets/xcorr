@@ -4,11 +4,13 @@ r"""
 
 
 # import all modules
-from ..util import time
-from ..util import receiver
 from ..util import hasher
+from ..util import history
+from ..util import receiver
+from ..util import time
 
 # Import all functions
-from ..util.time import *
-from ..util.receiver import *
 from ..util.hasher import *
+from ..util.history import *
+from ..util.receiver import *
+from ..util.time import *

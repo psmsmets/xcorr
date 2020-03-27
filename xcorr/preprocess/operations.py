@@ -21,7 +21,7 @@ crosscorrelation postprocessing routines.
 import warnings
 import xarray as xr
 import json
-from obspy import Inventory
+from obspy import Inventory, Stream, Trace
 
 
 # Relative imports
@@ -30,8 +30,8 @@ from ..util import to_UTCDateTime, hash_obj
 
 
 __all__ = ['help', 'stream_operations', 'is_stream_operation',
-           'apply_stream_operation', 'preprocess', 'example_operations',
-           'filter_operations', 'hash_operations', 'check_operations_hash',
+           'preprocess', 'example_operations_dict',
+           'hash_operations', 'check_operations_hash',
            'operations_to_dict', 'operations_to_json',
            'preprocess_operations_to_json', 'preprocess_operations_to_dict']
 
@@ -99,26 +99,52 @@ def is_stream_operation(operation: str):
 
     Parameters
     ----------
-    operation : str
-        Operation name. See :func:`stream_operations` for a list of
-        implemented operations.
+    operation : `str`
+        Operation name. See :func:`help` or :func:`stream_operations` for a
+        list of implemented operations.
 
     Returns
     -------
-        Returns `True` of the ``operation`` is part of the implemented
+    is_operation : `bool`
+        Returns `True` if the ``operation`` is part of the implemented
         stream operations, `False` otherwise.
 
     """
     return operation in _stream_operations
 
 
-def _inject_parameters(
+def inject_dynamic_parameters(
     operation: str, parameters: dict, inventory: Inventory = None,
     starttime=None, endtime=None
 ):
-    r"""
-    Inject starttime, endtime and inventory to the parameters dictionary
-    when needed.
+    r"""Inject dynamic parameters to the static parameter dictionary
+    when needed by the operation.
+
+    Parameters
+    ----------
+    operation : `str`
+        Operation name. See :func:`help` or :func:`stream_operations` for a
+        list of implemented operations.
+
+    parameters : `dict`
+        Dictionary with static arguments for the operation.
+
+    inventory : :class:`obspy.Inventory`, optional
+        Inventory object, including the instrument response.
+
+    starttime : various, optional
+        Start time of the stream, used for trimming and selecting the correct
+        instrument response.
+
+    endtime : various, optional
+        End time of the stream, used for trimming and selecting the correct
+        instrument response.
+
+    Returns
+    -------
+    parameters : `dict`
+        Dictionary with static and dynamic arguments for the operations.
+    
     """
     params = parameters.copy()
     if (
@@ -142,8 +168,30 @@ def _inject_parameters(
 def apply_stream_operation(
     stream, operation: str, parameters: dict, verbose: bool = False
 ):
-    """
-    Apply a stream operation with the provided parameters.
+    r"""Apply an in-place operation with the provided parameters.
+
+    Parameters
+    ----------
+    stream : :class:`obspy.Stream`
+        Waveforms on which to apply the list of operations.
+
+    operations : `list`
+        List of operations. Each item is a tuple ('operation', {parameters}).
+        Use :func:`help` to list all valid operations and its documentation.
+
+    parameters : `dict`
+        Dictionary with all arguments for the operation. If the ``operation``
+        requires dynamic parameters you should inject them first using
+        :func:`inject_dynamic_parameters`
+
+    verbose : `bool`, optional
+        Print each operation and its arguments if `True`. Defaults to `False`.
+
+    Returns
+    -------
+    stream : :class:`obspy.Stream`
+        Waveforms after applying the list of operations.
+
     """
     if not is_stream_operation(operation):
         return
@@ -154,19 +202,46 @@ def apply_stream_operation(
         return eval(f'stream.{operation}(**parameters)')
     else:
         return method(stream, **parameters)
-        # return eval(f'{method}(stream, **parameters)')
 
 
 def preprocess(
-    stream, operations: list, inventory: Inventory = None,
+    stream: Stream, operations: list, inventory: Inventory = None,
     starttime=None, endtime=None, verbose: bool = False,
     debug: bool = False
 ):
-    """
-    Preprocess a `stream` (~obspy.Stream or ~obspy.Trace) given a list
-    of operations.
-    Optionally provide the `inventory`, `starttime`, `endtime` to inject
-    the parameters.
+    r"""Preprocess waveforms given a list of operations.
+
+    Parameters
+    ----------
+    stream : :class:`obspy.Stream`
+        Waveforms on which to apply the list of operations.
+
+    operations : `list`
+        List of operations. Each item is a tuple ('operation', {parameters}).
+        Use :func:`help` to list all valid operations and its documentation.
+
+    inventory : :class:`obspy.Inventory`, optional
+        Inventory object, including the instrument response.
+
+    starttime : various, optional
+        Start time of the stream, used for trimming and selecting the correct
+        instrument response.
+
+    endtime : various, optional
+        End time of the stream, used for trimming and selecting the correct
+        instrument response.
+
+    verbose : `bool`, optional
+        Print each operation and its arguments if `True`. Defaults to `False`.
+
+    debug :
+        Print the stream after each operation if `True`. Defaults to `False`.
+
+    Returns
+    -------
+    stream : :class:`obspy.Stream`
+        Waveforms after applying the list of operations.
+
     """
     st = stream.copy()
     for operation_params in operations:
@@ -197,7 +272,7 @@ def preprocess(
             st = apply_stream_operation(
                 stream=st,
                 operation=operation,
-                parameters=_inject_parameters(
+                parameters=inject_dynamic_parameters(
                     operation, parameters, inventory, starttime, endtime
                 ),
                 verbose=verbose,
@@ -214,7 +289,10 @@ def preprocess(
     return st
 
 
-def example_operations(to_json: bool = False):
+def example_operations_dict(to_json: bool = False):
+    r"""Returns and example preprocessing operations dictionary, containing a
+    list of operations per SEED channel as key.
+    """
     operations = {
         'BHZ': [
             ('merge', {
@@ -342,11 +420,14 @@ _channel_band_codes = 'FGDCESHBMLVURPTQ'
 def filter_operations(
     operations: dict
 ):
-    """
-    Only keep keys with 3 character channel codes starting with the known
+    r"""Only keep keys with 3 character channel codes starting with the known
     SEED channel band codes 'FGDCESHBMLVURPTQ'.
     """  
-    channels = [chan for chan in operations.keys() if (len(chan) == 3 and chan[0] in _channel_band_codes)]
+    channels = [
+        chan for chan in operations.keys() if (
+            len(chan) == 3 and chan[0] in _channel_band_codes
+        )
+    ]
     return { chan: operations[chan] for chan in channels }
 
 
@@ -426,10 +507,6 @@ def preprocess_operations_to_dict(pair: xr.DataArray, attribute: str = None):
         Specify the operations attribute name. If None, ``attribute`` is
         'preprocess' (default).
 
-    Returns
-    -------
-    None
-
     """
     attribute = attribute or 'preprocess'
     if isinstance(pair.attrs[attribute], str):
@@ -451,10 +528,6 @@ def preprocess_operations_to_json(pair: xr.DataArray, attribute: str = None):
     attribute : str, optional
         Specify the operations attribute name. If None, ``attribute`` is
         'preprocess' (default).
-
-    Returns
-    -------
-    None
 
     """
     attribute = attribute or 'preprocess'

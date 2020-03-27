@@ -24,34 +24,68 @@ import xarray as xr
 from scipy import signal
 
 
-__all__ = ['butterworth_filter']
+# Relative imports
+from ..util.history import historicize
 
 
-def butterworth_filter(
-    darray: xr.DataArray, order: int, btype: str, frequency: float,
-    **kwargs
+__all__ = ['filter']
+
+
+def filter(
+    x: xr.DataArray, frequency, btype: str, order: int = 2,
+    dim: str = 'lag', **kwargs
 ):
+    r"""Butterworth filter an N-D labeled array of data.
+
+    Parameters:
+    -----------
+    x : :class:`xarray.DataArray`
+        The array of data to be filtered.
+
+    btype : `str` {‘lowpass’, ‘highpass’, ‘bandpass’, ‘bandstop’}, optional
+       The type of filter. Default is ‘lowpass’.
+
+    order : `int`, optional
+        The order of the filter. Default is 2.
+
+    dim : `str`, optional
+        The coordinates name if ``x`` to be filtered over. Default is 'lag'.
+
+    Returns:
+    --------
+    y : :class:`xarray.DataArray`
+        The filtered output of ``x``.
     """
-    Butterworth filter a `xr.DataArray`.
-    """
+    assert dim in x.dims, (
+        'x has no dimension "{}"!'.format(dim)
+    )
+    assert 'sampling_rate' in x[dim].attrs, (
+        'Dimension "{}" has no attribute "sampling_rate"!'.format(dim)
+    )
+    assert (
+        isinstance(frequency, float) or
+        (isinstance(frequency, list) and len(frequency) == 2)
+    ), 'Corner frequency should be a `float` or tuple-pair with (min, max)!'
+
     sos = signal.butter(
         N=order,
         Wn=frequency,
         btype=btype,
         output='sos',
-        fs=darray.lag.sampling_rate
+        fs=x[dim].sampling_rate
     )
-    fun = lambda x, sos: signal.sosfiltfilt(sos, x)
+    fun = lambda x, sos: signal.sosfiltfilt(sos, x, **kwargs)
 
-    darray_filt = xr.apply_ufunc(fun, darray, sos)
-    darray_filt.attrs = {
-        **darray.attrs,
-        'filtered': np.int8(True),
-        'filter_design': 'butterworth',
-        'filter_method': 'cascaded second-order sections (sos)',
-        'filter_zerophase': np.int8(True),
-        'filter_order': order,
-        'filter_btype': btype,
-        'filter_frequency': frequency,
-    }
-    return darray_filt
+    y = xr.apply_ufunc(fun, x, sos)
+
+    # add and update attributes
+    y.attrs = x.attrs
+    historicize(y, f='filter', a={
+        'frequency': frequency,
+        'btype': btype,
+        'order': order,
+        'dim': dim,
+        '**kwargs': kwargs,
+    })
+    
+    return y
