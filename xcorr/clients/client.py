@@ -49,9 +49,6 @@ _msg_loaded_archive = 'Waveform data for {} loaded from archive.'
 _msg_added_archive = 'Waveform data for downloaded and added to archive.'
 
 
-# Todo: allow fdsn_service = None/False -> disable downloading!
-
-
 class Client(object):
     """
     `xcorr` waveform request client.
@@ -112,15 +109,18 @@ class Client(object):
         for _sds_root_read in self._sds_root_read:
             self._sds_read.append(sdsClient(_sds_root_read))
 
-        if isinstance(fdsn_service, str):
-            self._fdsn = fdsnClient(fdsn_service)
-        elif isinstance(fdsn_service, fdsnClient):
-            self._fdsn = fdsn_service
+        if fdsn_service:
+            if isinstance(fdsn_service, str):
+                self._fdsn = fdsnClient(fdsn_service)
+            elif isinstance(fdsn_service, fdsnClient):
+                self._fdsn = fdsn_service
+            else:
+                raise TypeError(
+                    '`fdsn_service` should be of type str or '
+                    ':class:`obspy.clients.fdsn.Client`!'
+                )
         else:
-            raise TypeError(
-                '`fdsn_service` should be of type str or '
-                ':class:`obspy.clients.fdsn.Client`!'
-            )
+            self._fdsn = False
         self._nms = nmsClient() if nms_service and nmsClient else False
         self._max_gap = abs(max_gap or 300.)
 
