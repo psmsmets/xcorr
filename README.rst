@@ -33,22 +33,21 @@ Main xcorr features listed per submodule:
   operations per channel id. Channel operations and parameters are added to the
   `pair` as attribute containing id as key.
 
-- **cc**. Crosscorrelation functions and constructors for ``lag`` time and
-  unbiased ``weight`` vectors.
+- **cc**. Crosscorrelation functions and constructors for `lag` time and
+  unbiased `weight` vectors.
 
 - **signal**. Postprocess crosscorrelation estimates, or any `xarray.DataArray`
   with a (lag) time dimension:
 
-  - Detrend (demean and linear).
-  - Mask coordinates of interest (one or two-dimensional).
-  - Root-mean-square.
-  - Signal-to-noise ratio.
-  - Time-domain filter using a forward-backward (zero-phase) digital
+  - ``detrend``: demean and linear detrend.
+  - ``mask``: mask coordinates of interest (one or two-dimensional).
+  - ``rms``: root-mean-square.
+  - ``snr``: signal-to-noise ratio.
+  - ``filter``: time-domain filter using a forward-backward (zero-phase) digital
     butterworth filter by cascaded second-order sections.
-  - Periodogram.
-  - Spectrogram.
-  - Stack crosscorrelation estimates over a full time period, or grouped per
-    day, month, year, year-day, year-month. 
+  - ``psd``: spectrogram.
+  - ``stack``: stack over a full time period, or grouped per day, month, year,
+    year-day, year-month. 
 
 - **util**. Various utilities:
 
