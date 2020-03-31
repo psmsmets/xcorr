@@ -11,8 +11,8 @@ in other languages, packages, machines or platforms.
 
 **xcorr** exists of various submodules such as generalized waveform preprocessing,
 a waterfall-based client wrapping various getters from both local archives and
-remote services, an (unbiased) frequency-domain-based crosscorrelations algorithm
-and postprocessing/analysis tools.
+remote services, an (unbiased) frequency-domain crosscorrelations algorithm and
+various postprocessing/analysis tools.
 
 
 Features
