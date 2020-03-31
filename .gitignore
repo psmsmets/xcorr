@@ -67,3 +67,4 @@ venv.bak/
 *.key
 *.swp
 *.DS_Store
+*.nc
