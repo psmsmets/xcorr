@@ -36,8 +36,8 @@ Main xcorr features listed per submodule:
 - **cc**. Crosscorrelation functions and constructors for ``lag`` time and
   unbiased ``weight`` vectors.
 
-- **signal**: postprocess operations to crosscorrelation estimates, or any
-    `xarray.DataArray` with a (``lag``) time dimension:
+- **signal**. Postprocess crosscorrelation estimates, or any `xarray.DataArray`
+  with a (lag) time dimension:
 
   - Detrend (demean and linear).
   - Mask coordinates of interest (one or two-dimensional).
