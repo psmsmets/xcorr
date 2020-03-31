@@ -329,8 +329,36 @@ def read(
     path: str, extract: bool = False, load_and_close: bool = False,
     fast: bool = False, quick_and_dirty: bool = False, debug: bool = False
 ):
-    """
-    Read a netCDF dataset with cc while checking the data availability.
+    r"""Read an xcorr N-D labeled data array from a netCDF4 file.
+
+    Parameters:
+    -----------
+    path : `str`
+        NetCDF4 filename.
+
+    extract : `bool`, optional
+        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
+        `True`. Defaults to `False`.
+
+    load_and_close : `bool`, optional
+        Load file to memory and close if `True` (default).
+
+    fast : `bool`, optional
+        Omit verifying the `sha256_hash` if `True`. Default is `False`.
+
+    quick_and_dirty : `bool`, optional
+        Omit verifying both the `sha256_hash` and `sha256_hash_metadata`
+        if `True`. Default is `False`.
+
+    debug : `bool`, optional
+        If `True` some extra debug information is printed to the screen.
+        Default is `False`.
+
+    Returns:
+    --------
+    dataset : :class:`xarray.Dataset`
+        The initiated `xcorr` N-D labeled data array.
+
     """
     if not os.path.isfile(path):
         return False
@@ -397,12 +425,33 @@ def read(
 
 def write(
     dataset: xr.Dataset, path: str, close: bool = True,
-    force_write: bool = False, **kwargs
+    force_write: bool = False,
 ):
-    """
-    Write a dataset to netCDF using a tmp file and replacing the destination.
-    """
+    r"""Write an xcorr N-D labeled data array to a netCDF4 file using a
+    temporary file and replacing the final destination.
 
+    Before writing the dataset metadata and data hash hashes are verified and
+    updated if necessary. This changes the dataset attributes in place.
+
+    Parameters:
+    -----------
+    dataset : :class:`xarray.Dataset`
+        The `xcorr` N-D labeled data array.
+
+    path : `str`
+        The netCDF4 filename.
+
+    extract : `bool`, optional
+        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
+        `True`. Defaults to `False`.
+
+    close : `bool`, optional
+        Close the data `True` (default).
+
+    force_write : `bool`, optional
+        Always write file if `True` even if its empty. Default is `False`.
+
+    """
     if (
         np.sum(dataset.status.values == 1) == 0 or
         (np.sum(dataset.status.values == -1) == 0 and force_write)
@@ -448,7 +497,7 @@ def write(
     preprocess_operations_to_json(dataset.pair)
 
     print('To temporary netcdf', end='. ')
-    dataset.to_netcdf(path=tmp, mode='w', format='NETCDF4', **kwargs)
+    dataset.to_netcdf(path=tmp, mode='w', format='NETCDF4')
     print('Replace', end='. ')
     os.replace(tmp, os.path.join(abspath, file))
     print('Done.')
@@ -461,9 +510,33 @@ def merge(
     datasets: list, extract: bool = True, merge_versions: bool = False,
     debug: bool = False, **kwargs
 ):
-    """
-    Merge a list of datasets by specifying either the path as a `str`
-    or the :class:`xarray.DataSet` objects.
+    r"""Merge a list of xcorr N-D labeled data arrays.
+
+    Parameters:
+    -----------
+    datasets : `list`
+        A list with either a `str` specifying the netCDF4 path or a
+        :class:`xarray.Dataset` containing the `xcorr` N-D labeled data array.
+
+    extract : `bool`, optional
+        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
+        `True`. Defaults to `False`.
+
+    merge_versions : `bool`, optional
+        Ignore data arrays with different `xcorr` versions.
+
+    debug : `bool`, optional
+        If `True` some extra debug information is printed to the screen.
+        Default is `False`.
+
+    kwargs :
+        Additional parameters provided to :func:`read`.
+
+    Returns:
+    --------
+    datasets : :class:`xarray.Dataset`
+        The merged `xcorr` N-D labeled data array.
+
     """
     dsets = None
     for ds in datasets:
@@ -558,7 +631,7 @@ def process(
     x: xr.Dataset, client: Client, inventory: obspy.Inventory = None,
     retry_missing: bool = False, test_run: bool = False,  **kwargs
 ):
-    r"""Process the xcorr dataset in place.
+    r"""Process the xcorr N-D labeled data array.
 
     Parameters
     ----------
@@ -673,7 +746,7 @@ def bias_correct(
     x: xr.Dataset, biased_var: str = 'cc', unbiased_var: str = None,
     weight_var: str = 'w'
 ):
-    r"""Bias correct the xcorr dataset in place.
+    r"""Bias correct the xcorr N-D labeled data array.
 
     Parameters
     ----------
