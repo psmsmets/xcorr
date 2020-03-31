@@ -15,6 +15,7 @@ import json
 
 ## Relative imports
 from ..version import version
+from ..util.hasher import _to_serializable
 from .. import __name__ as name
 
 
@@ -38,10 +39,17 @@ def historicize(x: DataArray, f: str, a: dict = {}):
 
     """
     h = x.history.split('; ') if 'history' in x.attrs else []
-    h.append('{n} {v}: {f}({a})'.format(
+    h.append('{n}-{v}: {f}({a})'.format(
         n=name,
         v=version,
         f=f,
-        a=json.dumps(a),
+        a=json.dumps(
+            a,
+            separators=(',', ':'),
+            sort_keys=False,
+            indent=None,
+            skipkeys=False,
+            default=_to_serializable
+        ),
     ))
     x.attrs['history'] = '; '.join(h)

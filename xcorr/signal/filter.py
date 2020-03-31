@@ -1,20 +1,10 @@
-# -*- coding: utf-8 -*-
-"""
-Python module with crosscorrelation processing, waveform preprocessing and
-crosscorrelation postprocessing routines.
+r"""
 
-.. module:: process
+:mod:`signal.filter` -- Filter
+==============================
 
-:author:
-    Pieter Smets (P.S.M.Smets@tudelft.nl)
+Filter an N-D labeled array of data.
 
-:copyright:
-    Pieter Smets
-
-:license:
-    This code is distributed under the terms of the
-    GNU General Public License, Version 3
-    (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
 
@@ -33,9 +23,12 @@ __all__ = ['filter']
 
 def filter(
     x: xr.DataArray, frequency, btype: str, order: int = 2,
-    dim: str = 'lag', **kwargs
+    dim: str = 'lag', inplace = False, **kwargs
 ):
     r"""Butterworth filter an N-D labeled array of data.
+
+    Implementation of :func:`scipy.signal.butter` and
+    :func:`scipy.signal.sosfiltfilt` to a :class:`xarray.DataArray`.
 
     Parameters:
     -----------
@@ -49,12 +42,15 @@ def filter(
         The order of the filter. Default is 2.
 
     dim : `str`, optional
-        The coordinates name if ``x`` to be filtered over. Default is 'lag'.
+        The coordinates name of ``x`` to be filtered over. Default is 'lag'.
+
+    inplace : `bool`, optional
+        If `True`, filter in place and avoid a copy. Default is `False`.
 
     Returns:
     --------
-    y : :class:`xarray.DataArray`
-        The filtered output of ``x``.
+    y : :class:`xarray.DataArray` or `None`
+        The windowed output of ``x`` if ``inplace`` is `False`.
     """
     assert dim in x.dims, (
         'x has no dimension "{}"!'.format(dim)
@@ -74,18 +70,18 @@ def filter(
         output='sos',
         fs=x[dim].sampling_rate
     )
-    fun = lambda x, sos: signal.sosfiltfilt(sos, x, **kwargs)
 
-    y = xr.apply_ufunc(fun, x, sos)
+    y = x if inplace else x.copy()
+    y.data = signal.sosfiltfilt(sos, x.data, axis=x.dims.index(dim))
 
-    # add and update attributes
-    y.attrs = x.attrs
     historicize(y, f='filter', a={
+        'x': x.name,
         'frequency': frequency,
         'btype': btype,
         'order': order,
         'dim': dim,
+        'inplace': inplace,
         '**kwargs': kwargs,
     })
-    
-    return y
+
+    return None if inplace else y

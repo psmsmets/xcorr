@@ -16,6 +16,9 @@ from pandas import to_datetime, to_timedelta
 from obspy import UTCDateTime
 
 
+# Relative imports
+from ..util.history import historicize
+
 __all__ = ['_one_second', 'to_seconds', 'to_UTCDateTime',
            '_dpm', 'leap_year', 'get_dpm', 'get_dpy']
 
@@ -37,10 +40,17 @@ def to_seconds(time):
         Dtype float seconds.
 
     """
-    if time.dtype == np.dtype('timedelta64[ns]'):
-        return time / _one_second
-    else:
+    if not hasattr(time, 'dtype'):
         return time
+    if time.dtype != np.dtype('timedelta64[ns]'):
+        return time
+    if isinstance(time, DataArray):
+        y = (time / _one_second).astype(np.float64)
+        y.attrs['units'] = 's'
+        historicize(y, f='to_seconds', a={})
+        return y
+    else:
+        return time / _one_second
 
 
 def to_UTCDateTime(time):

@@ -29,9 +29,9 @@ analysis tools.
 # import all modules
 from xcorr import util
 from xcorr import clients
-from xcorr import cc 
 from xcorr import preprocess 
-from xcorr import postprocess 
+from xcorr import cc 
+from xcorr import signal 
 from xcorr import core
 
 # Import all functions

@@ -1,21 +1,12 @@
-# -*- coding: utf-8 -*-
+r"""
+
+:mod:`signal.stack` -- Stack
+============================
+
+Stack an N-D labeled array of data.
+
 """
-Python module with crosscorrelation processing, waveform preprocessing and
-crosscorrelation postprocessing routines.
 
-.. module:: process
-
-:author:
-    Pieter Smets (P.S.M.Smets@tudelft.nl)
-
-:copyright:
-    Pieter Smets
-
-:license:
-    This code is distributed under the terms of the
-    GNU General Public License, Version 3
-    (https://www.gnu.org/licenses/gpl-3.0.en.html)
-"""
 
 # Mandatory imports
 import xarray as xr
@@ -26,7 +17,7 @@ import pandas as pd
 from ..util import get_dpm
 
 
-__all__ = ['list_dim_variables', 'stack_all', 'stack_year_month', 'stack_year_dayofyear']
+__all__ = ['stack_all', 'stack_year_month', 'stack_year_dayofyear']
 
 
 def list_dim_variables(
