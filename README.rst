@@ -1,19 +1,18 @@
-*********************************
-xcorr - xarray based correlations
-*********************************
+*************************************
+xcorr - xarray contained correlations
+*************************************
 
 
-**xcorr** is an open-source project containing tools to crosscorrelate
-waveform timeseries  (`obspy.Stream` objects) and wrap all results and
-metadata as a self-describing N-D labeled `xarray.Dataset` following
-CF-1.9 Conventions and FAIR data guidelines. Data can be stored as
-`netCDF4` and opened/postprocessed in other languages, packages,
-machines or platforms.
+**xcorr** is an open-source project existing of tools to crosscorrelate
+waveform timeseries (`obspy.Stream` objects) contained in a self-describing
+N-D labeled `xarray.Dataset` following CF-1.9 Conventions and FAIR data
+guidelines. Data and metadata can be stored as `netCDF4` and read/postprocessed
+in other languages, packages, machines or platforms.
 
-**xcorr** contains various modules such as waveform preprocessing, a
-waterfall-based client wrapping various getters from local archives as well
-as remote services, unbiased frequency-domain-based crosscorrelations and
-postprocessing/analysis tools.
+**xcorr** exists of various submodules such as generalized waveform preprocessing,
+a waterfall-based client wrapping various getters from both local archives and
+remote services, an (unbiased) frequency-domain-based crosscorrelations algorithm
+and postprocessing/analysis tools.
 
 
 Features
