@@ -425,7 +425,7 @@ def read(
 
 def write(
     dataset: xr.Dataset, path: str, close: bool = True,
-    force_write: bool = False,
+    force_write: bool = False
 ):
     r"""Write an xcorr N-D labeled data array to a netCDF4 file using a
     temporary file and replacing the final destination.
@@ -490,7 +490,7 @@ def write(
     # calculate dataset hash
     print('Hash', end='. ')
     dataset.attrs['sha256_hash'] = (
-        util.hasher.hash_Dataset(dataset, metadata_only=False, debug=True)
+        util.hasher.hash_Dataset(dataset, metadata_only=False)
     )
 
     # convert preprocess operations
