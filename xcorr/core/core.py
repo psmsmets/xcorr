@@ -150,7 +150,7 @@ def init(
         'comment': attrs['comment'] if 'comment' in attrs else 'n/a',
         'Conventions': 'CF-1.9',
         'xcorr_version': __version__,
-        'dependency_versions': dependency_versions(as_str=True),
+        'dependencies_version': dependencies_version(as_str=True),
     }
 
     # pair
@@ -686,11 +686,10 @@ def process(
             st = client.get_pair_preprocessed_waveforms(
                 pair=p.values,
                 time=t.values,
-                operations=o,
+                preprocess=o,
                 duration=t.window_length,
                 buffer=t.window_length/10,
                 inventory=inventory,
-                operations_from_json=False,
                 **kwargs
             )
             if not isinstance(st, obspy.Stream) or len(st) != 2:
@@ -833,7 +832,7 @@ def get_weights(
     )
 
 
-def dependency_versions(as_str: bool = False):
+def dependencies_version(as_str: bool = False):
     r"""Returns a `dict` with core dependencies and its version.
     """
     versions = {
