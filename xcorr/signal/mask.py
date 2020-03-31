@@ -161,17 +161,17 @@ def multi_mask(
     lower = get_scalar_value(lower) if lower else None
     upper = get_scalar_value(upper) if upper else None
 
-    dim = y.dims[0]
-    mask = []
+    d = y.dims[0]
+    m = []
     for y0 in y:
-        m = mask_coord(x, lower=lower, upper=upper, scalar=y0.values, invert=invert)
-        mask.append(m.assign_coords(coord=y0[dim]))
+        m0 = mask(x, lower=lower, upper=upper, scalar=y0.values, invert=invert)
+        m.append(m0.assign_coords(coord=y0[d]))
 
-    mask = xr.concat(mask, dim=dim)
-    mask.name = 'mask_{}_{}'.format(x.name, y.name)
-    mask.attrs.pop('history')
+    m = xr.concat(m, dim=d)
+    m.name = 'mask_{}_{}'.format(x.name, y.name)
+    m.attrs.pop('history')
 
-    historicize(mask, f='multi_mask', a={
+    historicize(m, f='multi_mask', a={
         'x': '{} ({})'.format(x.name, x.dims[0]),
         'y': '{} ({})'.format(y.name, y.dims[0]),
         'lower': lower,
@@ -180,4 +180,4 @@ def multi_mask(
         'name': name,
     })
 
-    return mask
+    return m
