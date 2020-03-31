@@ -17,6 +17,7 @@ from scipy import signal
 
 # Relative import
 from ..util import to_seconds
+from ..util.history import historicize
 
 
 __all__ = ['psd', 'psd_f_t']
@@ -89,7 +90,7 @@ def psd(
         fs=x[dim].sampling_rate,
         nperseg=win_len,
         noverlap=win_len-1,
-        nfft=int(padding*win_len),
+        nfft=int(win_len*padding_factor),
         scaling='density',
         mode='psd',
         axis=x.dims.index(dim),
@@ -228,7 +229,7 @@ def psd_f_t(
         fs=x[dim].sampling_rate,
         nperseg=win_len,
         noverlap=win_shift,
-        nfft=win_len*padding_factor,
+        nfft=int(win_len*padding_factor),
         scaling='density',
         mode='psd',
         axis=x.dims.index(dim),

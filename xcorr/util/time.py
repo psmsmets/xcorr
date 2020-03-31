@@ -26,7 +26,7 @@ __all__ = ['_one_second', 'to_seconds', 'to_UTCDateTime',
 _one_second = to_timedelta(1, unit='s')
 
 
-def to_seconds(time):
+def to_seconds(time, inplace: bool = False):
     r"""Convert dtype timedelta64[ns] to float seconds
 
     Parameters
@@ -45,10 +45,11 @@ def to_seconds(time):
     if time.dtype != np.dtype('timedelta64[ns]'):
         return time
     if isinstance(time, DataArray):
-        y = (time / _one_second).astype(np.float64)
+        y = time if inplace else time.copy()
+        y.values = (y.values / _one_second).astype(np.float64)
         y.attrs['units'] = 's'
         historicize(y, f='to_seconds', a={})
-        return y
+        return None if inplace else y
     else:
         return time / _one_second
 

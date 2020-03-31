@@ -21,6 +21,19 @@ from ..util.history import historicize
 __all__ = ['mask', 'multi_mask']
 
 
+def get_scalar_value(x: xr.DataArray, x0=None, timedelta_to_seconds: bool = True):
+    r"""Convert a dimensionless array to a scalar value.
+    """
+    assert not (not x and not x0), (
+        'Input parameter cannot be empty without a default value!'
+    )
+    if isinstance(x, np.ndarray) or isinstance(x, xr.DataArray):
+        y = np.asscalar(x) if x else x0
+    else:
+        y = x if x else x0
+    return to_seconds(y) if timedelta_to_seconds else y
+
+
 def mask(
     x: xr.DataArray, lower=None, upper=None, scalar = None,
     name: str = None, invert: bool = False, to_where: bool = False, **kwargs
@@ -92,19 +105,6 @@ def mask(
     })
 
     return coord.where(mask, **kwargs) if to_where else mask
-
-
-def get_scalar_value(x: xr.DataArray, x0=None, timedelta_to_seconds: bool = True):
-    r"""Convert a dimensionless array to a scalar.
-    """
-    assert not (not x and not x0), (
-        'Input parameter cannot be empty without a default value!'
-    )
-    if isinstance(x, np.ndarray) or isinstance(x, xr.DataArray):
-        y = np.asscalar(x) if x else x0
-    else:
-        y = x if x else x0
-    return to_seconds(y) if timedelta_to_seconds else y
 
 
 def multi_mask(
