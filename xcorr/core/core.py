@@ -352,9 +352,10 @@ def write(
     )
     if sha256_hash_metadata != dataset.sha256_hash_metadata:
         warnings.warn(
-            'Dataset metadata sha256 hash is inconsistent',
+            'Dataset metadata sha256 hash is updated.',
             UserWarning
         )
+        dataset.attrs['sha256_hash_metadata'] = sha256_hash_metadata
 
     print('Write dataset as "{}"'.format(path), end=': ')
     abspath, file = os.path.split(os.path.abspath(path))
@@ -373,7 +374,7 @@ def write(
     # calculate dataset hash
     print('Hash', end='. ')
     dataset.attrs['sha256_hash'] = (
-        util.hasher.hash_Dataset(dataset, metadata_only=False)
+        util.hasher.hash_Dataset(dataset, metadata_only=False, debug=True)
     )
 
     # convert preprocess operations

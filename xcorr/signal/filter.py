@@ -72,7 +72,9 @@ def filter(
     )
 
     y = x if inplace else x.copy()
-    y.data = signal.sosfiltfilt(sos, x.data, axis=x.dims.index(dim))
+    y.data = signal.sosfiltfilt(
+        sos, x.data, axis=x.dims.index(dim)
+    ).astype(x.dtype)
 
     historicize(y, f='filter', a={
         'x': x.name,

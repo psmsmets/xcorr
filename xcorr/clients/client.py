@@ -49,6 +49,9 @@ _msg_loaded_archive = 'Waveform data for {} loaded from archive.'
 _msg_added_archive = 'Waveform data for downloaded and added to archive.'
 
 
+# Todo: allow fdsn_service = None/False -> disable downloading!
+
+
 class Client(object):
     """
     `xcorr` waveform request client.
