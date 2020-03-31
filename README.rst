@@ -21,23 +21,23 @@ Features
 
 Main xcorr features listed per submodule:
 
-- **core**. Main functions of xcorr are `init`, `process`. `bias_correct`,
+- **core**: Main functions of xcorr are `init`, `process`. `bias_correct`,
   `read`, `write` and `merge`. All of these return or are applied on an
   `xarray.Dataset`.
 
-- **clients**. Load waveform data from a local SeisComP Data Structure (SDS)
+- **clients**: Load waveform data from a local SeisComP Data Structure (SDS)
   archive and automatically download missing or incomplete waveforms by the
   FDSN web service and/or NMS Client.
 
-- **preprocess**: process waveforms before correlation given a dictionary with
+- **preprocess**: Process waveforms before correlation given a dictionary with
   operations per channel id. Channel operations and parameters are added to the
   `pair` as attribute containing id as key.
 
-- **cc**. Crosscorrelation functions and constructors for `lag` time and
+- **cc**: Crosscorrelation functions and constructors for `lag` time and
   unbiased `weight` vectors.
 
-- **signal**. Postprocess crosscorrelation estimates, or any `xarray.DataArray`
-  with a (lag) time dimension:
+- **signal**: Postprocess crosscorrelation estimates, or any `xarray.DataArray`
+  with a (lag) time dimension.
 
   - ``detrend``: demean and linear detrend.
   - ``mask``: mask coordinates of interest (one or two-dimensional).
@@ -49,7 +49,7 @@ Main xcorr features listed per submodule:
   - ``stack``: stack over a full time period, or grouped per day, month, year,
     year-day, year-month. 
 
-- **util**. Various utilities:
+- **util**: Various utilities.
 
   - Hash utilities for python `list` and `dict` types, and entire objects such
     as `obspy.Trace`, `obspy.Stream`, `xarray.DataArray`, and `xarray.Dataset`.
