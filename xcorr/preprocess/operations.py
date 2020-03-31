@@ -1,27 +1,17 @@
-# -*- coding: utf-8 -*-
-"""
-Python module with crosscorrelation processing, waveform preprocessing and
-crosscorrelation postprocessing routines.
+r"""
 
-.. module:: process
+:mod:`preprocess.operations` -- Preprocess operations
+=====================================================
 
-:author:
-    Pieter Smets (P.S.M.Smets@tudelft.nl)
+Preprocess a :class:`obspy.Stream` given a list of operations and parameters.
 
-:copyright:
-    Pieter Smets
-
-:license:
-    This code is distributed under the terms of the
-    GNU General Public License, Version 3
-    (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
 # Mandatory imports
 import warnings
 import xarray as xr
 import json
-from obspy import Inventory, Stream, Trace
+from obspy import Inventory, Stream
 
 
 # Relative imports
@@ -144,7 +134,7 @@ def inject_dynamic_parameters(
     -------
     parameters : `dict`
         Dictionary with static and dynamic arguments for the operations.
-    
+
     """
     params = parameters.copy()
     if (
@@ -218,7 +208,7 @@ def preprocess(
 
     operations : `list`
         List of operations. Each item is a tuple ('operation', {parameters}).
-        Use :func:`help` to list all valid operations and its documentation.
+        Use :func:`help` to list all valid operations and their documentation.
 
     inventory : :class:`obspy.Inventory`, optional
         Inventory object, including the instrument response.
@@ -422,13 +412,13 @@ def filter_operations(
 ):
     r"""Only keep keys with 3 character channel codes starting with the known
     SEED channel band codes 'FGDCESHBMLVURPTQ'.
-    """  
+    """
     channels = [
         chan for chan in operations.keys() if (
             len(chan) == 3 and chan[0] in _channel_band_codes
         )
     ]
-    return { chan: operations[chan] for chan in channels }
+    return {chan: operations[chan] for chan in channels}
 
 
 def hash_operations(
@@ -439,7 +429,7 @@ def hash_operations(
     before hashing using :func:`filter_operations`.
     """
     operations = filter_operations(operations)
-    operations['sha256_hash'] = hash_obj(operations) 
+    operations['sha256_hash'] = hash_obj(operations)
     return operations
 
 

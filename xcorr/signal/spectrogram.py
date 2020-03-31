@@ -10,7 +10,6 @@ Generate a spectrogram of an N-D labeled array of data.
 
 # Mandatory imports
 import xarray as xr
-#import pandas as pd
 import numpy as np
 from scipy import signal
 
@@ -38,7 +37,7 @@ def psd(
     The computed spectrogram contains the coordinates of ``x`` and a new
     coordinate 'frequency' with sample frequencies ranging from dc up to
     Nyquist ``dim.sampling_rate/2``. Spectrogram time segments correspond to
-    the samples in ``dim``, with `NaN` at the outer edges (``duration/2``). 
+    the samples in ``dim``, with `NaN` at the outer edges (``duration/2``).
 
     Parameters:
     -----------
@@ -142,7 +141,7 @@ def psd(
     edge = int(np.rint(win_len/2-1))
 
     y.data.fill(np.nan)
-    y.loc[{'lag':y[dim][edge:-1-edge]}] = Sxx
+    y.loc[{'lag': y[dim][edge: -1-edge]}] = Sxx
 
     historicize(y, f='psd', a={
         'x': x.name,
@@ -169,9 +168,9 @@ def psd_f_t(
     both sampling attributes ``sampling_rate`` and ``delta``.
 
     The computed spectrogram contains the coordinates of ``x`` minus ``dim``,
-    and two new coordinates, 'psd_f' and 'psd_t`, with sample frequencies ranging
-    from dc up to Nyquist ``dim.sampling_rate/2`` and with time segments depending
-    on ``dim``, ``duration`` and ``overlap``, respectively. 
+    and two new coordinates, 'psd_f' and 'psd_t`, with sample frequencies
+    ranging from dc up to Nyquist ``dim.sampling_rate/2`` and with time
+    segments depending on ``dim``, ``duration`` and ``overlap``, respectively.
 
     Parameters:
     -----------
@@ -277,7 +276,7 @@ def psd_f_t(
             'overlap': overlap,
             'centered': np.byte(True),
             **kwargs
-        }, 
+        },
     )
 
     historicize(y, f='psd_f_t', a={

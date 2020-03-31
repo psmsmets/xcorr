@@ -54,7 +54,7 @@ def stack_all(
 
 
 def stack_year_month(
-    dataset: xr.Dataset
+    dataset: xr.Dataset, **kwargs
 ):
     """
     Stack `xr.Dataset` per year and month.

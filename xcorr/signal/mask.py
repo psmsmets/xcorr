@@ -21,7 +21,9 @@ from ..util.history import historicize
 __all__ = ['mask', 'multi_mask']
 
 
-def get_scalar_value(x: xr.DataArray, x0=None, timedelta_to_seconds: bool = True):
+def get_scalar_value(
+    x: xr.DataArray, x0=None, timedelta_to_seconds: bool = True
+):
     r"""Convert a dimensionless array to a scalar value.
     """
     assert not (not x and not x0), (
@@ -35,7 +37,7 @@ def get_scalar_value(x: xr.DataArray, x0=None, timedelta_to_seconds: bool = True
 
 
 def mask(
-    x: xr.DataArray, lower=None, upper=None, scalar = None,
+    x: xr.DataArray, lower=None, upper=None, scalar=None,
     name: str = None, invert: bool = False, to_where: bool = False, **kwargs
 ):
     r"""Construct a one-dimensional N-D labeled mask array.
@@ -83,14 +85,14 @@ def mask(
     upper = get_scalar_value(upper) if upper else None
 
     # Invert
-    l = 1/upper if invert else lower
-    u = 1/lower if invert else upper
+    lo = 1/upper if invert else lower
+    up = 1/lower if invert else upper
 
     # Multiply or replace None
-    l = l * scalar if l else x.min().values
-    u = u * scalar if u else x.max().values
+    lo = lo * scalar if lo else x.min().values
+    up = up * scalar if up else x.max().values
 
-    mask = (x >= l) & (x <= u)
+    mask = (x >= lo) & (x <= up)
     mask.name = name or 'mask_{}'.format(x.name)
 
     historicize(mask, f='mask', a={
@@ -104,7 +106,7 @@ def mask(
         '**kwargs': kwargs,
     })
 
-    return coord.where(mask, **kwargs) if to_where else mask
+    return x.where(mask, **kwargs) if to_where else mask
 
 
 def multi_mask(

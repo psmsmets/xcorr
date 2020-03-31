@@ -1,27 +1,16 @@
-# -*- coding: utf-8 -*-
-"""
-Python module for loading waveform data from a primary local sds archive, and
-automatically retrieve missing daily waveforms using fdsn and nms web
-request services.
+r"""
 
-.. module:: clients
+:mod:`client.client` -- Client
+==============================
 
-:author:
-    Pieter Smets (P.S.M.Smets@tudelft.nl)
+Load waveform data from a primary local sds archive, and automatically
+retrieve missing daily waveforms using fdsn and nms web request services.
 
-:copyright:
-    Pieter Smets
-
-:license:
-    This code is distributed under the terms of the
-    GNU General Public License, Version 3
-    (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
 # Mandatory imports
 import numpy as np
 import pandas as pd
-import json
 from obspy import UTCDateTime, Stream, Inventory
 from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
@@ -34,7 +23,7 @@ except ImportError:
 
 # Relative imports
 from ..clients.datafetch import stream2SDS
-from ..preprocess import preprocess
+from ..preprocess import preprocess as xcorr_preprocess
 from ..util.receiver import check_receiver, split_pair
 from ..util.time import to_UTCDateTime
 
@@ -64,35 +53,40 @@ class Client(object):
 
         >>> client = Client('/tmp')
 
-        Parameters
-        ----------
-        sds_root : str
+        Parameters:
+        -----------
+        sds_root : `str`
             Path to the local SeisComP Data Structure (SDS) archive. All
             downloaded waveforms will be added to this archive if
-            `sds_root_write` is not specified.
+            ``sds_root_write`` is not specified.
 
-        sds_root_write: str, optional
+        sds_root_write: `str`, optional
             Specify an SDS archive to store automatically downloaded
             waveforms by the FDSN web service and/or NMS Client.
 
-        sds_root_read: list, optional
+        sds_root_read: `list`, optional
             Scan multiple SDS archives.
 
-        fdsn_service : str or :class:`obspy.clients.fdsn.Client`, optional
-            FDSN web service base URL. If None, 'IRIS' is used (default).
+        fdsn_service : `str` or :class:`obspy.clients.fdsn.Client`, optional
+            FDSN web service base URL. If `None` or `False`, FDSN web service
+            is disabled. Default web service is 'IRIS'.
 
-        nms_service : bool, optional
-            Enable the NMS Client to access IMS waveform data of the
+        nms_service : `bool`, optional
+            Enable the NMS Client to access restricted IMS waveform data of the
             Comprehensive Nuclear-Test-Ban Treaty Organization (CTBTO)
-            if True (default). If no :class:`nms_tools.nms_client.Client`
-            is found `nms_service` will be False.
+            if `True` (default). If no :class:`nms_tools.nms_client.Client`
+            is found or credentials are invalid, ``nms_service`` will be
+            disabled.
 
-        max_gap : float, optional
+        max_gap : `float`, optional
             Specify the maximum time gap in seconds that is allowed in a day.
-            If None, `max_gap` is 300s (default).
+            If `None`, ``max_gap`` is 300s (default).
 
         """
-        if not sds_root and not sds_root_read or not sds_root and not sds_root_write:
+        if (
+            (not sds_root and not sds_root_read) or
+            (not sds_root and not sds_root_write)
+        ):
             raise AttributeError(
                 'At least `sds_root` or `sds_root_read` and '
                 '`sds_root_write` are required.'
@@ -120,47 +114,116 @@ class Client(object):
                     ':class:`obspy.clients.fdsn.Client`!'
                 )
         else:
-            self._fdsn = False
-        self._nms = nmsClient() if nms_service and nmsClient else False
+            self._fdsn = None
+        self._nms = nmsClient() if nms_service and nmsClient else None
         self._max_gap = abs(max_gap or 300.)
 
     @property
     def sds_root(self):
-        raise NotImplementedError('Use either `sds_root_read` or `sds_root_write`!')
+        raise NotImplementedError(
+            'Use either `sds_root_read` or `sds_root_write`!'
+        )
 
     @property
     def sds_root_read(self):
+        r"""sds_root_read.
+
+        Returns:
+        --------
+        sds_read : `list`
+            List of SDS client roots used to initiate ``self.sds_read``.
+        """
         return self._sds_root_read
 
     @property
     def sds_root_write(self):
+        r""""sds_root_read
+
+        Returns:
+        --------
+        sds_root_write : `str`
+            SDS client root used to initiate ``self.sds_write``.
+        """
         return self._sds_root_write
 
     @property
     def sds_read(self):
+        r"""sds_read
+
+        Returns:
+        --------
+        sds_read : `list` of :class:`obspy.clients.filesystem.sds.Client`
+            List of SDS client objects used to get local waveforms.
+        """
         return self._sds_read
 
     @property
     def sds_write(self):
+        r"""sds_write
+
+        Returns:
+        --------
+        sds_write : :class:`obspy.clients.filesystem.sds.Client`
+            SDS client object used to write waveforms.
+        """
         return self._sds_write
 
     @property
     def fdsn(self):
+        r"""fdsn
+
+        Returns:
+        --------
+        fdsn : :class:`obspy.clients.fdsn.Client`
+            FDSN web service object used to download missing waveforms.
+        """
         return self._fdsn
 
     @property
     def nms(self):
+        r"""fdsn
+
+        Returns:
+        --------
+        nms : :class:`nms_tools.nms_client.Client`
+            NMS Client to access restricted IMS waveform data of the
+            Comprehensive Nuclear-Test-Ban Treaty Organization (CTBTO),
+            used to download missing waveforms.
+        """
         return self._nms
 
     @property
     def max_gap(self):
+        r"""max_gap
+
+        Returns:
+        --------
+        max_gap : `float`
+            Maximum number of seconds that are allowed to be missing in a
+            day of data.
+        """
         return self._max_gap
 
+    def _sds_write_daystream(
+        self, stream: Stream, verbose: bool = False
+    ):
+        r"""Wrapper to write a day stream of data to the local SDS archive.
 
-    def _sds_write_daystream(stream: Stream, verbose: bool = False):
-        """
-        Write daystream to `self.sds_root_write` if `stream` passes
-        :func:`_check_daystream_length`.
+        Parameters:
+        -----------
+        stream : :class:`obspy.Stream`
+            Stream with a day of data.
+
+        verbose : `bool`, optional
+            Print a message if ``stream`` is successfully added to the SDS
+            archive.
+
+        Returns:
+        --------
+        status : `bool`
+            Returns `False` if ``stream`` does not pass the day criteria of
+            :meth:'_check_daystream_length', otherwise returns `True`.
+
         """
         if not self._check_daystream_length(stream, verbose):
             return False
@@ -177,9 +240,8 @@ class Client(object):
     def _check_daystream_length(
         self, stream: Stream, verbose: bool = False
     ):
-        """
-        Return if a stream (assuming a uniqe SEED-id) contains a day of data
-        not exceeding the allowed `gap` (default 300s.)
+        r"""Returns `True` if a stream (assuming a uniqe SEED-id) contains a
+        day of data not exceeding the allowed ``max_gap``.
         """
         if not isinstance(stream, Stream) or len(stream) == 0:
             return False
@@ -198,10 +260,44 @@ class Client(object):
         duration: float = 86400., buffer: float = 60.,
         allow_wildcards: bool = False, verbose: bool = False
     ):
-        """
-        Get waveforms given the SEED-id `receiver` and
-        `time` (default `centered`)
-        for `duration` (default 86400s) and `buffer` (default 60s).
+        r"""Get waveforms from the clients given a SEED-id.
+
+        Parameters:
+        -----------
+        receiver : `str`
+            Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
+
+        time : `np.datetime64`
+            Anchor node of the time window, either the start or the center of
+            of the waveform time window, depending on ``centered``.
+
+        centered : `bool`, optional
+            Controls the anchor type of ``time``. If `True`, ``time``
+            corresponds to the center of the waveform time window, otherwise
+            ``time`` is the left corner (start) of the time window. Defaults
+            to `True`.
+
+        duration : `float`, optional
+            Set the duration of the waveform time window, in seconds. Defaults
+            to a full day: 86400s.
+
+        buffer : `float`, optional
+            Symmetrically extent the time window by a buffer, in seconds.
+            Defaults to 60s.
+
+        allow_wildscards : `bool`, optional
+            Enable wildcards '*' and '?' in the ``receiver`` SEED-id string.
+            Defaults to `False`, not allowing wildcards.
+
+        verbose : `bool`, optional
+            Print a message if ``stream`` is successfully added to the SDS
+            archive.
+
+        Returns:
+        --------
+        stream : :class:`obspy.Stream`
+            The requested waveforms.
+
         """
         # check if receiver SEED-id is valid
         check_receiver(
@@ -217,7 +313,7 @@ class Client(object):
         t0 = pd.to_datetime(time)
         if centered:
             t0 -= pd.offsets.DateOffset(seconds=duration/2)
-        t1 = t0 + pd.offsets.DateOffset(seconds=duration) 
+        t1 = t0 + pd.offsets.DateOffset(seconds=duration)
         if buffer > 0.:
             t0 -= pd.offsets.DateOffset(seconds=buffer)
             t1 += pd.offsets.DateOffset(seconds=buffer)
@@ -256,7 +352,7 @@ class Client(object):
                     if verbose:
                         print(_msg_loaded_archive.format(t))
                     stream += daystream
-                    break 
+                    break
             else:
                 if verbose:
                     print(_msg_no_data.format(t))
@@ -307,19 +403,57 @@ class Client(object):
                         if verbose:
                             print('an error occurred:')
                             print(e)
-
-        return stream.trim(starttime=to_UTCDateTime(t0), endtime=to_UTCDateTime(t1))
+        stream.trim(starttime=to_UTCDateTime(t0), endtime=to_UTCDateTime(t1))
+        return stream
 
     def get_preprocessed_waveforms(
-        self, receiver: str, time: np.datetime64, operations: dict,
+        self, receiver: str, time: np.datetime64, preprocess: dict,
         duration: float = 86400., inventory: Inventory = None,
-        operations_from_json: bool = False, three_components: str = '12Z',
+        three_components: str = '12Z',
         verbose: bool = False, debug: bool = False, **kwargs
     ):
-        """
-        Get the preprocessed `obspy.Stream` given the SEED-id `receiver`,
-        `time`, preprocess `operations` and `duration` (default 86400s).
-        Optionally provide the `obspy.Inventory` and some other options.
+        r"""Get preprocessed waveforms from the clients given a SEED-id and
+        an operations dictionary.
+
+        Parameters:
+        -----------
+        receiver : `str`
+            Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
+
+        time : `np.datetime64`
+            Center time of the waveform time window.
+
+        preprocess : `dict`
+            Preprocessing operations dictionary, containing a list of
+            operations per SEED channel as key. Each list item should be a
+            tuple ('operation', {parameters}).
+            Use :func:`xcorr.preprocess.help` to list all valid operations and
+            their documentation.
+
+        duration : `float`, optional
+            Set the duration of the waveform time window, in seconds. Defaults
+            to a full day: 86400s.
+
+        inventory : :class:`obspy.Inventory`, optional
+            Inventory object, including the instrument response.
+
+        three_components: `str` {'12Z', 'NEZ'}, optional
+            Set the three-component orientation characters. Defaults to '12Z'.
+
+        verbose : `bool`, optional
+            Print standard status messages if `True`. Defaults to `False`.
+
+        debug : `bool`, optional
+            Print many status messages if `True`. Defaults to `False`.
+
+        kwargs :
+            Parameters passed to :meth:`get_waveforms`.
+
+        Returns:
+        --------
+        stream : :class:`obspy.Stream`
+            The requested waveforms after preprocessing.
+
         """
         # check if receiver SEED-id is valid
         check_receiver(receiver, allow_wildcards=False, raise_error=True)
@@ -331,7 +465,7 @@ class Client(object):
         # radial or transverse component? Request all channels manually.
         if ch[-1] == 'R' or ch[-1] == 'T':
             st = Stream()
-            for c in three_components:
+            for c in three_components:  # '12NEZ'??
                 st += self.get_waveforms(
                     receiver=receiver[:-1]+c,
                     time=time,
@@ -355,12 +489,9 @@ class Client(object):
         if not isinstance(st, Stream) or len(st) == 0:
             return Stream()
         try:
-            st = preprocess(
+            st = xcorr_preprocess(
                 stream=st,
-                operations=(
-                    json.loads(operations[ch])
-                    if operations_from_json else operations[ch]
-                ),
+                operations=preprocess[ch],
                 inventory=inventory,
                 starttime=t0,
                 endtime=t1,
@@ -381,14 +512,30 @@ class Client(object):
         return st
 
     def get_pair_preprocessed_waveforms(
-        self, pair, time: np.datetime64, operations: dict, **kwargs
+        self, pair, **kwargs
     ):
-        """
-        Get the preprocessed `obspy.Stream` given the SEED-ids receiver
-        `pair`, `time` and preprocess `operations`.
+        r"""Get preprocessed waveforms from the clients given a receiver couple
+        SEED-id and an operations dictionary.
+
+        Parameters:
+        -----------
+        pair : str or :mod:`~xarray.DataArray`
+            Receiver couple separated by `separator`. Each receiver is
+            specified by a SEED-id string:
+            '{network}.{station}.{location}.{channel}'.
+
+        kwargs :
+            Parameters passed to :meth:`get_preprocessed_waveforms` and
+            :meth:`get_waveforms`.
+
+        Returns:
+        --------
+        stream : :class:`obspy.Stream`
+            The requested waveforms after preprocessing.
+
         """
         rA, rB = split_pair(pair)
         return (
-            self.get_preprocessed_waveforms(rA, time, operations, **kwargs) +
-            self.get_preprocessed_waveforms(rB, time, operations, **kwargs)
+            self.get_preprocessed_waveforms(rA, **kwargs) +
+            self.get_preprocessed_waveforms(rB, **kwargs)
         )

@@ -32,16 +32,80 @@ __all__ = ['init', 'read', 'write', 'merge', 'process', 'bias_correct']
 
 def init(
     pair: str, starttime: datetime, endtime: datetime, preprocess: dict,
-    sampling_rate: float, attrs: dict,
-    window_length: float = 86400., window_overlap: float = 0.875,
+    attrs: dict, sampling_rate: float, window_length: float = 86400.,
+    window_overlap: float = 0.875,
     clip_lag=None, unbiased_cc: bool = False,
     closed: str = 'left', dtype: np.dtype = np.float32,
     inventory: obspy.Inventory = None, stationary_poi: dict = None,
 ):
+    r"""Initiate an xcorr N-D labeled data array.
+
+    Parameters:
+    -----------
+    pair : `str`
+        Receiver couple separated by a '-'. Each receiver is specified by its
+        SEED-id string: '{network}.{station}.{location}.{channel}'.
+
+    starttime : `datetime.datetime`
+        Start time for generating crosscorrelation time windows.
+
+    endtime : `datetime.datetime`
+        End time for generating crosscorrelation time windows.
+
+    preprocess : `dict`
+        Preprocessing operations dictionary, containing a list of operations
+        per SEED channel as key. Each list item should be a tuple
+        ('operation', {parameters}).
+        Use :func:`xcorr.preprocess.help` to list all valid operations and
+        their documentation.
+
+    attrs : `dict`
+        Dictionary with global attributes the comply with COARDS and CF
+        conventions. Following keys are required:
+        ['institution', 'author', 'source']
+
+    sampling_rate : `float`
+        Sampling rate for the crosscorrelation lag time.
+
+    window_length : `float`, optional
+        Crosscorrelation window length, in seconds. Defaults to 86400s.
+
+    window_overlap : `float`, optional
+        Crosscorrelation window overlap, [0,1). Defaults to 0.875.
+
+    clip_lag : :class:`pd.Timedelta` or :class:`pd.TimedeltaIndex`
+        Clip the crosscorrelation lag time. Defaults to `None`. If ``clip_lag``
+        is a single value of type :class:`pd.Timedelta` ``lag`` is clipped
+        symmetrically around zero with radius ``clip_lag``.
+        Provide a :class:`pd.TimedeltaIndex` of size 2 to clip a specific lag
+        range of interest.
+
+    unbiased_cc : `bool`, optional
+        Automatically bias correct the crosscorrelation estimate in place if
+        `True`. Default is `False`.
+
+    closed : {`None`, 'left', 'right'}, optional
+        Make the time interval closed with respect to the given frequency to
+        the 'left' (default), 'right', or both sides (`None`).
+
+    dtype : `np.dtype`, optional
+        Set the crosscorrelation estimate dtype. Defaults to `np.float32`.
+
+    inventory : :class:`obspy.Inventory`, optional
+        Inventory object, including the instrument response.
+
+    stationary_poi : `dict`, optional
+        Specify a point-of-interest `dict` with keys ['longitude','latitude']
+        in decimal degrees to obtain a relative distance.
+        If `None` (default), the receiver pair geodetic distance is calculated.
+
+    Returns:
+    --------
+    dataset : :class:`xarray.Dataset`
+        The initiated `xcorr` N-D labeled data array.
+
     """
-    Initiate an xcorr xarray.Dataset.
-    """
-    # check metadata
+    # check
     assert 'institution' in attrs, (
         "attrs['institution'] = 'Institution, department'!"
     )
@@ -50,6 +114,9 @@ def init(
     )
     assert 'source' in attrs, (
         "attrs['source'] = 'Data source description'!"
+    )
+    assert isinstance(pair, str), (
+        "pair should be receiver pair string!"
     )
     # config
     delta = 1/sampling_rate
@@ -491,7 +558,7 @@ def process(
     x: xr.Dataset, client: Client, inventory: obspy.Inventory = None,
     retry_missing: bool = False, test_run: bool = False,  **kwargs
 ):
-    r"""Process the xcorr dataset in-place.
+    r"""Process the xcorr dataset in place.
 
     Parameters
     ----------
@@ -499,7 +566,7 @@ def process(
         The data array to process.
 
     client : :class:`xcorr.Client`
-        The initiated client to the local and remote archives.
+        The initiated client to the local and remote data archives.
 
     inventory : :class:`obspy.Inventory`
         The inventory object with instrument responses.
@@ -511,6 +578,9 @@ def process(
     test_run : `bool`, optional
         If `True` the function is aborted after the first iteration.
         Default is `False`.
+
+    kwargs :
+        Arguments passed to :meth:``client.get_pair_preprocessed_waveforms``.
 
     """
     x.attrs['history'] += (
@@ -603,7 +673,7 @@ def bias_correct(
     x: xr.Dataset, biased_var: str = 'cc', unbiased_var: str = None,
     weight_var: str = 'w'
 ):
-    r"""Bias correct the xcorr dataset in-place.
+    r"""Bias correct the xcorr dataset in place.
 
     Parameters
     ----------

@@ -13,7 +13,6 @@ import xarray as xr
 
 
 # Relative imports
-from ..util.time import to_seconds
 from ..util.history import historicize
 from ..signal.rms import rms
 
@@ -23,7 +22,7 @@ __all__ = ['snr']
 
 def snr(
     x: xr.DataArray, signal: xr.DataArray, noise: xr.DataArray,
-    dim:str = 'lag'
+    dim: str = 'lag'
 ):
     r"""Compute the signal-to-noise ratio of an N-D labeled array of data
     given a signal mask and a noise mask.

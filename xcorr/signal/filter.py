@@ -9,7 +9,6 @@ Filter an N-D labeled array of data.
 
 
 # Mandatory imports
-import numpy as np
 import xarray as xr
 from scipy import signal
 
@@ -23,7 +22,7 @@ __all__ = ['filter']
 
 def filter(
     x: xr.DataArray, frequency, btype: str, order: int = 2,
-    dim: str = 'lag', inplace = False, **kwargs
+    dim: str = 'lag', inplace: bool = False, **kwargs
 ):
     r"""Butterworth filter an N-D labeled array of data.
 

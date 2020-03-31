@@ -1,20 +1,11 @@
-# -*- coding: utf-8 -*-
-"""
-Python module with crosscorrelation processing, waveform preprocessing and
-crosscorrelation postprocessing routines.
+r"""
 
-.. module:: process
+:mod:`preprocess.running_rms` -- Running RMS
+============================================
 
-:author:
-    Pieter Smets (P.S.M.Smets@tudelft.nl)
+Running root-mean-square amplitude of a :class:`obspy.Trace` and
+:class:`obspy.Stream`.
 
-:copyright:
-    Pieter Smets
-
-:license:
-    This code is distributed under the terms of the
-    GNU General Public License, Version 3
-    (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
 # Mandatory imports
@@ -26,9 +17,22 @@ __all__ = ['running_rms', 'running_rms_stream', 'running_rms_trace']
 
 
 def running_rms(signal, **kwargs):
-    """
-    Returns a new :class:`obspy.Stream` or :class:`obpsy.Trace` with the
-    running root-mean-square amplitude per `window` (seconds).
+    r"""Running root-mean-square amplitude.
+
+    Parameters
+    ----------
+    signal : :class:`obspy.Stream` or :class:`obspy.Trace`
+        Input signal to apply the running root-mean-square amplitude.
+
+    kwargs : optional
+        Arguments passed to :func:`running_rms_trace`.
+
+    Returns
+    -------
+    rms_signal : same type as ``signal``
+        Output signal after the running root-mean-square amplitude with the
+        same type as ``signal``.
+
     """
     if isinstance(signal, Stream):
         return running_rms_stream(signal, **kwargs)
@@ -42,9 +46,21 @@ def running_rms(signal, **kwargs):
 
 
 def running_rms_stream(stream: Stream, **kwargs):
-    """
-    Returns a new `obspy.Stream` with the running root-mean-square
-    amplitude per `window` (seconds).
+    r"""Stream running root-mean-square amplitude.
+
+    Parameters
+    ----------
+    stream : :class:`obspy.Stream`
+        Input stream to apply the running root-mean-square amplitude.
+
+    kwargs : optional
+        Arguments passed to :func:`running_rms_trace`.
+
+    Returns
+    -------
+    rms_stream : :class:`obspy.Trace`
+        Output stream after the running root-mean-square amplitude.
+
     """
     rms_stream = Stream()
 
@@ -55,9 +71,21 @@ def running_rms_stream(stream: Stream, **kwargs):
 
 
 def running_rms_trace(trace: Trace, window: float = 1.):
-    """
-    Returns a new `obspy.Trace` with the running root-mean-square
-    amplitude per `window` (seconds).
+    r"""Trace running root-mean-square amplitude.
+
+    Parameters
+    ----------
+    trace : :class:`obspy.Trace`
+        Input trace to apply the running root-mean-square amplitude.
+
+    window : `float`, optional
+        Set the running window duration, in seconds. Defaults to 1s.
+
+    Returns
+    -------
+    rms_trace : :class:`obspy.Trace`
+        Output trace after the running root-mean-square amplitude.
+
     """
     npts = int(trace.stats.endtime-trace.stats.starttime) / window
     rms_trace = Trace(data=np.zeros(int(npts), dtype=np.float64))

@@ -66,7 +66,9 @@ def cc(
     n = len(x)
     dtype = dtype or x.dtype
     assert n == len(y), "Vectors `x` and `y` should have the same length!"
-    assert x.dtype == y.dtype, "Vectors `x` and `y` should have the same dtype!"
+    assert x.dtype == y.dtype, (
+        "Vectors `x` and `y` should have the same dtype!"
+    )
     if pad:
         nn = 2*n-1
         xx = np.zeros(nn, dtype=dtype)
@@ -80,7 +82,7 @@ def cc(
     if normalize:
         fg = fg / (np.linalg.norm(xx) * np.linalg.norm(yy))
     Rxy = fftshift(np.real(ifft(fg)))
-    return Rxy * CC.weight(nn, False) if unbiased else Rxy
+    return Rxy * weight(nn, False) if unbiased else Rxy
 
 
 def lag(
@@ -108,7 +110,7 @@ def lag(
 
     """
     nn = n*2-1 if pad else n
-    return fftshift(np.fft.fftfreq(nn, 1/(nn*delta)))
+    return fftshift(fftfreq(nn, 1/(nn*delta)))
 
 
 def weight(
@@ -237,8 +239,8 @@ def compute_shift(
         of the crosscorrelation estimate `Rxy`.
 
     """
-    Rxy = CC.cc(x, y, **kwargs)
-    return CC.extract_shift_and_max(Rxy, delta)[0]
+    Rxy = cc(x, y, **kwargs)
+    return extract_shift_and_max(Rxy, delta)[0]
 
 
 def compute_shift_and_max(
@@ -274,5 +276,5 @@ def compute_shift_and_max(
         The maximum of the crosscorrelation estimate `Rxy`.
 
     """
-    Rxy = CC.cc(x, y, **kwargs)
-    return CC.extract_shift_and_max(Rxy, delta)
+    Rxy = cc(x, y, **kwargs)
+    return extract_shift_and_max(Rxy, delta)

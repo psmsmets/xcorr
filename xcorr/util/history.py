@@ -13,7 +13,7 @@ from xarray import DataArray
 import json
 
 
-## Relative imports
+# Relative imports
 from ..version import version
 from ..util.hasher import _to_serializable
 from .. import __name__ as name

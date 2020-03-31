@@ -52,13 +52,18 @@ def detrend(
 
     Returns:
     --------
-    y : `None` or :class:`xarray.DataArray` 
+    y : `None` or :class:`xarray.DataArray`
         The detrended output of ``x`` if ``inplace`` is `False`.
     """
     assert dim in x.dims, 'Dimension not found!'
 
     y = x if inplace else x.copy()
-    y.data = signal.detrend(y.data, axis=y.dims.index(dim), type='linear', bp=0)
+    y.data = signal.detrend(
+        x=y.data,
+        axis=y.dims.index(dim),
+        type='linear',
+        bp=0
+    )
 
     historicize(y, f='detrend', a={
         'x': x.name,
@@ -90,7 +95,7 @@ def demean(x: xr.DataArray, dim: str = 'lag', inplace: bool = True):
 
     Returns:
     --------
-    y : `None` or :class:`xarray.DataArray` 
+    y : `None` or :class:`xarray.DataArray`
         The demeaned output of ``x`` if ``inplace`` is `False`.
     """
     assert dim in x.dims, 'Dimension not found!'
