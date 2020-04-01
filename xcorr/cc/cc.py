@@ -13,7 +13,7 @@ import numpy as np
 from numpy.fft import fftshift, fftfreq
 try:
     from pyfftw.interfaces.numpy_fft import fft, ifft
-except ImportError:
+except ModuleNotFoundError:
     from numpy.fft import fft, ifft
     warnings.warn(
         "Could not import fft and ifft from pyfftw. "

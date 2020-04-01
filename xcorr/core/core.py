@@ -33,8 +33,7 @@ __all__ = ['init', 'read', 'write', 'merge', 'process', 'bias_correct']
 def init(
     pair: str, starttime: datetime, endtime: datetime, preprocess: dict,
     attrs: dict, sampling_rate: float, window_length: float = 86400.,
-    window_overlap: float = 0.875,
-    clip_lag=None, unbiased_cc: bool = False,
+    window_overlap: float = 0.875, clip_lag=None, unbiased_cc: bool = False,
     closed: str = 'left', dtype: np.dtype = np.float32,
     inventory: obspy.Inventory = None, stationary_poi: dict = None,
 ):

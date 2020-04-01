@@ -17,7 +17,7 @@ from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
 try:
     from nms_tools.nms_client import Client as nmsClient
-except ImportError:
+except ModuleNotFoundError:
     nmsClient = None  # make it work without nmsClient
 
 
