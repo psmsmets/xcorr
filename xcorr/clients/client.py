@@ -18,14 +18,18 @@ from obspy.clients.filesystem.sds import Client as sdsClient
 try:
     from nms_tools.nms_client import Client as nmsClient
 except ModuleNotFoundError:
-    nmsClient = None  # make it work without nmsClient
+    nmsClient = None
+try:
+    import dask
+except ModuleNotFoundError:
+    dask = None
 
 
 # Relative imports
 from ..clients.datafetch import stream2SDS
 from ..preprocess import preprocess as xcorr_preprocess
 from ..util.receiver import check_receiver, split_pair
-from ..util.time import to_UTCDateTime
+from ..util.time import to_UTCDateTime, get_dates
 
 
 __all__ = []
@@ -47,7 +51,8 @@ class Client(object):
     def __init__(
         self, sds_root: str = None, sds_root_write: str = None,
         sds_root_read: list = None, fdsn_service='IRIS',
-        nms_service: bool = True, max_gap: float = None
+        nms_service: bool = True, max_gap: float = None,
+        dask_delayed: bool = True,
     ):
         r"""Initialize a `xcorr` waveform request client.
 
@@ -81,6 +86,10 @@ class Client(object):
         max_gap : `float`, optional
             Specify the maximum time gap in seconds that is allowed in a day.
             If `None`, ``max_gap`` is 300s (default).
+
+        dask_delayed : `bool`, optional
+            Parallelize reading and writing daily waveforms using
+            :class:`dask.delayed`. Defaults to `True` if `dask` is found.
 
         """
         if (
@@ -117,6 +126,7 @@ class Client(object):
             self._fdsn = None
         self._nms = nmsClient() if nms_service and nmsClient else None
         self._max_gap = abs(max_gap or 300.)
+        self._delayed = dask and dask_delayed
 
     @property
     def sds_root(self):
@@ -204,6 +214,18 @@ class Client(object):
         """
         return self._max_gap
 
+    @property
+    def delayed(self):
+        r"""delayed
+
+        Returns:
+        --------
+        delayed : `bool`
+            `True` if parallelized reading and writing of daily waveforms using
+            :class:`dask.delayed` is enabled.
+        """
+        return self._delayed
+
     def _sds_write_daystream(
         self, stream: Stream, verbose: bool = False
     ):
@@ -258,7 +280,8 @@ class Client(object):
     def get_waveforms(
         self, receiver: str, time: np.datetime64, centered: bool = True,
         duration: float = 86400., buffer: float = 60.,
-        allow_wildcards: bool = False, verbose: bool = False
+        allow_wildcards: bool = False, verbose: bool = False,
+        compute: bool = True
     ):
         r"""Get waveforms from the clients given a SEED-id.
 
@@ -293,6 +316,11 @@ class Client(object):
             Print a message if ``stream`` is successfully added to the SDS
             archive.
 
+        compute : `bool`, optional
+            Compute the lazy :class:`dask.delayed` result in parallel, if
+            `True` (default) and ``dask`` is enabled. Set to `False` to
+            visualize the process with ``stream.visualize()``.
+
         Returns:
         --------
         stream : :class:`obspy.Stream`
@@ -306,9 +334,6 @@ class Client(object):
             raise_error=True
         )
 
-        # split receiver SEED-id
-        network, station, location, channel = receiver.split('.')
-
         # center time of 24h window -12h
         t0 = pd.to_datetime(time)
         if centered:
@@ -319,92 +344,108 @@ class Client(object):
             t1 += pd.offsets.DateOffset(seconds=buffer)
         if verbose:
             print(
-                'Get waveforms for {} from {} until {}'.format(
-                    receiver, t0, t1
-                )
+                'Get waveforms for {} from {} until {}'
+                .format(receiver, t0, t1)
             )
 
-        # start with an empty Stream
-        stream = Stream()
+        # split receiver SEED-id to a dictionary
+        receiver = dict(zip(
+            ['network', 'station', 'location', 'channel'],
+            receiver.split('.')
+        ))
 
-        # request or download per entire day
-        for day in pd.date_range(
-            start=t0 + pd.offsets.DateOffset(0, normalize=True),
-            end=t1 + pd.offsets.DateOffset(1, normalize=True),
-            name='days',
-            freq='D'
-        ):
-            t = UTCDateTime(day)
+        # list of days
+        days = get_dates(t0, t1)
 
-            if verbose:
-                print(_msg_load_archive.format(t))
-
-            for sds in self.sds_read:
-                daystream = sds.get_waveforms(
-                    network=network,
-                    station=station,
-                    location=location,
-                    channel=channel,
-                    starttime=t,
-                    endtime=t + 86400,
+        # get streams per day
+        if self._delayed and len(days) > 1:
+            streams = []
+            for day in days:
+                st = dask.delayed(self._get_waveforms_for_date)(receiver, day)
+                streams.append(st)
+            stream = dask.delayed(sum_stream_list)(streams)
+            if compute:
+                stream = stream.compute()
+        else:
+            stream = Stream()
+            for day in days:
+                stream += self._get_waveforms_for_date(
+                    receiver=receiver,
+                    date=day
                 )
-                if self._check_daystream_length(daystream, verbose):
-                    if verbose:
-                        print(_msg_loaded_archive.format(t))
-                    stream += daystream
-                    break
-            else:
-                if verbose:
-                    print(_msg_no_data.format(t))
-
-                # get attempt via fdsn
-                if self.fdsn:
-                    if verbose:
-                        print('Try FDSN.')
-                    try:
-                        daystream = self.fdsn.get_waveforms(
-                            network=network,
-                            station=station,
-                            location=location,
-                            channel=channel,
-                            starttime=t,
-                            endtime=t + 86400,
-                        )
-                        if self._sds_write_daystream(daystream, verbose):
-                            stream += daystream
-                            continue
-                    except (KeyboardInterrupt, SystemExit):
-                        raise
-                    except FDSNNoDataException:
-                        if verbose:
-                            print(_msg_no_data.format(t))
-                    except Exception as e:
-                        if verbose:
-                            print('an error occurred:')
-                            print(e)
-
-                # get attempt via nms
-                if self.nms:
-                    if verbose:
-                        print('Try NMS_Client')
-                    try:
-                        daystream = self.nms.get_waveforms(
-                            starttime=t,
-                            station=station,
-                            channel=channel,
-                            verbose=False,
-                        )
-                        if self._sds_write_daystream(daystream, verbose):
-                            stream += daystream
-                            continue
-                    except (KeyboardInterrupt, SystemExit):
-                        raise
-                    except Exception as e:
-                        if verbose:
-                            print('an error occurred:')
-                            print(e)
-        stream.trim(starttime=to_UTCDateTime(t0), endtime=to_UTCDateTime(t1))
         return stream
+
+    def _get_waveforms_for_date(self, receiver: dict, date: pd.Timestamp,
+                                verbose: bool = False):
+        r"""Get the waveforms for a receiver on a day.
+
+        Parameters:
+        -----------
+        receiver : `dict`
+            Receiver dictionary with SEED-id keys:
+            ['network', 'station', 'location', 'channel'].
+
+        date : :class:`pd.Timestamp`
+            The date.
+
+        verbose : `bool`, optional
+            Print a message if ``stream`` is successfully added to the SDS
+            archive.
+
+        Returns:
+        --------
+        stream : :class:`obspy.Stream`
+            The waveforms for ``receiver`` on ``date``.
+
+        """
+        time = UTCDateTime(date + pd.offsets.DateOffset(0, normalize=True))
+        args = dict(**receiver, starttime=time, endtime=time + 86400)
+
+        if verbose:
+            print(_msg_load_archive.format(time))
+
+        for sds in self.sds_read:
+            daystream = sds.get_waveforms(**args)
+            if self._check_daystream_length(daystream, verbose):
+                if verbose:
+                    print(_msg_loaded_archive.format(time))
+                return daystream
+        else:
+            if verbose:
+                print(_msg_no_data.format(time))
+
+            # get attempt via fdsn
+            if self.fdsn:
+                if verbose:
+                    print('Try FDSN.')
+                try:
+                    daystream = self.fdsn.get_waveforms(**args)
+                    if self._sds_write_daystream(daystream, verbose):
+                        return daystream
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except FDSNNoDataException:
+                    if verbose:
+                        print(_msg_no_data.format(time))
+                except Exception as e:
+                    if verbose:
+                        print('an error occurred:')
+                        print(e)
+
+            # get attempt via nms
+            if self.nms:
+                if verbose:
+                    print('Try NMS_Client')
+                try:
+                    daystream = self.nms.get_waveforms(**args)
+                    if self._sds_write_daystream(daystream, verbose):
+                        return daystream
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except Exception as e:
+                    if verbose:
+                        print('an error occurred:')
+                        print(e)
 
     def get_preprocessed_waveforms(
         self, receiver: str, time: np.datetime64, preprocess: dict,
@@ -539,3 +580,23 @@ class Client(object):
             self.get_preprocessed_waveforms(rA, **kwargs) +
             self.get_preprocessed_waveforms(rB, **kwargs)
         )
+
+
+def sum_stream_list(streams: list):
+    r"""Sum a list of streams into a single stream object.
+
+    Parameters:
+    -----------
+    streams : `list`
+        A list of :class:`obspy.Stream` objects.
+
+    Returns:
+    --------
+    stream : :class:`obspy.Stream`
+        The merged single stream object.
+
+    """
+    stream = Stream()
+    for st in streams:
+        stream += st
+    return stream

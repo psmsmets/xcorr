@@ -10,20 +10,20 @@ Utilities for ``xcorr`` for time conversions.
 
 # Mandatory imports
 import numpy as np
+import pandas as pd
 from xarray import DataArray
 from datetime import datetime
-from pandas import to_datetime, to_timedelta
 from obspy import UTCDateTime
 
 
 # Relative imports
 from ..util.history import historicize
 
-__all__ = ['_one_second', 'to_seconds', 'to_UTCDateTime',
+__all__ = ['_one_second', 'to_seconds', 'to_UTCDateTime', 'get_dates',
            '_dpm', 'leap_year', 'get_dpm', 'get_dpy']
 
 
-_one_second = to_timedelta(1, unit='s')
+_one_second = pd.to_timedelta(1, unit='s')
 
 
 def to_seconds(time, inplace: bool = False):
@@ -70,10 +70,39 @@ def to_UTCDateTime(time):
     """
     if isinstance(time, UTCDateTime):
         return time
-    elif isinstance(time, str) or isinstance(time, datetime):
+    elif (
+        isinstance(time, str) or
+        isinstance(time, datetime) or
+        isinstance(time, pd.Timestamp)
+    ):
         return UTCDateTime(time)
     elif isinstance(time, np.datetime64):
-        return UTCDateTime(to_datetime(time))
+        return UTCDateTime(pd.to_datetime(time))
+
+
+def get_dates(start: pd.Timestamp, end: pd.Timestamp):
+    r"""Get the dates for the outer span of days from start to end time.
+    Parameters:
+    -----------
+    start : :class:`pd.Timestamp`
+        Start date and time.
+
+    end : :class:`pd.Timestamp`
+        End date and time.
+
+    Returns:
+    --------
+    dates : :class:`pandas.DatetimeIndex`
+        All dates with days from start to end, with time at midnight.
+
+    """
+    return pd.date_range(
+        start=start + pd.offsets.DateOffset(0, normalize=True),
+        end=end + pd.offsets.DateOffset(1, normalize=True),
+        name='days',
+        freq='D',
+        closed='left'
+    )
 
 
 _calendars = ['standard', 'gregorian', 'proleptic_gregorian', 'julian']
