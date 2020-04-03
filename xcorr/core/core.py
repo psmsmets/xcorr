@@ -1,8 +1,14 @@
-# -*- coding: utf-8 -*-
-"""
+r"""
+
+:mod:`core.core` -- Core
+========================
+
+Main functions of xcorr to init, process. bias_correct,
+read, write and merge N-D labeled arrays of data.
+
 """
 
-# Absolute imports
+# Mandatory imports
 import numpy as np
 import xarray as xr
 import pandas as pd
@@ -11,7 +17,7 @@ import scipy
 import json
 import warnings
 import os
-from datetime import datetime
+
 
 # Relative imports
 from ..version import version as __version__
@@ -31,11 +37,12 @@ __all__ = ['init', 'read', 'write', 'merge', 'process', 'bias_correct']
 
 
 def init(
-    pair: str, starttime: datetime, endtime: datetime, preprocess: dict,
-    attrs: dict, sampling_rate: float, window_length: float = 86400.,
-    window_overlap: float = 0.875, clip_lag=None, unbiased_cc: bool = False,
-    closed: str = 'left', dtype: np.dtype = np.float32,
-    inventory: obspy.Inventory = None, stationary_poi: dict = None,
+    pair: str, starttime: pd.Timestamp, endtime: pd.Timestamp,
+    preprocess: dict, attrs: dict, sampling_rate: float,
+    window_length: float = 86400., window_overlap: float = 0.875,
+    clip_lag=None, unbiased_cc: bool = False, closed: str = 'left',
+    dtype: np.dtype = np.float32, inventory: obspy.Inventory = None,
+    stationary_poi: dict = None, hash_waveforms: bool = False,
 ):
     r"""Initiate an xcorr N-D labeled data array.
 
@@ -45,10 +52,10 @@ def init(
         Receiver couple separated by a '-'. Each receiver is specified by its
         SEED-id string: '{network}.{station}.{location}.{channel}'.
 
-    starttime : `datetime.datetime`
+    starttime : `pd.Timestamp`
         Start time for generating crosscorrelation time windows.
 
-    endtime : `datetime.datetime`
+    endtime : `pd.Timestamp`
         End time for generating crosscorrelation time windows.
 
     preprocess : `dict`
@@ -97,6 +104,10 @@ def init(
         Specify a point-of-interest `dict` with keys ['longitude','latitude']
         in decimal degrees to obtain a relative distance.
         If `None` (default), the receiver pair geodetic distance is calculated.
+
+    hash_waveforms : `bool`, optional
+        Create a sha256 hash of the preprocessed waveforms used for each
+        correlation step. Caution: hashing can take some time (~10s per step).
 
     Returns:
     --------
@@ -247,26 +258,27 @@ def init(
         },
     )
 
-    # status
-    dataset['hash'] = (
-        ('pair', 'time'),
-        np.array([['n/a']*len(dataset.time)], dtype=object),
-        {
-            'long_name': 'pair preprocessed stream hash',
-            'standard_name': 'pair_preprocessed_stream_hash',
-            'units': '-',
-            'description': (
-                "Openssl SHA256 hash of the pair preprocessed waveform "
-                "stream. Be aware that stream/pair order matters! "
-                "The hash is updated per `obspy.Trace` and includes the "
-                "stats with keys=['network', 'station', 'location', "
-                "'channel', 'starttime', 'endtime', 'sampling_rate', 'delta', "
-                "'npts'], sorted and dumped to json with 4 character space "
-                "indentation and separators ',' and ':', followed by the hash "
-                "of each sample byte representation."
-            ),
-        },
-    )
+    # hash waveforms
+    if hash_waveforms:
+        dataset['hash'] = (
+            ('pair', 'time'),
+            np.array([['n/a']*len(dataset.time)], dtype=object),
+            {
+                'long_name': 'pair preprocessed stream hash',
+                'standard_name': 'pair_preprocessed_stream_hash',
+                'units': '-',
+                'description': (
+                    "Openssl SHA256 hash of the pair preprocessed waveform "
+                    "stream. Be aware that stream/pair order matters! "
+                    "The hash is updated per `obspy.Trace` and includes the "
+                    "stats with keys=['network', 'station', 'location', "
+                    "'channel', 'starttime', 'endtime', 'sampling_rate', "
+                    "'delta', 'npts'], sorted and dumped to json with 4 "
+                    "character space indentation and separators ',' and ':', "
+                    "followed by the hash of each sample byte representation."
+                ),
+            },
+        )
 
     # pair offset
     dataset['pair_offset'] = (
@@ -326,7 +338,7 @@ def init(
 
 def read(
     path: str, extract: bool = False, load_and_close: bool = False,
-    fast: bool = False, quick_and_dirty: bool = False, debug: bool = False
+    fast: bool = False, quick_and_dirty: bool = False, verb: int = 0
 ):
     r"""Read an xcorr N-D labeled data array from a netCDF4 file.
 
@@ -349,9 +361,8 @@ def read(
         Omit verifying both the `sha256_hash` and `sha256_hash_metadata`
         if `True`. Default is `False`.
 
-    debug : `bool`, optional
-        If `True` some extra debug information is printed to the screen.
-        Default is `False`.
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
 
     Returns:
     --------
@@ -372,14 +383,15 @@ def read(
     if not quick_and_dirty:
         sha256_hash_metadata = util.hasher.hash_Dataset(
             dataset,
-            metadata_only=True
+            metadata_only=True,
+            debug=verb > 3,
         )
         if sha256_hash_metadata != dataset.sha256_hash_metadata:
             warnings.warn(
                 'Dataset metadata sha256 hash is inconsistent.',
                 UserWarning
             )
-            if debug:
+            if verb > 1:
                 print(
                     'sha256 hash metadata in ncfile :',
                     dataset.sha256_hash_metadata
@@ -391,27 +403,24 @@ def read(
     if not (quick_and_dirty or fast):
         sha256_hash = util.hasher.hash_Dataset(
             dataset,
-            metadata_only=False
+            metadata_only=False,
+            debug=verb > 3,
         )
         if sha256_hash != dataset.sha256_hash:
             warnings.warn(
                 'Dataset sha256 hash is inconsistent.',
                 UserWarning
             )
-            if debug:
+            if verb > 1:
                 print('sha256 hash in ncfile :', dataset.sha256_hash)
                 print('sha256 hash computed  :', sha256_hash)
 
-    if debug:
+    if verb > 0:
         print('{p} #(status==1): {n} of {m}'.format(
             p=path,
             n=np.sum(dataset.status.values == 1),
             m=dataset.time.size,
         ))
-
-    if np.sum(dataset.status.values == 1) == 0 and not debug:
-        dataset.close()
-        return False
 
     if extract:
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
@@ -424,7 +433,7 @@ def read(
 
 def write(
     dataset: xr.Dataset, path: str, close: bool = True,
-    force_write: bool = False
+    force_write: bool = False, verb: int = 0
 ):
     r"""Write an xcorr N-D labeled data array to a netCDF4 file using a
     temporary file and replacing the final destination.
@@ -450,6 +459,9 @@ def write(
     force_write : `bool`, optional
         Always write file if `True` even if its empty. Default is `False`.
 
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
+
     """
     if (
         np.sum(dataset.status.values == 1) == 0 or
@@ -472,42 +484,56 @@ def write(
         )
         dataset.attrs['sha256_hash_metadata'] = sha256_hash_metadata
 
-    print('Write dataset as "{}"'.format(path), end=': ')
+    if verb:
+        print('Write dataset as "{}"'.format(path), end=': ')
     abspath, file = os.path.split(os.path.abspath(path))
     if not os.path.exists(abspath):
         os.makedirs(abspath)
 
     tmp = os.path.join(
         abspath,
-        '{f}.{t}'.format(f=file, t=int(datetime.now().timestamp()*1e3))
+        '{f}.{t}'.format(f=file, t=int(pd.to_datetime('now').timestamp()*1e3))
     )
 
     if close:
-        print('Close', end='. ')
+        if verb:
+            print('Close', end='. ')
         dataset.close()
 
     # calculate dataset hash
-    print('Hash', end='. ')
+    if verb:
+        print('Hash', end='. ')
     dataset.attrs['sha256_hash'] = (
         util.hasher.hash_Dataset(dataset, metadata_only=False)
     )
 
-    # convert preprocess operations
+    # Convert preprocess operations
+    if verb > 1:
+        print('Operations to json.', end='. ')
     preprocess_operations_to_json(dataset.pair)
 
-    print('To temporary netcdf', end='. ')
+    # Write to temporary file
+    if verb:
+        print('To temporary netcdf', end='. ')
     dataset.to_netcdf(path=tmp, mode='w', format='NETCDF4')
-    print('Replace', end='. ')
+
+    # Replace file
+    if verb:
+        print('Replace', end='. ')
     os.replace(tmp, os.path.join(abspath, file))
-    print('Done.')
 
     # convert preprocess operations
+    if verb > 1:
+        print('Operations to dict.', end='. ')
     preprocess_operations_to_dict(dataset.pair)
+
+    if verb:
+        print('Done.')
 
 
 def merge(
     datasets: list, extract: bool = True, merge_versions: bool = False,
-    debug: bool = False, **kwargs
+    verb: int = 0, **kwargs
 ):
     r"""Merge a list of xcorr N-D labeled data arrays.
 
@@ -524,11 +550,10 @@ def merge(
     merge_versions : `bool`, optional
         Ignore data arrays with different `xcorr` versions.
 
-    debug : `bool`, optional
-        If `True` some extra debug information is printed to the screen.
-        Default is `False`.
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
 
-    kwargs :
+    **kwargs :
         Additional parameters provided to :func:`read`.
 
     Returns:
@@ -559,13 +584,16 @@ def merge(
                 UserWarning
             )
             continue
-        if debug:
+        if verb > 1:
             print("\n# Open and inspect xcorr dataset:\n\n", ds, "\n")
+
         if ds is False:
             continue
+
         if not isinstance(dsets, xr.Dataset):
             dsets = ds.copy()
             continue
+
         if (
             dsets.pair.preprocess['sha256_hash'] !=
             ds.pair.preprocess['sha256_hash']
@@ -575,12 +603,14 @@ def merge(
                 UserWarning
             )
             continue
+
         if dsets.sha256_hash_metadata != ds.sha256_hash_metadata:
             warnings.warn(
                 'Dataset metadata hash does not match. Item skipped.',
                 UserWarning
             )
             continue
+
         if dsets.xcorr_version != ds.xcorr_version:
             if merge_versions:
                 warnings.warn(
@@ -593,6 +623,7 @@ def merge(
                     UserWarning
                 )
                 continue
+
         try:
             dsets = dsets.merge(ds, join='outer')
         except xr.MergeError:
@@ -628,7 +659,9 @@ def merge(
 
 def process(
     x: xr.Dataset, client: Client, inventory: obspy.Inventory = None,
-    retry_missing: bool = False, test_run: bool = False,  **kwargs
+    retry_missing: bool = False, test_run: bool = False, verb: int = 1,
+    hash_waveforms: bool = True,
+    **kwargs
 ):
     r"""Process the xcorr N-D labeled data array.
 
@@ -651,7 +684,15 @@ def process(
         If `True` the function is aborted after the first iteration.
         Default is `False`.
 
-    kwargs :
+    hash_waveforms : `bool`, optional
+        Compute the sha256 hash of the preprocessed waveforms used for each
+        correlation step if `True` (default), and ``x`` contains the variable
+        ``hash``. Caution: hashing can take some time (~10s per step).
+
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 1.
+
+    **kwargs :
         Arguments passed to :meth:``client.get_pair_preprocessed_waveforms``.
 
     """
@@ -665,23 +706,28 @@ def process(
     else:
         o = operations_to_dict(x.pair.preprocess)
 
+    # hash?
+    hash_waveforms = hash_waveforms and 'hash' in ds.variables
+
     # process each pair per time step
     for p in x.pair:
         for t in x.time:
-            print(str(p.values), str(t.values)[:19], end=': ')
+            if verb:
+                print(str(p.values), str(t.values)[:19], end=': ')
             if x.status.loc[{'pair': p, 'time': t}].values != 0:
                 if not (
                     retry_missing and
                     x.status.loc[{'pair': p, 'time': t}].values == -1
                 ):
-                    print(
-                        'Has status "{}". Skip.'
-                        .format(
-                            x.status.loc[{'pair': p, 'time': t}].values
-                        )
-                    )
+                    if verb:
+                        print('Has status "{}". Skip.'.format(
+                                x.status.loc[{'pair': p, 'time': t}].values
+                        ))
                     continue
-            print('Waveforms', end='. ')
+
+            # Waveforms
+            if verb:
+                print('Waveforms', end='. ')
             st = client.get_pair_preprocessed_waveforms(
                 pair=p.values,
                 time=t.values,
@@ -689,6 +735,7 @@ def process(
                 duration=t.window_length,
                 buffer=t.window_length/10,
                 inventory=inventory,
+                verb=verb-1,
                 **kwargs
             )
             if not isinstance(st, obspy.Stream) or len(st) != 2:
@@ -706,9 +753,16 @@ def process(
                 pd.to_timedelta(x.time.window_length / 2, unit='s') -
                 x.time.loc[{'time': t}].values
             )
-            print('Hash', end='. ')
-            x.hash.loc[{'pair': p, 'time': t}] = util.hash_Stream(st)
-            print('CC', end='. ')
+
+            # Hash
+            if hash_waveforms:
+                if verb:
+                    print('Hash', end='. ')
+                x.hash.loc[{'pair': p, 'time': t}] = util.hash_Stream(st)
+
+            # CC 
+            if verb:
+                print('CC', end='. ')
             x.cc.loc[{'pair': p, 'time': t}] = cc.cc(
                 x=st[0].data[:x.lag.npts],
                 y=st[1].data[:x.lag.npts],
@@ -716,8 +770,13 @@ def process(
                 pad=x.lag.pad == 1,
                 unbiased=False,  # apply correction for full dataset!
             )[x.lag.index_min:x.lag.index_max]
+
+            # Status
             x.status.loc[{'pair': p, 'time': t}] = 1
-            print('Done.')
+
+            # Finish
+            if verb:
+                print('Done.')
             if test_run:
                 break
 
@@ -760,6 +819,10 @@ def bias_correct(
 
     weight_var: `str`, optional
         The name of unbiased correlation weight variable. Defaults to 'w'.
+
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
+
     """
     if x[biased_var].unbiased != 0:
         print('No need to bias correct again.')

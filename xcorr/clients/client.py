@@ -11,6 +11,7 @@ retrieve missing daily waveforms using fdsn and nms web request services.
 # Mandatory imports
 import numpy as np
 import pandas as pd
+import xarray as xr
 from obspy import UTCDateTime, Stream, Inventory
 from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
@@ -21,6 +22,7 @@ except ModuleNotFoundError:
     nmsClient = None
 try:
     import dask
+    from dask.diagnostics import ProgressBar
 except ModuleNotFoundError:
     dask = None
 
@@ -28,7 +30,7 @@ except ModuleNotFoundError:
 # Relative imports
 from ..clients.datafetch import stream2SDS
 from ..preprocess import preprocess as xcorr_preprocess
-from ..util.receiver import check_receiver, split_pair
+from ..util.receiver import check_receiver, split_pair, receiver_to_dict
 from ..util.time import to_UTCDateTime, get_dates
 
 
@@ -52,7 +54,7 @@ class Client(object):
         self, sds_root: str = None, sds_root_write: str = None,
         sds_root_read: list = None, fdsn_service='IRIS',
         nms_service: bool = True, max_gap: float = None,
-        dask_delayed: bool = True,
+        parallel: bool = True,
     ):
         r"""Initialize a `xcorr` waveform request client.
 
@@ -87,9 +89,9 @@ class Client(object):
             Specify the maximum time gap in seconds that is allowed in a day.
             If `None`, ``max_gap`` is 300s (default).
 
-        dask_delayed : `bool`, optional
-            Parallelize reading and writing daily waveforms using
-            :class:`dask.delayed`. Defaults to `True` if `dask` is found.
+        dask : `bool`, optional
+            Parallelize workflows using :class:`dask.delayed`. Defaults to
+            `True` if `dask` is found.
 
         """
         if (
@@ -126,7 +128,7 @@ class Client(object):
             self._fdsn = None
         self._nms = nmsClient() if nms_service and nmsClient else None
         self._max_gap = abs(max_gap or 300.)
-        self._delayed = dask and dask_delayed
+        self._parallel = dask and parallel
 
     @property
     def sds_root(self):
@@ -215,19 +217,20 @@ class Client(object):
         return self._max_gap
 
     @property
-    def delayed(self):
-        r"""delayed
+    def parallel(self):
+        r"""parallel
 
         Returns:
         --------
-        delayed : `bool`
-            `True` if parallelized reading and writing of daily waveforms using
-            :class:`dask.delayed` is enabled.
+        parallel : `bool`
+            `True` if :mod:`dask` is loaded and :class:`Client` is initiated
+            ``parallel``=`True`. All routines of :class:`Client` will default
+            to this value.
         """
-        return self._delayed
+        return self._parallel
 
     def _sds_write_daystream(
-        self, stream: Stream, verbose: bool = False
+        self, stream: Stream, verb: int = 0
     ):
         r"""Wrapper to write a day stream of data to the local SDS archive.
 
@@ -236,9 +239,8 @@ class Client(object):
         stream : :class:`obspy.Stream`
             Stream with a day of data.
 
-        verbose : `bool`, optional
-            Print a message if ``stream`` is successfully added to the SDS
-            archive.
+        verb : {0, 1, 2, 3, 4}, optional
+            Level of verbosity. Defaults to 0.
 
         Returns:
         --------
@@ -247,20 +249,20 @@ class Client(object):
             :meth:'_check_daystream_length', otherwise returns `True`.
 
         """
-        if not self._check_daystream_length(stream, verbose):
+        if not self._check_daystream_length(stream, verb > 1):
             return False
         stream2SDS(
             stream,
             sds_path=self.sds_root_write,
             force_override=True,
-            verbose=False
+            verbose=verb == 4,
         )
-        if verbose:
+        if verb > 0:
             print(_msg_added_archive)
         return True
 
     def _check_daystream_length(
-        self, stream: Stream, verbose: bool = False
+        self, stream: Stream, verb: int = 0
     ):
         r"""Returns `True` if a stream (assuming a uniqe SEED-id) contains a
         day of data not exceeding the allowed ``max_gap``.
@@ -270,7 +272,7 @@ class Client(object):
         npts_day = int(stream[0].stats.sampling_rate * 86400)
         npts_gap = int(stream[0].stats.sampling_rate * self._max_gap)
         npts_str = sum([trace.stats.npts for trace in stream])
-        if verbose:
+        if verb > 2:
             print(
                 'Samples in day = {}, samples in stream = {}, max gaps = {}.'
                 .format(npts_day, npts_str, npts_gap)
@@ -278,10 +280,9 @@ class Client(object):
         return npts_str >= (npts_day - npts_gap)
 
     def get_waveforms(
-        self, receiver: str, time: np.datetime64, centered: bool = True,
+        self, receiver: str, time: pd.Timestamp, centered: bool = True,
         duration: float = 86400., buffer: float = 60.,
-        allow_wildcards: bool = False, verbose: bool = False,
-        compute: bool = True
+        allow_wildcards: bool = False, verb: int = 0, **kwargs
     ):
         r"""Get waveforms from the clients given a SEED-id.
 
@@ -290,7 +291,7 @@ class Client(object):
         receiver : `str`
             Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
 
-        time : `np.datetime64`
+        time : `pd.Timestamp`
             Anchor node of the time window, either the start or the center of
             of the waveform time window, depending on ``centered``.
 
@@ -312,14 +313,11 @@ class Client(object):
             Enable wildcards '*' and '?' in the ``receiver`` SEED-id string.
             Defaults to `False`, not allowing wildcards.
 
-        verbose : `bool`, optional
-            Print a message if ``stream`` is successfully added to the SDS
-            archive.
+        verb : {0, 1, 2, 3, 4}, optional
+            Level of verbosity. Defaults to 0.
 
-        compute : `bool`, optional
-            Compute the lazy :class:`dask.delayed` result in parallel, if
-            `True` (default) and ``dask`` is enabled. Set to `False` to
-            visualize the process with ``stream.visualize()``.
+        **kwargs :
+            Parameters passed to :meth:`_get_waveforms_for_date`
 
         Returns:
         --------
@@ -342,7 +340,7 @@ class Client(object):
         if buffer > 0.:
             t0 -= pd.offsets.DateOffset(seconds=buffer)
             t1 += pd.offsets.DateOffset(seconds=buffer)
-        if verbose:
+        if verb > 0:
             print(
                 'Get waveforms for {} from {} until {}'
                 .format(receiver, t0, t1)
@@ -358,26 +356,21 @@ class Client(object):
         days = get_dates(t0, t1)
 
         # get streams per day
-        if self._delayed and len(days) > 1:
-            streams = []
-            for day in days:
-                st = dask.delayed(self._get_waveforms_for_date)(receiver, day)
-                streams.append(st)
-            stream = dask.delayed(sum_stream_list)(streams)
-            if compute:
-                stream = stream.compute()
-        else:
-            stream = Stream()
-            for day in days:
-                stream += self._get_waveforms_for_date(
-                    receiver=receiver,
-                    date=day
-                )
+        stream = Stream()
+        for day in days:
+            stream += self._get_waveforms_for_date(
+                receiver=receiver,
+                date=day
+            )
+
+        # trim to asked time range
+        stream.trim(starttime=to_UTCDateTime(t0), endtime=to_UTCDateTime(t1))
+
         return stream
 
     def _get_waveforms_for_date(self, receiver: dict, date: pd.Timestamp,
-                                verbose: bool = False):
-        r"""Get the waveforms for a receiver on a day.
+                                download: bool = True, verb: int = 0):
+        r"""Get the waveforms for a receiver and date.
 
         Parameters:
         -----------
@@ -388,9 +381,13 @@ class Client(object):
         date : :class:`pd.Timestamp`
             The date.
 
-        verbose : `bool`, optional
-            Print a message if ``stream`` is successfully added to the SDS
-            archive.
+        download : `bool`, optional
+            If `True` (default) automatically download waveforms missing in the
+            local SDS archives ``self.sds_read`` using ``self.fdsn`` and
+            ``self.nms`` services. Data is added to ``self.sds_write``.
+
+        verb : {0, 1, 2, 3, 4}, optional
+            Level of verbosity. Defaults to 0.
 
         Returns:
         --------
@@ -398,60 +395,72 @@ class Client(object):
             The waveforms for ``receiver`` on ``date``.
 
         """
-        time = UTCDateTime(date + pd.offsets.DateOffset(0, normalize=True))
+        time = pd.to_datetime(date) + pd.offsets.DateOffset(0, normalize=True)
+        time = UTCDateTime(time)
         args = dict(**receiver, starttime=time, endtime=time + 86400)
 
-        if verbose:
+        if verb > 0:
+            print(
+                "Get waveforms for {network}.{station}.{location}.{channel} "
+                "from {starttime} until {endtime}".format(**args)
+            )
+
+        if verb > 1:
             print(_msg_load_archive.format(time))
 
         for sds in self.sds_read:
             daystream = sds.get_waveforms(**args)
-            if self._check_daystream_length(daystream, verbose):
-                if verbose:
+            if self._check_daystream_length(daystream, verb > 2):
+                if verb > 1:
                     print(_msg_loaded_archive.format(time))
                 return daystream
         else:
-            if verbose:
+            if verb > 1:
                 print(_msg_no_data.format(time))
+
+            if not download:
+                return None
 
             # get attempt via fdsn
             if self.fdsn:
-                if verbose:
+                if verb > 1:
                     print('Try FDSN.')
                 try:
                     daystream = self.fdsn.get_waveforms(**args)
-                    if self._sds_write_daystream(daystream, verbose):
+                    if self._sds_write_daystream(daystream, verb > 2):
                         return daystream
                 except (KeyboardInterrupt, SystemExit):
                     raise
                 except FDSNNoDataException:
-                    if verbose:
+                    if verb > 1:
                         print(_msg_no_data.format(time))
                 except Exception as e:
-                    if verbose:
+                    if verb > 0:
                         print('an error occurred:')
                         print(e)
 
             # get attempt via nms
             if self.nms:
-                if verbose:
+                if verb > 1:
                     print('Try NMS_Client')
                 try:
                     daystream = self.nms.get_waveforms(**args)
-                    if self._sds_write_daystream(daystream, verbose):
+                    if self._sds_write_daystream(daystream, verb > 2):
                         return daystream
+                    if verb > 1:
+                        print(_msg_no_data.format(time))
                 except (KeyboardInterrupt, SystemExit):
                     raise
                 except Exception as e:
-                    if verbose:
+                    if verb > 0:
                         print('an error occurred:')
                         print(e)
+        return None
 
     def get_preprocessed_waveforms(
         self, receiver: str, time: np.datetime64, preprocess: dict,
         duration: float = 86400., inventory: Inventory = None,
-        three_components: str = '12Z',
-        verbose: bool = False, debug: bool = False, **kwargs
+        three_components: str = '12Z', verb: int = 0, **kwargs
     ):
         r"""Get preprocessed waveforms from the clients given a SEED-id and
         an operations dictionary.
@@ -478,16 +487,13 @@ class Client(object):
         inventory : :class:`obspy.Inventory`, optional
             Inventory object, including the instrument response.
 
-        three_components: `str` {'12Z', 'NEZ'}, optional
+        three_components: {'12Z', 'NEZ'}, optional
             Set the three-component orientation characters. Defaults to '12Z'.
 
-        verbose : `bool`, optional
-            Print standard status messages if `True`. Defaults to `False`.
+        verb : {0, 1, 2, 3, 4}, optional
+            Level of verbosity. Defaults to 0.
 
-        debug : `bool`, optional
-            Print many status messages if `True`. Defaults to `False`.
-
-        kwargs :
+        **kwargs :
             Parameters passed to :meth:`get_waveforms`.
 
         Returns:
@@ -504,15 +510,15 @@ class Client(object):
         ch = receiver.split('.')[-1]
 
         # radial or transverse component? Request all channels manually.
-        if ch[-1] == 'R' or ch[-1] == 'T':
+        if ch[-1] in 'RT':
             st = Stream()
             for c in three_components:  # '12NEZ'??
-                st += self.get_waveforms(
+                st = st + self.get_waveforms(
                     receiver=receiver[:-1]+c,
                     time=time,
                     duration=duration,
                     centered=True,
-                    verbose=debug,
+                    verb=verb,
                     **kwargs
                 )
         else:
@@ -521,31 +527,23 @@ class Client(object):
                 time=time,
                 duration=duration,
                 centered=True,
-                verbose=debug,
+                verb=verb,
                 **kwargs
             )
 
-        if verbose:
+        if verb > 2:
             print(st)
         if not isinstance(st, Stream) or len(st) == 0:
             return Stream()
-        try:
-            st = xcorr_preprocess(
-                stream=st,
-                operations=preprocess[ch],
-                inventory=inventory,
-                starttime=t0,
-                endtime=t1,
-                verbose=verbose,
-                debug=debug,
-            )
-        except KeyboardInterrupt:
-            exit()
-        except Exception as e:
-            if verbose:
-                print('an error occurred:')
-                print(e)
-            return Stream()
+
+        st = xcorr_preprocess(
+            stream=st,
+            operations=preprocess[ch],
+            inventory=inventory,
+            starttime=t0,
+            endtime=t1,
+            verb=verb-1,
+        )
         if not isinstance(st, Stream) or len(st) != 1:
             return Stream()
         if st[0].stats.npts * st[0].stats.delta < duration:
@@ -565,9 +563,9 @@ class Client(object):
             specified by a SEED-id string:
             '{network}.{station}.{location}.{channel}'.
 
-        kwargs :
-            Parameters passed to :meth:`get_preprocessed_waveforms` and
-            :meth:`get_waveforms`.
+        **kwargs :
+            Parameters passed to :meth:`get_waveforms` via
+            :meth:`get_preprocessed_waveforms`.
 
         Returns:
         --------
@@ -575,11 +573,245 @@ class Client(object):
             The requested waveforms after preprocessing.
 
         """
+        # split
         rA, rB = split_pair(pair)
-        return (
+
+        # get streams per receiver
+        stream = (
             self.get_preprocessed_waveforms(rA, **kwargs) +
             self.get_preprocessed_waveforms(rB, **kwargs)
         )
+
+        return stream
+
+    def data_availability(
+        self, pairs_or_receivers: list, times: pd.DatetimeIndex,
+        verb: int = 0, **kwargs
+    ):
+        r"""Verify the waveform data availability for receivers and times.
+
+        Parameters:
+        -----------
+        pairs_or_receivers : `list`
+            List of receivers or pairs (receiver couple separated by a '-').
+            Each receiver should be specified by a SEED-id string of format
+            '{network}.{station}.{location}.{channel}'.
+
+        times : `pd.DatetimeIndex`
+            Sequence of dates with `freq`="D".
+
+        verb : {0, 1, 2, 3, 4}, optional
+            Level of verbosity. Defaults to 0.
+
+        **kwargs :
+            Parameters passed to :meth:`verify_data_availability`.
+
+        Returns:
+        --------
+        status : :class:`xarray.DataArray`
+            Data availability status N-D labelled array with dimensions
+            ``time`` and ``receiver``.
+
+        """
+        # dask delayed
+        parallel = parallel or self.parallel
+        if parallel and not dask:
+            raise RuntimeError('Dask is required but cannot be found!')
+
+        status = self.init_data_availability(pairs_or_receivers, times)
+
+        if verb:
+            print('Verify {} (receiver, time) combinations.'
+                  .format(status.size))
+
+        verified = self.verify_data_availability(status, **kwargs)
+
+        if verb:
+            print('Verified {} out of {}.'
+                  .format(verified, status.size))
+
+        return status
+
+    def init_data_availability(
+        self, pairs_or_receivers: list, times: pd.DatetimeIndex,
+        extend_days: int = 0, **kwargs
+    ):
+        r"""Create a new N-D labelled array to verify the waveform data
+        availability for receivers and times.
+
+        Parameters:
+        -----------
+        pairs_or_receivers : `list`
+            List of receivers or pairs (receiver couple separated by a '-').
+            Each receiver should be specified by a SEED-id string of format
+            '{network}.{station}.{location}.{channel}'.
+
+        times : `pd.DatetimeIndex`
+            Sequence of dates with `freq`="D".
+
+        extend_days : `int`, optional
+            Extend ``times`` with n-days at both left and right edges.
+
+        **kwargs :
+            Extra parameters are passed on to :func:`xcorr.util.split_pair`
+
+        Returns:
+        --------
+        status : :class:`xarray.DataArray`
+            Data availability status N-D labelled array with dimensions
+            ``time`` and ``receiver``.
+
+        """
+        assert isinstance(times, pd.DatetimeIndex) and times.freqstr == 'D', (
+            '``times`` should be a pandas.DatetimeIndex with freq="D"!'
+        )
+
+        # Get all receivers from pairs
+        receivers = []
+        for p in pairs_or_receivers:
+            receivers += split_pair(p, to_dict=False, **kwargs)
+        receivers = sorted(list(set(receivers)))
+
+        # Time
+        if extend_days > 0:
+            times = pd.date_range(
+                start=times[0] - pd.offsets.DateOffset(days=extend_days),
+                end=times[-1] + pd.offsets.DateOffset(days=extend_days),
+                freq=times.freqstr
+            )
+
+        # Construct status xarray object
+        status = xr.DataArray(
+            data=np.zeros((len(receivers), len(times)), dtype=np.byte),
+            coords=[np.array(receivers, dtype=object), times],
+            dims=['receiver', 'time'],
+            name='status',
+            attrs={
+                'long_name': 'Data availability status',
+                'standard_name': 'data_availability_status',
+                'units': '-',
+                'valid_range': np.byte([-1, 1]),
+                'flag_values': np.byte([-1, 0, 1]),
+                'flag_meanings': 'missing not_validated available',
+            }
+        )
+        status.receiver.attrs = {
+            'long_name': 'Receiver SEED-id',
+            'standard_name': 'receiver_seed_id',
+            'units': '-',
+        }
+
+        return status
+
+    def verify_data_availability(
+        self, status: xr.DataArray, count_verified: bool = False,
+        parallel: bool = None, compute: bool = True, **kwargs
+    ):
+        r"""Verify daily waveform availability for receivers and times.
+
+        Parameters:
+        -----------
+        status : :class:`xarray.DataArray`
+            Data availability status N-D labelled array with dimensions
+            ``status.time`` and ``status.receiver``. ``status`` is updated in
+            place.
+
+        count_verified : `bool`, optional
+            If `True`, count the number of verified (receiver, time) couples.
+            Defaults to `False`.
+
+        parallel : `bool`, optional
+            Enable parallel processing using :method:`dask`. If `None`
+            (default) ``self.parallel`` is used.
+
+        compute : `bool`, optional
+            Compute the lazy :class:`dask.delayed` result in parallel, if
+            `True` (default) and ``dask`` is enabled. Set to `False` to add
+            more delayed tasks, or to visualize the process with
+            ``stream.visualize()``.
+
+        **kwargs :
+            Parameters passed to :meth:`_get_waveforms_for_date`
+
+        Returns:
+        --------
+        verified : `int`, optional
+            The number of verified (receiver, time) couples. If
+            ``count_verified`` is `True`, otherwise `None`.
+
+        """
+        parallel = parallel or self.parallel
+        if parallel and not dask:
+            raise RuntimeError('Dask is required but cannot be found!')
+
+        # get daily waveforms per receiver and time
+        verified = [] if parallel else 0
+
+        for receiver in status.receiver:
+            rec_dict = receiver_to_dict(str(receiver.values))
+            for time in status.time:
+                if status.loc[{'receiver': receiver, 'time': time}] == 1:
+                    continue
+                if parallel:
+                    stream = dask.delayed(self._get_waveforms_for_date)(
+                        rec_dict, time.values, verb=0, **kwargs
+                    )
+                    flag = dask.delayed(set_availability_by_stream)(
+                        status, receiver, time, stream, True
+                    )
+                    verified.append(flag != 0)
+                else:
+                    stream = self._get_waveforms_for_date(
+                        receiver, time.values, **kwargs
+                    )
+                    set_availability_by_stream(status, receiver, time, stream)
+                    verified += 1
+
+        if parallel:
+            verified = dask.delayed(sum)(verified)
+            verified = verified.compute() if compute else verified
+
+        if count_verified or (parallel and not compute):
+            return verified
+
+
+# local methods use for dask.delayed
+
+def set_availability_by_stream(
+    status: xr.DataArray, receiver: xr.DataArray, time: xr.DataArray,
+    stream: Stream, return_flag: bool = False,
+):
+    r"""Set status availability for receiver and time by stream.
+
+    Parameters:
+    -----------
+    status : :class:`xarray.DataArray`
+        Data availability status N-D labelled array with dimensions
+        ``status.time`` and ``status.receiver``, updated in place.
+
+    receiver : :class:`xarray.DataArray`
+        ``status`` receiver coordinate to set the status.
+
+    time : :class:`xarray.DataArray`
+        ``status`` time coordinate to set the status.
+
+    stream : :class:`obspy.Stream`
+        Waveform stream used to define the status code. If `None`,
+        ``status``=-1, else 1.
+
+    return_flag : `bool`, optional
+       If `True`, return the status flag. Defaults to `False`.
+
+    Returns:
+    --------
+    flag : `np.int8`
+        Returns data availability flag if ``return_flag`` is `True`,
+        otherwise `None`.
+
+    """
+    flag = 1 if stream else -1
+    status.loc[{'receiver': receiver, 'time': time}] = flag
+    return flag if return_flag else None
 
 
 def sum_stream_list(streams: list):
@@ -598,5 +830,5 @@ def sum_stream_list(streams: list):
     """
     stream = Stream()
     for st in streams:
-        stream += st
+        stream = stream + st
     return stream

@@ -156,7 +156,7 @@ def inject_dynamic_parameters(
 
 
 def apply_stream_operation(
-    stream, operation: str, parameters: dict, verbose: bool = False
+    stream, operation: str, parameters: dict, verb: int = 0, prefix: str = ''
 ):
     r"""Apply an in-place operation with the provided parameters.
 
@@ -174,8 +174,8 @@ def apply_stream_operation(
         requires dynamic parameters you should inject them first using
         :func:`inject_dynamic_parameters`
 
-    verbose : `bool`, optional
-        Print each operation and its arguments if `True`. Defaults to `False`.
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
 
     Returns
     -------
@@ -186,8 +186,8 @@ def apply_stream_operation(
     if not is_stream_operation(operation):
         return
     method = _stream_operations[operation]['method']
-    if verbose:
-        print(operation, ': ', parameters)
+    if verb > 0:
+        print(prefix, operation, ': ', parameters)
     if method == _self:
         return eval(f'stream.{operation}(**parameters)')
     else:
@@ -196,8 +196,7 @@ def apply_stream_operation(
 
 def preprocess(
     stream: Stream, operations: list, inventory: Inventory = None,
-    starttime=None, endtime=None, verbose: bool = False,
-    debug: bool = False
+    starttime=None, endtime=None, verb: int = 0
 ):
     r"""Preprocess waveforms given a list of operations.
 
@@ -221,11 +220,8 @@ def preprocess(
         End time of the stream, used for trimming and selecting the correct
         instrument response.
 
-    verbose : `bool`, optional
-        Print each operation and its arguments if `True`. Defaults to `False`.
-
-    debug :
-        Print the stream after each operation if `True`. Defaults to `False`.
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
 
     Returns
     -------
@@ -233,6 +229,8 @@ def preprocess(
         Waveforms after applying the list of operations.
 
     """
+    if verb > 0:
+        print('Apply preprocessing operations:')
     st = stream.copy()
     for operation_params in operations:
         if (
@@ -265,16 +263,17 @@ def preprocess(
                 parameters=inject_dynamic_parameters(
                     operation, parameters, inventory, starttime, endtime
                 ),
-                verbose=verbose,
+                verb=verb,
+                prefix=' *',
             )
         except Exception as e:
             warnings.warn(
                 'Failed to execute operation "{}".'.format(operation),
                 RuntimeWarning
             )
-            if verbose:
+            if verb > 0:
                 print(e)
-        if debug:
+        if verb > 2:
             print(st)
     return st
 
