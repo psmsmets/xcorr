@@ -54,6 +54,9 @@ target/
 # pyenv
 .python-version
 
+# local tests
+data/
+
 # Environments
 .env
 .venv
