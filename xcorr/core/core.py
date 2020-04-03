@@ -433,7 +433,7 @@ def read(
 
 def write(
     dataset: xr.Dataset, path: str, close: bool = True,
-    force_write: bool = False, verb: int = 0
+    force_write: bool = False, verb: int = 1
 ):
     r"""Write an xcorr N-D labeled data array to a netCDF4 file using a
     temporary file and replacing the final destination.
@@ -460,7 +460,7 @@ def write(
         Always write file if `True` even if its empty. Default is `False`.
 
     verb : {0, 1, 2, 3, 4}, optional
-        Level of verbosity. Defaults to 0.
+        Level of verbosity. Defaults to 1.
 
     """
     if (
@@ -707,7 +707,17 @@ def process(
         o = operations_to_dict(x.pair.preprocess)
 
     # hash?
-    hash_waveforms = hash_waveforms and 'hash' in ds.variables
+    hash_waveforms = hash_waveforms and 'hash' in x.variables
+
+    # filter inventory on ds period
+    inventory = inventory.select(
+        starttime=util.to_UTCDateTime(
+            pd.to_datetime(x.time[0].values) + pd.offsets.DateOffset(0)
+        ),
+        endtime=util.to_UTCDateTime(
+            pd.to_datetime(x.time[-1].values) + pd.offsets.DateOffset(1)
+        ),
+    )
 
     # process each pair per time step
     for p in x.pair:

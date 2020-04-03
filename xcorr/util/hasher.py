@@ -35,7 +35,7 @@ def _filter_obj(obj):
     return {key: obj[key] for key in keys}
 
 
-def _to_json(obj):
+def to_json(obj):
     r"""Wrapper for :func:`json.dumps`.
     """
     return json.dumps(
@@ -49,7 +49,7 @@ def _to_json(obj):
 
 
 def _to_serializable(obj):
-    """Used by :func:`_to_json` to serialize non-standard dtypes.
+    """Used by :func:`to_json` to serialize non-standard dtypes.
     """
     if (
         isinstance(obj, np.int8) or
@@ -133,7 +133,7 @@ def hash_obj(
 
     """
     h = hashlib_obj or hashlib.sha256()
-    h.update(_to_json(obj).encode(_enc))
+    h.update(to_json(obj).encode(_enc))
     if debug:
         print('Obj {} hash'.format(type(obj)), h.hexdigest())
     return None if hashlib_obj else h.hexdigest()
@@ -173,7 +173,7 @@ def hash_Trace(
     """
     h = hashlib_obj or hashlib.sha256()
     stats = dict(zip(_trace_keys, [trace.stats[key] for key in _trace_keys]))
-    h.update(_to_json(stats).encode(_enc))
+    h.update(to_json(stats).encode(_enc))
     for d in trace.data:
         h.update(d.tobytes())
     if debug:
@@ -251,7 +251,7 @@ def hash_Dataset(
     """
     h = hashlib_obj or hashlib.sha256()
     if not metadata_only:
-        h.update(_to_json(dataset.attrs).encode(_enc))
+        h.update(to_json(dataset.attrs).encode(_enc))
     for coord in dataset.coords:
         hash_DataArray(
             dataset[coord],
@@ -306,7 +306,7 @@ def hash_DataArray(
     h = hashlib_obj or hashlib.sha256()
     h.update(darray.name.encode(_enc))
     h.update(repr(darray.dims).encode(_enc))
-    h.update(_to_json(darray.attrs).encode(_enc))
+    h.update(to_json(darray.attrs).encode(_enc))
     if not metadata_only:
         if darray.dtype == np.dtype(object):
             for d in np.nditer(darray, flags=['refs_ok']):

@@ -122,7 +122,7 @@ pairs = [
     'IM.H03S1..EDH-IU.RAR.10.BHR',
 ]
 
-times = pd.date_range(start='2015-01-14', end='2015-01-15', freq='1D')
+times = pd.date_range(start='2015-01-17', end='2015-01-18', freq='1D')
 
 inventory = '../examples/Monowai.xml'
 
@@ -154,12 +154,13 @@ def filename(pair: str, time: pd.Timestamp, dest: str = None):
 
 
 @dask.delayed
-def load(pair: str, time: pd.Timestamp):
+def single_process(pair: str, time: pd.Timestamp, verb: int = 0, **kwargs):
     r"""Main xcorr processing sequence.
     """
     global dest, status, inventory, xcorr_init_args
+    ncfile = filename(pair, time, dest)
     # Open
-    data = xcorr.read(filename(pair, time, dest), fast=True)
+    data = xcorr.read(ncfile, fast=True)
     # Update
     if data and np.all(data.status.values == 1):
         data.close()
@@ -173,16 +174,6 @@ def load(pair: str, time: pd.Timestamp):
             inventory=inventory,
             **xcorr_init_args
         )
-    return data
-
-
-@dask.delayed
-def process(data: xr.Dataset, verb: int = 0, **kwargs):
-    r"""Main xcorr processing sequence.
-    """
-    global inventory, client
-    if not data:
-        return data
     # Process
     xcorr.process(
         data,
@@ -193,17 +184,9 @@ def process(data: xr.Dataset, verb: int = 0, **kwargs):
         verb=verb,
         **kwargs
     )
-    return data
-
-
-@dask.delayed
-def save(data: xr.Dataset, pair: str, time: pd.Timestamp, verb: int = 0):
-    r"""
-    """
-    global dest
     # Save
     if data and np.any(data.status.values == 1):
-        xcorr.write(data, filename(pair, time, dest), verb=verb)
+        xcorr.write(data, ncfile, verb=verb)
         return True
     else:
         return False
@@ -241,9 +224,7 @@ def lazy_processes(pairs: list, times: pd.DatetimeIndex, status: xr.DataArray,
             if any(availability.sum(dim='receiver') == len(receivers)):
                 if verb:
                     print('Add lazy process.')
-                data = load(pair, time)
-                data = process(data, verb, **kwargs)
-                result = save(data, pair, time, verb)
+                result = single_process(pair, time, verb, **kwargs)
                 results.append(result)
             else:
                 if verb:
