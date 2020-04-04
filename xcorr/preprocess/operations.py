@@ -346,9 +346,11 @@ def preprocess(
                 verb=verb,
                 stdout_prefix=' * ',
             )
+        except (KeyboardInterrupt, SystemExit):
+            raise
         except Exception as e:
-            msg = ('Failed to execute operation "{}". Returned error: {}'
-                   .format(operation, e))
+            msg = ('Failed to execute operation "{}". Skipped to next. '
+                   'Returned error: {}'.format(operation, e))
             warnings.warn(msg, UserWarning)
 
     if verb > 2:

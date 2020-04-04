@@ -22,7 +22,7 @@ import os
 # Relative imports
 from ..version import version as __version__
 from ..clients import Client
-from .. import cc
+from .. import cc as correlate
 from .. import util
 from ..preprocess import (
     hash_operations,
@@ -186,7 +186,7 @@ def init(
     }
 
     # lag
-    lag = cc.lag(npts, delta, pad=True)
+    lag = correlate.lag(npts, delta, pad=True)
     if clip_lag is not None:
         if isinstance(clip_lag, pd.Timedelta):
             clip_lag = pd.to_timedelta((-np.abs(clip_lag), np.abs(clip_lag)))
@@ -418,7 +418,7 @@ def read(
     if verb > 0:
         print('{p} #(status==1): {n} of {m}'.format(
             p=path,
-            n=np.sum(dataset.status.values == 1),
+            n=np.sum(dataset.status.data == 1),
             m=dataset.time.size,
         ))
 
@@ -464,7 +464,7 @@ def write(
 
     """
     if (
-        np.sum(dataset.status.values == 1) == 0 or
+        np.sum(dataset.status.data == 1) == 0 or
         (np.sum(dataset.status.values == -1) == 0 and force_write)
     ):
         warnings.warn(
@@ -658,7 +658,7 @@ def merge(
 
 
 def process(
-    x: xr.Dataset, client: Client, inventory: obspy.Inventory = None,
+    dataset: xr.Dataset, client: Client, inventory: obspy.Inventory = None,
     retry_missing: bool = False, test_run: bool = False, verb: int = 1,
     hash_waveforms: bool = True,
     **kwargs
@@ -667,7 +667,7 @@ def process(
 
     Parameters
     ----------
-    x: :class:`xarray.Dataset`
+    dataset: :class:`xarray.Dataset`
         The data array to process.
 
     client : :class:`xcorr.Client`
@@ -696,46 +696,42 @@ def process(
         Arguments passed to :meth:``client.get_pair_preprocessed_waveforms``.
 
     """
-    x.attrs['history'] += (
+    dataset.attrs['history'] += (
         ', Process started @ {}'.format(pd.to_datetime('now'))
     )
     # extract and validate preprocess operations
-    if isinstance(x.pair.preprocess, dict):
-        o = x.pair.preprocess
+    if isinstance(dataset.pair.preprocess, dict):
+        o = dataset.pair.preprocess
         check_operations_hash(o, raise_error=True)
     else:
-        o = operations_to_dict(x.pair.preprocess)
+        o = operations_to_dict(dataset.pair.preprocess)
 
     # hash?
-    hash_waveforms = hash_waveforms and 'hash' in x.variables
-
-    # filter inventory on ds period
-    inventory = inventory.select(
-        starttime=util.to_UTCDateTime(
-            pd.to_datetime(x.time[0].values) + pd.offsets.DateOffset(0)
-        ),
-        endtime=util.to_UTCDateTime(
-            pd.to_datetime(x.time[-1].values) + pd.offsets.DateOffset(1)
-        ),
-    )
+    hash_waveforms = hash_waveforms and 'hash' in dataset.variables
 
     # process each pair per time step
-    for p in x.pair:
-        for t in x.time:
+    for p in dataset.pair:
+
+        for t in dataset.time:
+
+            # set location
+            pt = {'pair': p, 'time': t}
+
             if verb:
                 print(str(p.values), str(t.values)[:19], end=': ')
-            if x.status.loc[{'pair': p, 'time': t}].values != 0:
+
+            # skip processed
+            if dataset.status.loc[pt].values != 0:
                 if not (
                     retry_missing and
-                    x.status.loc[{'pair': p, 'time': t}].values == -1
+                    dataset.status.loc[pt].values == -1
                 ):
                     if verb:
                         print('Has status "{}". Skip.'.format(
-                                x.status.loc[{'pair': p, 'time': t}].values
-                        ))
+                              dataset.status.loc[pt].values))
                     continue
 
-            # Waveforms
+            # waveforms
             if verb:
                 print('Waveforms', end='. ')
             st = client.get_pair_preprocessed_waveforms(
@@ -750,39 +746,42 @@ def process(
             )
             if not isinstance(st, obspy.Stream) or len(st) != 2:
                 print('Missing data. Set status "-1" and skip.')
-                x.status.loc[{'pair': p, 'time': t}] = -1
+                dataset.status.loc[pt] = -1
                 if test_run:
                     break
                 continue
-            x.pair_offset.loc[{'pair': p, 'time': t}] = (
+
+            # track timing offsets
+            dataset.pair_offset.loc[pt] = (
                 pd.to_datetime(st[0].stats.starttime.datetime) -
                 pd.to_datetime(st[1].stats.starttime.datetime)
             )
-            x.time_offset.loc[{'pair': p, 'time': t}] = (
+            dataset.time_offset.loc[pt] = (
                 pd.to_datetime(st[0].stats.starttime.datetime) +
-                pd.to_timedelta(x.time.window_length / 2, unit='s') -
-                x.time.loc[{'time': t}].values
+                pd.to_timedelta(dataset.time.window_length / 2, unit='s') -
+                dataset.time.loc[{'time': t}].values
             )
 
-            # Hash
+            # hash
             if hash_waveforms:
                 if verb:
                     print('Hash', end='. ')
-                x.hash.loc[{'pair': p, 'time': t}] = util.hash_Stream(st)
+                dataset.hash.loc[pt] = util.hash_Stream(st)
 
-            # CC 
+            # cc
             if verb:
                 print('CC', end='. ')
-            x.cc.loc[{'pair': p, 'time': t}] = cc.cc(
-                x=st[0].data[:x.lag.npts],
-                y=st[1].data[:x.lag.npts],
-                normalize=x.cc.normalize == 1,
-                pad=x.lag.pad == 1,
+            dataset.cc.loc[pt] = correlate.cc(
+                x=st[0].data[:dataset.lag.npts],
+                y=st[1].data[:dataset.lag.npts],
+                normalize=dataset.cc.attrs['normalize'] == 1,
+                pad=dataset.lag.attrs['pad'] == 1,
                 unbiased=False,  # apply correction for full dataset!
-            )[x.lag.index_min:x.lag.index_max]
+                dtype=dataset.cc.dtype,
+            )[dataset.lag.index_min:dataset.lag.index_max]
 
             # Status
-            x.status.loc[{'pair': p, 'time': t}] = 1
+            dataset.status.loc[pt] = 1
 
             # Finish
             if verb:
@@ -791,33 +790,30 @@ def process(
                 break
 
     # update history
-    x.attrs['history'] += (
+    dataset.attrs['history'] += (
         ', Process ended @ {}'.format(pd.to_datetime('now'))
     )
 
     # bias correct?
-    if x.cc.bias_correct == 1:
-        x = bias_correct(x)
-        x.attrs['history'] += (
-            ', Bias corrected @ {}'.format(pd.to_datetime('now'))
-        )
+    if dataset.cc.attrs['bias_correct'] == 1:
+        dataset = bias_correct(dataset)
 
     # update metadata hash
-    x.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
-        x,
+    dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
+        dataset,
         metadata_only=True
     )
 
 
 def bias_correct(
-    x: xr.Dataset, biased_var: str = 'cc', unbiased_var: str = None,
+    dataset: xr.Dataset, biased_var: str = 'cc', unbiased_var: str = None,
     weight_var: str = 'w'
 ):
     r"""Bias correct the xcorr N-D labeled data array.
 
     Parameters
     ----------
-    x: :class:`xarray.Dataset`
+    dataset: :class:`xarray.Dataset`
         The data array to process.
 
     biased_var : `str`, optional
@@ -834,39 +830,39 @@ def bias_correct(
         Level of verbosity. Defaults to 0.
 
     """
-    if x[biased_var].unbiased != 0:
+    if dataset[biased_var].unbiased != 0:
         print('No need to bias correct again.')
         return
     unbiased_var = unbiased_var or biased_var
 
-    if weight_var not in x.data_vars:
-        x[weight_var] = get_weights(x.lag, name=weight_var)
+    if weight_var not in dataset.data_vars:
+        dataset[weight_var] = get_weights(dataset.lag, name=weight_var)
 
     # create unbiased_var in dataset
     if biased_var != unbiased_var:
-        x[unbiased_var] = x[biased_var].copy()
-    x[unbiased_var].data = (
-        x[unbiased_var] *
-        x[weight_var].astype(x[unbiased_var].dtype)
+        dataset[unbiased_var] = dataset[biased_var].copy()
+    dataset[unbiased_var].data = (
+        dataset[unbiased_var] *
+        dataset[weight_var].astype(dataset[unbiased_var].dtype)
     )
 
     # update attributes
-    x[unbiased_var].attrs['unbiased'] = np.byte(True)
-    x[unbiased_var].attrs['long_name'] = (
-        'Unbiased ' + x[unbiased_var].attrs['long_name']
+    dataset[unbiased_var].attrs['unbiased'] = np.byte(True)
+    dataset[unbiased_var].attrs['long_name'] = (
+        'Unbiased ' + dataset[unbiased_var].attrs['long_name']
     )
-    x[unbiased_var].attrs['standard_name'] = (
-        'unbiased_' + x[unbiased_var].attrs['standard_name']
+    dataset[unbiased_var].attrs['standard_name'] = (
+        'unbiased_' + dataset[unbiased_var].attrs['standard_name']
     )
 
     # update history
-    x.attrs['history'] += (
+    dataset.attrs['history'] += (
         ', Bias corrected CC @ {}'.format(pd.to_datetime('now'))
     )
 
     # update metadata hash
-    x.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
-        x,
+    dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
+        dataset,
         metadata_only=True
     )
 
@@ -891,7 +887,7 @@ def get_weights(
 
     """
     return xr.DataArray(
-        data=cc.weight(
+        data=correlate.weight(
             lag.npts, pad=True
         )[lag.index_min:lag.index_max],
         dims=('lag'),

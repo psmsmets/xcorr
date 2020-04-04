@@ -457,7 +457,7 @@ class Client(object):
         return None
 
     def get_preprocessed_waveforms(
-        self, receiver: str, time: np.datetime64, preprocess: dict,
+        self, receiver: str, time: pd.Timestamp, preprocess: dict,
         duration: float = 86400., inventory: Inventory = None,
         three_components: str = '12Z', verb: int = 0, **kwargs
     ):
@@ -469,7 +469,7 @@ class Client(object):
         receiver : `str`
             Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
 
-        time : `np.datetime64`
+        time : `pd.Timestamp`
             Center time of the waveform time window.
 
         preprocess : `dict`
@@ -535,8 +535,7 @@ class Client(object):
         if not isinstance(st, Stream) or len(st) == 0:
             return Stream()
 
-        st = xcorr_preprocess(
-            waveforms=st,
+        st = xcorr_preprocess(st,
             operations=preprocess[ch],
             inventory=inventory,
             starttime=t0,
