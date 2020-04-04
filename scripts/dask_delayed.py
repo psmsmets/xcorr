@@ -117,12 +117,20 @@ xcorr_init_args = {
 # pairs, times and inv
 pairs = [
     'IM.H10N1..EDH-IU.RAR.10.BHZ',
-    'IM.H10N1..EDH-IU.RAR.10.BHR',
+    'IM.H10N2..EDH-IU.RAR.10.BHZ',
+    'IM.H10N3..EDH-IU.RAR.10.BHZ',
     'IM.H03S1..EDH-IU.RAR.10.BHZ',
+    'IM.H03S2..EDH-IU.RAR.10.BHZ',
+    'IM.H03S3..EDH-IU.RAR.10.BHZ',
+    'IM.H10N1..EDH-IU.RAR.10.BHR',
+    'IM.H10N2..EDH-IU.RAR.10.BHR',
+    'IM.H10N3..EDH-IU.RAR.10.BHR',
     'IM.H03S1..EDH-IU.RAR.10.BHR',
+    'IM.H03S2..EDH-IU.RAR.10.BHR',
+    'IM.H03S3..EDH-IU.RAR.10.BHR',
 ]
 
-times = pd.date_range(start='2015-01-17', end='2015-01-18', freq='1D')
+times = pd.date_range(start='2015-01-10', end='2015-01-20', freq='1D')
 
 inventory = '../examples/Monowai.xml'
 
@@ -260,7 +268,7 @@ delayed_status = client.verify_data_availability(
 )
 
 # Print main parameters
-print('Parameters')
+print('Data')
 print('    pairs : {}'.format(len(pairs)))
 for p in pairs:
     print('        {}'.format(p))
@@ -272,7 +280,7 @@ print('        start : {}'.format(str(times[0])))
 print('        end   : {}'.format(str(times[-1])))
 
 # Evaluate data availability (parallel), and try to download missing data
-print('Verify data availability')
+print('Verify availability')
 with ProgressBar():
     verified = delayed_status.compute()
 

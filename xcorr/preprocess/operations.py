@@ -11,7 +11,7 @@ Preprocess a :class:`obspy.Stream` given a list of operations and parameters.
 import warnings
 import xarray as xr
 import json
-from obspy import Inventory, Stream
+from obspy import Inventory, Trace, Stream
 
 
 # Relative imports
@@ -19,37 +19,86 @@ from ..preprocess.running_rms import running_rms
 from ..util import to_UTCDateTime, hash_obj
 
 
-__all__ = ['help', 'stream_operations', 'is_stream_operation',
-           'preprocess', 'example_operations_dict',
-           'hash_operations', 'check_operations_hash',
-           'operations_to_dict', 'operations_to_json',
+__all__ = ['help', 'list_operations', 'is_operation', 'preprocess',
+           'example_preprocess_dict', 'hash_operations',
+           'check_operations_hash', 'operations_to_dict', 'operations_to_json',
            'preprocess_operations_to_json', 'preprocess_operations_to_dict']
 
-_self = 'obspy.core.stream.Stream'
+_self = 'obspy.core.stream.Trace'
 
-_stream_operations = {
-    'decimate': {'method': _self, 'inject': []},
-    'detrend': {'method': _self, 'inject': []},
-    'filter': {'method': _self, 'inject': []},
-    'interpolate': {'method': _self, 'inject': []},
-    'merge': {'method': _self, 'inject': []},
-    'normalize': {'method': _self, 'inject': []},
-    'remove_response': {'method': _self, 'inject': ['inventory']},
-    'remove_sensitivity': {'method': _self, 'inject': ['inventory']},
-    'resample': {'method': _self, 'inject': []},
-    'rotate': {'method': _self, 'inject': ['inventory']},
-    'select': {'method': _self, 'inject': []},
-    'taper': {'method': _self, 'inject': []},
-    'trim': {'method': _self, 'inject': ['starttime', 'endtime']},
-    'running_rms': {'method': running_rms, 'inject': []},
+_operations = {
+    'attach_response': {
+        'method': _self,
+        'inject': ['inventory'],
+    },
+    'decimate': {
+        'method': _self,
+        'inject': [],
+    },
+    'detrend': {
+        'method': _self,
+        'inject': [],
+    },
+    'filter': {
+        'method': _self,
+        'inject': [],
+    },
+    'interpolate': {
+        'method': _self,
+        'inject': [],
+    },
+    'merge': {
+        'method': _self,
+        'inject': [],
+    },
+    'normalize': {
+        'method': _self,
+        'inject': [],
+    },
+    'remove_response': {
+        'method': _self,
+        'inject': ['inventory'],
+    },
+    'remove_sensitivity': {
+        'method': _self,
+        'inject': ['inventory'],
+    },
+    'resample': {
+        'method': _self,
+        'inject': [],
+    },
+    'rotate': {
+        'method': _self,
+        'inject': ['inventory'],
+    },
+    'select': {
+        'method': _self,
+        'inject': [],
+    },
+    'simulate': {
+        'method': _self,
+        'inject': [],
+    },
+    'taper': {
+        'method': _self,
+        'inject': [],
+    },
+    'trim': {
+        'method': _self,
+        'inject': ['starttime', 'endtime'],
+    },
+    'running_rms': {
+        'method': running_rms,
+        'inject': [],
+    },
 }
 
 
-def stream_operations():
+def list_operations():
     r"""
     Returns a list of implemented stream operations.
     """
-    return list(_stream_operations.keys())
+    return list(_operations.keys())
 
 
 def help(operation: str = None):
@@ -57,20 +106,18 @@ def help(operation: str = None):
     Print a more extensive help for a given operation.
     """
     if operation is None:
-        operations = list(_stream_operations.keys())
-    elif operation in _stream_operations:
+        operations = list(_operations.keys())
+    elif operation in _operations:
         operations = [operation]
     else:
-        msg = (
-            "Operation '{}' not available as stream operation."
-            .format(operation)
-        )
+        msg = ('Operation "{}" not available as stream operation.'
+               .format(operation))
         raise ValueError(msg)
 
     msg = []
     for operation in operations:
-        method = _stream_operations[operation]['method']
-        inject = _stream_operations[operation]['inject']
+        method = _operations[operation]['method']
+        inject = _operations[operation]['inject']
 
         msg.append("Operation '{}'".format(operation))
         msg.append("          method : {}".format(
@@ -84,13 +131,13 @@ def help(operation: str = None):
     print("\n".join(msg))
 
 
-def is_stream_operation(operation: str):
+def is_operation(operation: str):
     r"""Verify if the operation is an implemented stream operation.
 
     Parameters
     ----------
     operation : `str`
-        Operation name. See :func:`help` or :func:`stream_operations` for a
+        Operation name. See :func:`help` or :func:`list_operations` for a
         list of implemented operations.
 
     Returns
@@ -100,12 +147,12 @@ def is_stream_operation(operation: str):
         stream operations, `False` otherwise.
 
     """
-    return operation in _stream_operations
+    return operation in _operations
 
 
 def inject_dynamic_parameters(
     operation: str, parameters: dict, inventory: Inventory = None,
-    starttime=None, endtime=None
+    starttime=None, endtime=None, verb: int = 0
 ):
     r"""Inject dynamic parameters to the static parameter dictionary
     when needed by the operation.
@@ -113,7 +160,7 @@ def inject_dynamic_parameters(
     Parameters
     ----------
     operation : `str`
-        Operation name. See :func:`help` or :func:`stream_operations` for a
+        Operation name. See :func:`help` or :func:`list_operations` for a
         list of implemented operations.
 
     parameters : `dict`
@@ -130,39 +177,34 @@ def inject_dynamic_parameters(
         End time of the stream, used for trimming and selecting the correct
         instrument response.
 
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
+
     Returns
     -------
     parameters : `dict`
         Dictionary with static and dynamic arguments for the operations.
 
     """
-    params = parameters.copy()
-    if (
-        'inventory' in
-        _stream_operations[operation]['inject']
-    ):
+    params = parameters.copy()  # do not touch the static parameters!
+    if 'inventory' in _operations[operation]['inject']:
         params['inventory'] = inventory
-    if (
-        'starttime' in
-        _stream_operations[operation]['inject']
-    ):
+    if 'starttime' in _operations[operation]['inject']:
         params['starttime'] = to_UTCDateTime(starttime)
-    if (
-        'endtime' in
-        _stream_operations[operation]['inject']
-    ):
+    if 'endtime' in _operations[operation]['inject']:
         params['endtime'] = to_UTCDateTime(endtime)
     return params
 
 
-def apply_stream_operation(
-    stream, operation: str, parameters: dict, verb: int = 0, prefix: str = ''
+def apply_operation(
+    waveforms, operation: str, parameters: dict,
+    dynamic_parameters: dict = None, stdout_prefix: str = '', verb: int = 0
 ):
     r"""Apply an in-place operation with the provided parameters.
 
     Parameters
     ----------
-    stream : :class:`obspy.Stream`
+    waveforms : :class:`obspy.Stream` or :class:`obspy.Trace`
         Waveforms on which to apply the list of operations.
 
     operations : `list`
@@ -171,38 +213,64 @@ def apply_stream_operation(
 
     parameters : `dict`
         Dictionary with all arguments for the operation. If the ``operation``
-        requires dynamic parameters you should inject them first using
-        :func:`inject_dynamic_parameters`
+        requires dynamic parameters you should provide them using
+        ``dynamic_parameters`` or inject them first manually using
+        :func:`inject_dynamic_parameters`.
+
+    dynamic_parameters : `dict`
+        Dictionary with all dynamic parameters that will be injected into
+        ``parameters`` if required by ``operation``.
+
+    stdout_prefix : `str`, optional
+        Add a prefix before printing to stdout.
 
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
 
     Returns
     -------
-    stream : :class:`obspy.Stream`
-        Waveforms after applying the list of operations.
+    operated_waveforms : :class:`obspy.Stream` or :class:`obspy.Trace`
+        Waveforms after applying the operation.
 
     """
-    if not is_stream_operation(operation):
-        return
-    method = _stream_operations[operation]['method']
+    if not (isinstance(waveforms, Trace) or
+            isinstance(waveforms, Stream)):
+        error = ('``waveforms`` is not of type '
+                 ':class:`obspy.Stream` or :class:`obspy.Trace`')
+        raise TypeError(error)
+
+    if not is_operation(operation):
+        error = '"{}" is not an operation.'.format(operation)
+        raise NotImplementedError(error)
+
+    method = _operations[operation]['method']
+    params = inject_dynamic_parameters(
+        operation, parameters, **dynamic_parameters
+    ) if dynamic_parameters else parameters
+
     if verb > 0:
-        print(prefix, operation, ': ', parameters)
-    if method == _self:
-        return eval(f'stream.{operation}(**parameters)')
-    else:
-        return method(stream, **parameters)
+        print('{}{} :'.format(stdout_prefix, operation), params)
+
+    operated_waveforms = (
+        eval(f'waveforms.{operation}(**params)') if method == _self
+        else method(waveforms, **params)
+    )
+
+    if verb > 3:
+        print(operated_waveforms)
+
+    return operated_waveforms
 
 
 def preprocess(
-    stream: Stream, operations: list, inventory: Inventory = None,
-    starttime=None, endtime=None, verb: int = 0
+    waveforms, operations: list, inventory: Inventory = None,
+    starttime=None, endtime=None, verb: int = 0, **kwargs
 ):
     r"""Preprocess waveforms given a list of operations.
 
     Parameters
     ----------
-    stream : :class:`obspy.Stream`
+    waveforms : :class:`obspy.Stream` or :class:`obspy.Trace`
         Waveforms on which to apply the list of operations.
 
     operations : `list`
@@ -223,62 +291,73 @@ def preprocess(
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
 
+    **kwargs :
+        Additional parameters passed to :func:`apply_operation`.
+
     Returns
     -------
-    stream : :class:`obspy.Stream`
+    operated_waveforms : :class:`obspy.Stream` or :class:`obspy.Trace`
         Waveforms after applying the list of operations.
 
     """
     if verb > 0:
         print('Apply preprocessing operations:')
-    st = stream.copy()
+
+    if not (isinstance(waveforms, Trace) or
+            isinstance(waveforms, Stream)):
+        error = ('``waveforms`` is not of type '
+                 ':class:`obspy.Stream` or :class:`obspy.Trace`')
+        raise TypeError(error)
+
+    # make sure not to apply the operations in place
+    operated_waveforms = waveforms.copy()
+
+    # bag dynamic parameters
+    dyn_params = {'inventory': inventory,
+                  'starttime': starttime,
+                  'endtime': endtime}
+
+    if verb > 1:
+        print('Dynamic parameters to be injected:', dyn_params)
+
+    # evaluate all listed operations
     for operation_params in operations:
         if (
-            not(
-                isinstance(operation_params, tuple) or
-                isinstance(operation_params, list)
-            ) or
+            not(isinstance(operation_params, tuple) or
+                isinstance(operation_params, list)) or
             len(operation_params) != 2
         ):
-            warnings.warn(
-                (
-                    'Provided operation should be a tuple or list with '
-                    'length 2 (method:str,params:dict).'
-                ),
-                UserWarning
-            )
+            msg = ('Provided operation should be a tuple or list with '
+                   'length 2 (method:str,params:dict).')
+            warnings.warn(msg, UserWarning)
             continue
         operation, parameters = operation_params
-        if not is_stream_operation(operation):
-            warnings.warn(
-                'Provided operation "{}" is invalid thus ignored.'
-                .format(operation),
-                UserWarning
-            )
+        if not is_operation(operation):
+            msg = ('Provided operation "{}" is invalid thus ignored.'
+                   .format(operation))
+            warnings.warn(msg, UserWarning)
             continue
         try:
-            st = apply_stream_operation(
-                stream=st,
+            operated_waveforms = apply_operation(
+                waveforms=operated_waveforms,
                 operation=operation,
-                parameters=inject_dynamic_parameters(
-                    operation, parameters, inventory, starttime, endtime
-                ),
+                parameters=parameters,
+                dynamic_parameters=dyn_params,
                 verb=verb,
-                prefix=' *',
+                stdout_prefix=' * ',
             )
         except Exception as e:
-            warnings.warn(
-                'Failed to execute operation "{}".'.format(operation),
-                RuntimeWarning
-            )
-            if verb > 0:
-                print(e)
-        if verb > 2:
-            print(st)
-    return st
+            msg = ('Failed to execute operation "{}". Returned error: {}'
+                   .format(operation, e))
+            warnings.warn(msg, UserWarning)
+
+    if verb > 2:
+        print(operated_waveforms)
+
+    return operated_waveforms
 
 
-def example_operations_dict(to_json: bool = False):
+def example_preprocess_dict(to_json: bool = False):
     r"""Returns and example preprocessing operations dictionary, containing a
     list of operations per SEED channel as key.
     """

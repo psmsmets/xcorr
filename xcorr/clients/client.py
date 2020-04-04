@@ -22,7 +22,6 @@ except ModuleNotFoundError:
     nmsClient = None
 try:
     import dask
-    from dask.diagnostics import ProgressBar
 except ModuleNotFoundError:
     dask = None
 
@@ -537,7 +536,7 @@ class Client(object):
             return Stream()
 
         st = xcorr_preprocess(
-            stream=st,
+            waveforms=st,
             operations=preprocess[ch],
             inventory=inventory,
             starttime=t0,
@@ -613,11 +612,6 @@ class Client(object):
             ``time`` and ``receiver``.
 
         """
-        # dask delayed
-        parallel = parallel or self.parallel
-        if parallel and not dask:
-            raise RuntimeError('Dask is required but cannot be found!')
-
         status = self.init_data_availability(pairs_or_receivers, times)
 
         if verb:
