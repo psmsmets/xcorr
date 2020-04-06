@@ -79,12 +79,12 @@ def init(
     window_overlap : `float`, optional
         Crosscorrelation window overlap, [0,1). Defaults to 0.875.
 
-    clip_lag : :class:`pd.Timedelta` or :class:`pd.TimedeltaIndex`
+    clip_lag : `float` or `tuple`, optional
         Clip the crosscorrelation lag time. Defaults to `None`. If ``clip_lag``
-        is a single value of type :class:`pd.Timedelta` ``lag`` is clipped
-        symmetrically around zero with radius ``clip_lag``.
-        Provide a :class:`pd.TimedeltaIndex` of size 2 to clip a specific lag
-        range of interest.
+        is a single value ``lag`` is clipped symmetrically around zero with
+        radius ``clip_lag`` (`float` seconds).
+        Provide a `tuple` with two elements, (lag_min, lag_max), both of type
+        `float` to clip a specific lag range of interest.
 
     unbiased_cc : `bool`, optional
         Automatically bias correct the crosscorrelation estimate in place if
@@ -188,33 +188,34 @@ def init(
     # lag
     lag = correlate.lag(npts, delta, pad=True)
     if clip_lag is not None:
-        if isinstance(clip_lag, pd.Timedelta):
-            clip_lag = pd.to_timedelta((-np.abs(clip_lag), np.abs(clip_lag)))
-        elif not (
-            isinstance(clip_lag, pd.TimedeltaIndex) and len(clip_lag) == 2
-        ):
-            raise TypeError(
-                'clip_lag should be of type ~pandas.Timedelta '
-                'or ~pandas.TimedeltaIndex with length 2 '
-                'specifying start and end.'
-            )
-        nmin = np.argmin(abs(lag - clip_lag[0] / util._one_second))
-        nmax = np.argmin(abs(lag - clip_lag[1] / util._one_second))
+        msg = ('``clip_lag`` should be in seconds of type `float` or of type'
+               '`tuple` with length 2 specifying start and end.')
+        if isinstance(clip_lag, float):
+            clip_lag = abs(clip_lag)
+            clip_lag = tuple(-clip_lag, clip_lag)
+        elif isinstance(clip_lag, tuple) and len(clip_lag) == 2:
+            if (
+                not(isinstance(clip_lag[0], float)) or
+                not(isinstance(clip_lag[0], float))
+            ):
+                raise TypeError(msg)
+        else:
+            raise TypeError(msg)
+        nmin = np.argmin(abs(lag - clip_lag[0]))
+        nmax = np.argmin(abs(lag - clip_lag[1]))
     else:
         nmin = 0
         nmax = 2*npts-1
-    dataset.coords['lag'] = pd.to_timedelta(lag[nmin:nmax], unit='s')
+    dataset.coords['lag'] = lag[nmin:nmax]
     dataset.lag.attrs = {
         'long_name': 'Lag time',
         'standard_name': 'lag_time',
+        'units': 's',
         'sampling_rate': float(sampling_rate),
         'delta': float(delta),
         'npts': int(npts),
-        'pad': np.byte(True),
-        'clip': int(clip_lag is not None),
         'clip_lag': (
-            clip_lag.values / util._one_second
-            if clip_lag is not None else None
+            np.array(clip_lag if clip_lag is not None else [])
         ),
         'index_min': int(nmin),
         'index_max': int(nmax),
@@ -329,8 +330,7 @@ def init(
 
     # add metadata hash
     dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
-        dataset,
-        metadata_only=True,
+        dataset, metadata_only=True, debug=False
     )
 
     return dataset
@@ -338,7 +338,8 @@ def init(
 
 def read(
     path: str, extract: bool = False, load_and_close: bool = False,
-    fast: bool = False, quick_and_dirty: bool = False, verb: int = 0
+    fast: bool = False, quick_and_dirty: bool = False,
+    metadata_hash: str = None, verb: int = 0
 ):
     r"""Read an xcorr N-D labeled data array from a netCDF4 file.
 
@@ -361,6 +362,10 @@ def read(
         Omit verifying both the `sha256_hash` and `sha256_hash_metadata`
         if `True`. Default is `False`.
 
+    metadata_hash : `str`, optional
+        Provide a template metadata sha256 hash to filter data arrays.
+        A mismatch in ``dataset.sha256_hash_metadata`` will return `None`.
+
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
 
@@ -370,11 +375,25 @@ def read(
         The initiated `xcorr` N-D labeled data array.
 
     """
+    # open dataset if it exists
     if not os.path.isfile(path):
-        return False
+        return None
     dataset = xr.open_dataset(path)
-    if 'xcorr_version' not in dataset.attrs:
-        return False
+
+    # check existance of main attributes
+    if (
+        'xcorr_version' not in dataset.attrs or
+        'sha256_hash_metadata' not in dataset.attrs or
+        'sha256_hash' not in dataset.attrs
+    ):
+        return None
+
+    # Verify metadata_hash input
+    if metadata_hash:
+        if not isinstance(metadata_hash, str):
+            raise TypeError('``metadata_hash`` should be a string.')
+        if not len(metadata_hash) == 64:
+            raise ValueError('``metadata_hash`` should be of length 64.')
 
     # convert preprocess operations
     preprocess_operations_to_dict(dataset.pair)
@@ -382,9 +401,7 @@ def read(
     # calculate some hashes
     if not quick_and_dirty:
         sha256_hash_metadata = util.hasher.hash_Dataset(
-            dataset,
-            metadata_only=True,
-            debug=verb > 3,
+            dataset, metadata_only=True, debug=False
         )
         if sha256_hash_metadata != dataset.sha256_hash_metadata:
             warnings.warn(
@@ -402,9 +419,7 @@ def read(
                 )
     if not (quick_and_dirty or fast):
         sha256_hash = util.hasher.hash_Dataset(
-            dataset,
-            metadata_only=False,
-            debug=verb > 3,
+            dataset, metadata_only=False, debug=False
         )
         if sha256_hash != dataset.sha256_hash:
             warnings.warn(
@@ -415,6 +430,7 @@ def read(
                 print('sha256 hash in ncfile :', dataset.sha256_hash)
                 print('sha256 hash computed  :', sha256_hash)
 
+    # verbose status
     if verb > 0:
         print('{p} #(status==1): {n} of {m}'.format(
             p=path,
@@ -422,9 +438,17 @@ def read(
             m=dataset.time.size,
         ))
 
+    # compare metadata_hash with template
+    if metadata_hash:
+        if dataset.sha256_hash_metadata is not metadata_hash:
+            dataset.close()
+            return None
+
+    # missing/unprocessed to NaN
     if extract:
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
 
+    # push to memory and close
     if load_and_close:
         dataset.load().close()
 
@@ -475,7 +499,7 @@ def write(
 
     # Verify metadata hash
     sha256_hash_metadata = (
-        util.hasher.hash_Dataset(dataset, metadata_only=True)
+        util.hasher.hash_Dataset(dataset, metadata_only=True, debug=False)
     )
     if sha256_hash_metadata != dataset.sha256_hash_metadata:
         warnings.warn(
@@ -504,7 +528,7 @@ def write(
     if verb:
         print('Hash', end='. ')
     dataset.attrs['sha256_hash'] = (
-        util.hasher.hash_Dataset(dataset, metadata_only=False)
+        util.hasher.hash_Dataset(dataset, metadata_only=False, debug=False)
     )
 
     # Convert preprocess operations
@@ -659,9 +683,9 @@ def merge(
 
 def process(
     dataset: xr.Dataset, client: Client, inventory: obspy.Inventory = None,
-    retry_missing: bool = False, test_run: bool = False, verb: int = 1,
-    hash_waveforms: bool = True,
-    **kwargs
+    retry_missing: bool = False, test_run: bool = False,
+    hash_waveforms: bool = True, metadata_hash: str = None,
+    verb: int = 1, **kwargs
 ):
     r"""Process the xcorr N-D labeled data array.
 
@@ -772,13 +796,13 @@ def process(
             if verb:
                 print('CC', end='. ')
             dataset.cc.loc[pt] = correlate.cc(
-                x=st[0].data[:dataset.lag.npts],
-                y=st[1].data[:dataset.lag.npts],
+                x=st[0].data[:dataset.lag.attrs['npts']],
+                y=st[1].data[:dataset.lag.attrs['npts']],
                 normalize=dataset.cc.attrs['normalize'] == 1,
-                pad=dataset.lag.attrs['pad'] == 1,
+                pad=True,
                 unbiased=False,  # apply correction for full dataset!
                 dtype=dataset.cc.dtype,
-            )[dataset.lag.index_min:dataset.lag.index_max]
+            )[dataset.lag.attrs['index_min']:dataset.lag.attrs['index_max']]
 
             # Status
             dataset.status.loc[pt] = 1
@@ -800,8 +824,7 @@ def process(
 
     # update metadata hash
     dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
-        dataset,
-        metadata_only=True
+        dataset, metadata_only=True, debug=False
     )
 
 
@@ -862,8 +885,7 @@ def bias_correct(
 
     # update metadata hash
     dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
-        dataset,
-        metadata_only=True
+        dataset, metadata_only=True, debug=False
     )
 
 
@@ -888,8 +910,8 @@ def get_weights(
     """
     return xr.DataArray(
         data=correlate.weight(
-            lag.npts, pad=True
-        )[lag.index_min:lag.index_max],
+            lag.attrs['npts'], pad=True
+        )[lag.attrs['index_min']:lag.attrs['index_max']],
         dims=('lag'),
         coords={'lag': lag},
         name=name,

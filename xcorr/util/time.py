@@ -46,7 +46,7 @@ def to_seconds(time, inplace: bool = False):
         return time
     if isinstance(time, DataArray):
         y = time if inplace else time.copy()
-        y.data = (y.data / _one_second).astype(np.float64)
+        y.values = (y.values / _one_second).astype(np.float64)
         y.attrs['units'] = 's'
         historicize(y, f='to_seconds', a={})
         return None if inplace else y
