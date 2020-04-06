@@ -15,7 +15,6 @@ from scipy import signal
 
 
 # Relative import
-from ..util import to_seconds
 from ..util.history import historicize
 
 
@@ -80,13 +79,13 @@ def psd(
         duration and duration > x[dim].delta
     ) else x[dim].delta
 
-    win_len = int(duration * x[dim].sampling_rate)
+    win_len = int(duration * x[dim].attrs['sampling_rate'])
 
     assert win_len >= 16, 'Change duration to have at least 16 sample points!'
 
     f, t, Sxx = signal.spectrogram(
         x=x.values,
-        fs=x[dim].sampling_rate,
+        fs=x[dim].attrs['sampling_rate'],
         nperseg=win_len,
         noverlap=win_len-1,
         nfft=int(win_len*padding_factor),
@@ -213,10 +212,10 @@ def psd_f_t(
     ) else 1
 
     duration = duration if (
-        duration and duration > x[dim].delta
-    ) else x[dim].delta
+        duration and duration > x[dim].attrs['delta']
+    ) else x[dim].attrs['delta']
 
-    win_len = int(duration * x[dim].sampling_rate)
+    win_len = int(duration * x[dim].attrs['sampling_rate'])
 
     assert win_len >= 16, 'Change duration to have at least 16 sample points!'
 
@@ -225,7 +224,7 @@ def psd_f_t(
 
     f, t, Sxx = signal.spectrogram(
         x=x.values,
-        fs=x[dim].sampling_rate,
+        fs=x[dim].attrs['sampling_rate'],
         nperseg=win_len,
         noverlap=win_shift,
         nfft=int(win_len*padding_factor),
@@ -235,7 +234,7 @@ def psd_f_t(
         **kwargs
     )
 
-    t += to_seconds(x[dim].values[0])
+    t += x[dim].values[0]
 
     coords = {}
     for d in x.dims:

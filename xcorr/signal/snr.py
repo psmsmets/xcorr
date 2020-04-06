@@ -49,7 +49,7 @@ def snr(
     s = x.where(signal)
     n = x.where(noise)
 
-    snr = rms(s, dim=dim) / rms(n, dim=dim)
+    snr = abs(s.max(dim=dim)) / rms(n, dim=dim)
     snr.name = 'snr'
     snr.attrs = {
         'long_name': 'signal-to-noise ratio',

@@ -14,7 +14,6 @@ import numpy as np
 
 
 # Relative imports
-from ..util.time import to_seconds
 from ..util.history import historicize
 
 
@@ -22,7 +21,7 @@ __all__ = ['mask', 'multi_mask']
 
 
 def get_scalar_value(
-    x: xr.DataArray, x0=None, timedelta_to_seconds: bool = True
+    x: xr.DataArray, x0=None
 ):
     r"""Convert a dimensionless array to a scalar value.
     """
@@ -33,7 +32,7 @@ def get_scalar_value(
         y = np.asscalar(x) if x else x0
     else:
         y = x if x else x0
-    return to_seconds(y) if timedelta_to_seconds else y
+    return y
 
 
 def mask(
@@ -79,7 +78,6 @@ def mask(
     assert len(x.coords) == 1, (
         '``x`` should be a coordinate or variable with a single dimension!'
     )
-    x = to_seconds(x)
     scalar = get_scalar_value(scalar, 1.)
     lower = get_scalar_value(lower) if lower else None
     upper = get_scalar_value(upper) if upper else None

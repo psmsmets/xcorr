@@ -34,6 +34,9 @@ def filter(
     x : :class:`xarray.DataArray`
         The array of data to be filtered.
 
+    frequency : `float` or `tuple`
+        The corner frequency (pair) of the filter, in Hz.
+
     btype : `str` {‘lowpass’, ‘highpass’, ‘bandpass’, ‘bandstop’}, optional
        The type of filter. Default is ‘lowpass’.
 
@@ -59,21 +62,22 @@ def filter(
     )
     assert (
         isinstance(frequency, float) or
-        (isinstance(frequency, list) and len(frequency) == 2)
+        (isinstance(frequency, tuple) and len(frequency) == 2)
     ), 'Corner frequency should be a `float` or tuple-pair with (min, max)!'
+
+    y = x if inplace else x.copy()
 
     sos = signal.butter(
         N=order,
         Wn=frequency,
         btype=btype,
         output='sos',
-        fs=x[dim].sampling_rate
+        fs=y[dim].attrs['sampling_rate']
     )
 
-    y = x if inplace else x.copy()
     y.data = signal.sosfiltfilt(
-        sos, x.data, axis=x.dims.index(dim)
-    ).astype(x.dtype)
+        sos, y.data, axis=y.dims.index(dim)
+    ).astype(y.dtype)
 
     historicize(y, f='filter', a={
         'x': x.name,
