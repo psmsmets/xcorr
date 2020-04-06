@@ -18,7 +18,7 @@ setup(
     author_email='mail@pietersmets.be',
     url='https://gitlab.com/psmsmets/xcorr',
     download_url='https://gitlab.com/psmsmets/xcorr.git',
-    license='MIT License',
+    license='GNU General Public License v3 (GPLv3)',
     packages=find_namespace_packages(include=['xcorr.*']),
     keywords=[
         'xcorr', 'correlation', 'signal-processing', 'timeseries',
@@ -27,8 +27,11 @@ setup(
     entry_points={},
     scripts=[],
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'License :: OSI Approved :: Apache Software License',
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Science/Research',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: ' +
+            'GNU General Public License v3 (GPLv3)',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
