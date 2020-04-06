@@ -16,14 +16,15 @@ dependencies:
   - pandas
   - xarray
   - matplotlib
-  - notebook
-  - ipython
-  - jupyter
   - basemap
   - cartopy
   - humanfriendly
   - tabulate
   - dateparser
   - dask
+  - notebook
+  - ipython
+  - jupyter
+  - pip
   - pip:
     - python-crontab
