@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from obspy import read_inventory
-import os
 import dask
 from dask.diagnostics import ProgressBar
 import xcorr
