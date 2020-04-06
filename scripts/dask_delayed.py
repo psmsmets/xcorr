@@ -14,17 +14,20 @@ import xcorr
 
 ##############################################################################
 #
-# Parameters
+# Config
 #
 ##############################################################################
 
 
-# general parameters
+# -----------------------------------------------------------------------------
+# xcorr_init_args : `dict`
+#     A dictionary with input argument to :class:`xcorr.init`
+# -----------------------------------------------------------------------------
 xcorr_init_args = {
     'sampling_rate': 50.,
     'window_length': 86400.,      # 24h
     'window_overlap': 21./24.,    # 3h shift
-    'clip_lag': pd.to_timedelta((0, 6), unit='h'),
+    'clip_lag': (0., 9*3600.),
     'unbiased_cc': False,         # correct afterwards at once
     'hash_waveforms': False,      # time consuming!
     'stationary_poi': {
@@ -99,8 +102,8 @@ xcorr_init_args = {
             }),
             ('filter', {'type': 'highpass', 'freq': .05}),
             ('detrend', {'type': 'demean'}),
-            ('remove_sensitivity', {}),
-            # ('remove_response', {}),
+            # ('remove_sensitivity', {}),
+            ('remove_response', {}),
             ('decimate', {'factor': 5}),
             ('trim', {}),
             ('detrend', {'type': 'demean'}),
@@ -113,8 +116,19 @@ xcorr_init_args = {
     },
 }
 
+# -----------------------------------------------------------------------------
+# xcorr_client_args : `dict`
+#     A dictionary with input argument to :class:`xcorr.Client`
+# -----------------------------------------------------------------------------
+xcorr_client_args = {
+    'sds_root': '../data/WaveformArchive',
+}
 
-# pairs, times and inv
+# -----------------------------------------------------------------------------
+# pairs : `list`
+#     Expects a list of `str`, with receiver couple SEED-id's
+#     separated by a '-'.
+# -----------------------------------------------------------------------------
 pairs = [
     'IM.H10N1..EDH-IU.RAR.10.BHZ',
     'IM.H10N2..EDH-IU.RAR.10.BHZ',
@@ -123,24 +137,26 @@ pairs = [
     'IM.H03S2..EDH-IU.RAR.10.BHZ',
     'IM.H03S3..EDH-IU.RAR.10.BHZ',
     'IM.H10N1..EDH-IU.RAR.10.BHR',
-    'IM.H10N2..EDH-IU.RAR.10.BHR',
-    'IM.H10N3..EDH-IU.RAR.10.BHR',
+    # 'IM.H10N2..EDH-IU.RAR.10.BHR',
+    # 'IM.H10N3..EDH-IU.RAR.10.BHR',
     'IM.H03S1..EDH-IU.RAR.10.BHR',
-    'IM.H03S2..EDH-IU.RAR.10.BHR',
-    'IM.H03S3..EDH-IU.RAR.10.BHR',
+    # 'IM.H03S2..EDH-IU.RAR.10.BHR',
+    # 'IM.H03S3..EDH-IU.RAR.10.BHR',
 ]
 
-times = pd.date_range(start='2015-01-10', end='2015-01-20', freq='1D')
+# -----------------------------------------------------------------------------
+# times : `pandas.data_range`
+#     Date range from start to end with ``freq``='D'.
+# -----------------------------------------------------------------------------
+times = pd.date_range(start='2015-01-15', end='2015-01-18', freq='1D')
 
-inventory = '../examples/Monowai.xml'
-
-dest = '../data/results'
-
-
-# start a client
-client = xcorr.Client(
-    sds_root='../data/WaveformArchive'
-)
+# -----------------------------------------------------------------------------
+# Mandatory parameters
+# -----------------------------------------------------------------------------
+inventory = '../data/Monowai.xml'  # path to inventory
+root = '../data/results'           # path to output dir root
+debug = False                      # run single-threaded
+replace = False                    # don't open existing files
 
 
 ##############################################################################
@@ -149,30 +165,27 @@ client = xcorr.Client(
 #
 ##############################################################################
 
-def filename(pair: str, time: pd.Timestamp, dest: str = None):
-    r"""Construct the filename.
-    """
-    dest = os.path.join(dest, pair) if dest else pair
-    ncfile = '{pair}.{y:04d}.{d:03d}.nc'.format(
-        pair=pair,
-        y=time.year,
-        d=time.dayofyear
-    )
-    return os.path.join(dest, ncfile)
-
 
 @dask.delayed
 def single_process(pair: str, time: pd.Timestamp, verb: int = 0, **kwargs):
     r"""Main xcorr processing sequence.
     """
-    global dest, status, inventory, xcorr_init_args
-    ncfile = filename(pair, time, dest)
-    # Open
-    data = xcorr.read(ncfile, fast=True)
-    # Update
-    if data and np.all(data.status.values == 1):
-        data.close()
-        return False
+    global root, replace, status, inventory, xcorr_init_args
+
+    # File
+    ncfile = xcorr.util.ncfile(pair, time, root)
+
+    if not replace:
+        # Open
+        data = xcorr.read(ncfile, fast=True)
+
+        # Update
+        if data and np.all(data.status.values == 1):
+            data.close()
+            return False
+    else:
+        data = None
+
     # Create
     if not data:
         data = xcorr.init(
@@ -182,6 +195,7 @@ def single_process(pair: str, time: pd.Timestamp, verb: int = 0, **kwargs):
             inventory=inventory,
             **xcorr_init_args
         )
+
     # Process
     xcorr.process(
         data,
@@ -192,6 +206,7 @@ def single_process(pair: str, time: pd.Timestamp, verb: int = 0, **kwargs):
         verb=verb,
         **kwargs
     )
+
     # Save
     if data and np.any(data.status.values == 1):
         xcorr.write(data, ncfile, verb=verb)
@@ -247,16 +262,26 @@ def lazy_processes(pairs: list, times: pd.DatetimeIndex, status: xr.DataArray,
 #
 ##############################################################################
 
-# run single-threaded
-debug = False
 
-# minimize output to stdout in dask!
-warnings.filterwarnings("ignore")
+# Print some config parameters
+print('-'*79)
+print('Config')
+print('    inventory :', inventory)
+print('    root      :', root)
+print('    debug     :', debug)
+print('    replace   :', replace)
+
+
+# init the waveform client
+client = xcorr.Client(**xcorr_client_args)
 
 # Read and filter inventory
 inventory = xcorr.util.get_pair_inventory(
     pairs, read_inventory(inventory), times
 )
+
+# minimize output to stdout in dask!
+warnings.filterwarnings("ignore")
 
 # Get waveform availability status
 status = client.init_data_availability(
@@ -267,7 +292,8 @@ delayed_status = client.verify_data_availability(
     status, download=True, compute=False
 )
 
-# Print main parameters
+# Print main data parameters
+print('-'*79)
 print('Data')
 print('    pairs : {}'.format(len(pairs)))
 for p in pairs:
@@ -279,7 +305,9 @@ print('    times : {} ({})'.format(len(times), len(status.time)))
 print('        start : {}'.format(str(times[0])))
 print('        end   : {}'.format(str(times[-1])))
 
+
 # Evaluate data availability (parallel), and try to download missing data
+print('-'*79)
 print('Verify availability')
 with ProgressBar():
     verified = delayed_status.compute()
@@ -296,6 +324,7 @@ for rec in status.receiver:
     print('        {} : {:.2f}%'.format(rec.values, pcnt))
 
 # Evaluate lazy process list
+print('-'*79)
 print('Compute')
 if debug:
     results = dask.compute(

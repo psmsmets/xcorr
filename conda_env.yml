@@ -1,0 +1,29 @@
+name: xcorr
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - numpy
+  - scipy
+  - numba
+  - obspy>=1.2.0
+  - pyfftw
+  - h5netcdf
+  - h5py
+  - netcdf4
+  - gdal
+  - pandas
+  - xarray
+  - matplotlib
+  - notebook
+  - ipython
+  - jupyter
+  - basemap
+  - cartopy
+  - humanfriendly
+  - tabulate
+  - dateparser
+  - dask
+  - pip:
+    - python-crontab
