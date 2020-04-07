@@ -92,7 +92,7 @@ def check_receiver(
 
 def split_pair(
     pair, separator: str = '-', substitute: bool = False,
-    three_components: str = '12Z', to_dict: bool = False
+    three_components: str = None, to_dict: bool = False
 ):
     r"""Split a receiver pair string into receivers SEED-ids.
 
@@ -135,7 +135,7 @@ def split_pair(
         'Pair should be either a string, numpy.ndarray or '
         'an xarray.DataArray'
     )
-
+    three_components = three_components or '12Z'
     assert three_components == '12Z' or three_components == 'NEZ', (
         '``three_components`` should be either "12Z" or "NEZ"!'
     )

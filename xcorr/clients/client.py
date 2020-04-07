@@ -635,7 +635,8 @@ class Client(object):
 
     def data_availability(
         self, pairs_or_receivers: list, times: pd.DatetimeIndex,
-        verb: int = 0, **kwargs
+        extend_days: int = None, substitute: bool = False,
+        three_components: str = None, verb: int = 0, **kwargs
     ):
         r"""Verify the waveform data availability for receivers and times.
 
@@ -648,6 +649,18 @@ class Client(object):
 
         times : `pd.DatetimeIndex`
             Sequence of dates with `freq`="D".
+
+        extend_days : `int`, optional
+            Extend ``times`` with n-days at both left and right edges.
+
+        substitute : `bool`, optional
+            If `True`, convert radial 'R' and transverse 'T' rotated
+            orientation codes automatically to ``three_components``.
+            Defaults to `False`.
+
+        three_components: {'12Z', 'NEZ'}, optional
+            Set the three-component orientation characters for ``substitute``.
+            Defaults to '12Z'.
 
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
@@ -662,7 +675,10 @@ class Client(object):
             ``time`` and ``receiver``.
 
         """
-        status = self.init_data_availability(pairs_or_receivers, times)
+        status = self.init_data_availability(
+            pairs_or_receivers, times, extend_days,
+            substitute, three_components
+        )
 
         if verb:
             print('Verify {} (receiver, time) combinations.'
@@ -678,7 +694,8 @@ class Client(object):
 
     def init_data_availability(
         self, pairs_or_receivers: list, times: pd.DatetimeIndex,
-        extend_days: int = 0, **kwargs
+        extend_days: int = None, substitute: bool = False,
+        three_components: str = None 
     ):
         r"""Create a new N-D labelled array to verify the waveform data
         availability for receivers and times.
@@ -696,8 +713,14 @@ class Client(object):
         extend_days : `int`, optional
             Extend ``times`` with n-days at both left and right edges.
 
-        **kwargs :
-            Extra parameters are passed on to :func:`xcorr.util.split_pair`
+        substitute : `bool`, optional
+            If `True`, convert radial 'R' and transverse 'T' rotated
+            orientation codes automatically to ``three_components``.
+            Defaults to `False`.
+
+        three_components: {'12Z', 'NEZ'}, optional
+            Set the three-component orientation characters for ``substitute``.
+            Defaults to '12Z'.
 
         Returns:
         --------
@@ -709,11 +732,16 @@ class Client(object):
         assert isinstance(times, pd.DatetimeIndex) and times.freqstr == 'D', (
             '``times`` should be a pandas.DatetimeIndex with freq="D"!'
         )
+        extend_days = extend_days or 0
+        assert isinstance(extend_days, int), (
+            '``extend_days`` should be of type `int`!'
+        )
 
         # Get all receivers from pairs
         receivers = []
         for p in pairs_or_receivers:
-            receivers += split_pair(p, to_dict=False, **kwargs)
+            receivers += split_pair(p, to_dict=False, substitute=substitute,
+                                    three_components=three_components)
         receivers = sorted(list(set(receivers)))
 
         # Time
