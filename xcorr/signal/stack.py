@@ -17,81 +17,135 @@ import pandas as pd
 from ..util import get_dpm
 
 
-__all__ = ['stack_all', 'stack_year_month', 'stack_year_dayofyear']
+__all__ = ['stack']
+
+_grouping = ['all', 'year_month', 'year_doy']
+
+
+def stack(
+    x: xr.Dataset, group: str = None, dim: str = None, **kwargs
+):
+    r"""Stack a an N-D labeled array of data over a (grouped) dimension.
+
+    Parameters:
+    -----------
+    x : :class:`xarray.DataArray`
+        The array of data to be stacked.
+
+    group : {'all', 'year_month', 'year_doy'}, optional
+       The method to group ``dim``.
+
+    dim : `str`, optional
+        The coordinates name of ``x`` to be stacked over. Default is 'time'.
+
+    Returns:
+    --------
+    y : :class:`xarray.DataArray` or `None`
+        The stacked output of ``x``.
+    """
+    group = group or 'all'
+    assert group in _grouping, f'"{group}" is not a group method!'
+
+    return eval(f'stack_{group}(x, dim=dim, **kwargs)')
 
 
 def list_dim_variables(
-    dataset: xr.Dataset, dim: str = 'time'
+    x: xr.Dataset, dim: str = None
 ):
     """
     List all variables in `xr.Dataset` with dimension `dim`.
     """
-    if isinstance(dim, str):
-        d = dim
-    elif isinstance(dim, xr.DataArray):
-        d = dim.name
-    else:
+    dim = dim or 'time'
+    if isinstance(dim, xr.DataArray):
+        dim = dim.name
+    elif not isinstance(dim, str):
         raise TypeError('Only xr.Dataset and str are allowed.')
     var = []
-    for v in dataset.data_vars:
-        if d in dataset[v].dims:
+    for v in x.data_vars:
+        if dim in x[v].dims:
             var.append(v)
     return var
 
 
 def stack_all(
-    dataset: xr.Dataset, dim: xr.DataArray = None, **kwargs
+    x: xr.Dataset, coord: xr.DataArray = None, dim: str = None,
+    **kwargs
 ):
     """
     Stack `xr.Dataset` over the dimension `dim` (default = time).
     """
-    ds = dataset.mean(
-        dim='time' if dim is None else dim.name,
-        keep_attrs=True,
-        **kwargs
+    dim = dim or 'time'
+    assert isinstance(dim, str), '"dim" should be of type `str`'
+    assert coord is None or isinstance(coord, xr.DataArray), (
+        '"coord" should be of type :class:`xarray.DataArray`'
     )
-    return ds.assign_coords(dim or {'time': dataset.time[0]})
+    if coord:
+        assert coord.name in x.dims, f'"{coord}" is not a coordinate of "x"!'
+        dim = coord.name
+    else:
+        assert dim in x.dims, f'"{dim}" is not a dimension of "x"!'
+        coord = x[dim]
+    y = x.mean(dim=dim, keep_attrs=True, **kwargs)
+    return y.assign_coords({dim: coord[0]})
 
 
 def stack_year_month(
-    dataset: xr.Dataset, **kwargs
+    x: xr.Dataset, dim: str = None
 ):
     """
     Stack `xr.Dataset` per year and month.
     """
-    year_month_idx = pd.MultiIndex.from_arrays(
-        [dataset['time.year'], dataset['time.month']]
-    )
-    dataset.coords['year_month'] = ('time', year_month_idx)
+    dim = dim or 'time'
+    assert isinstance(dim, str), '"dim" should be of type `str`'
+    assert dim in x.dims, f'"{dim}" is not a dimension of "x"!'
+
+    # extract all variables depending on dim
+    y = x[list_dim_variables(x, dim=dim)]
+
+    # construct multi-index
+    year = dim + '.year'
+    month = dim + '.month'
+    year_month_idx = pd.MultiIndex.from_arrays([y[year], y[month]])
+
+    # add new coordinate
+    y.coords['year_month'] = (dim, year_month_idx)
+
+    # month weight (correct for varying number of days)
     month_length = xr.DataArray(
-        get_dpm(dataset.time.to_index()),
-        coords=[dataset.time],
+        get_dpm(y[dim].to_index()),
+        coords=[y[dim]],
         name='month_length'
     )
-    weights = (
-        (month_length.groupby('time.month') / month_length)
-        .groupby('time.month')
-        .sum()
-    )
-    return (
-        (dataset[list_dim_variables(dataset, **kwargs)] * weights)
-        .groupby('year_month')
-        .sum(dim='time', keep_attrs=True)
-    )
+    w = (month_length.groupby(month)/month_length).groupby(month).sum()
+
+    # apply weight and group
+    y = (w*y).groupby('year_month').sum(dim=dim, keep_attrs=True)
+
+    return y
 
 
-def stack_year_dayofyear(
-    dataset: xr.Dataset, **kwargs
+def stack_year_doy(
+    x: xr.Dataset, dim: str = None
 ):
     """
-    Stack `xr.Dataset` per year and doy.
+    Stack `xr.Dataset` per year and doy (day of year).
     """
-    year_doy_idx = pd.MultiIndex.from_arrays(
-        [dataset['time.year'], dataset['time.dayofyear']]
-    )
-    dataset.coords['year_dayofyear'] = ('time', year_doy_idx)
-    return (
-        dataset[list_dim_variables(dataset, **kwargs)]
-        .groupby('year_dayofyear')
-        .mean(dim='time', keep_attrs=True)
-    )
+    dim = dim or 'time'
+    assert isinstance(dim, str), '"dim" should be of type `str`'
+    assert dim in x.dims, f'"{dim}" is not a dimension of "x"!'
+
+    # extract all variables depending on dim
+    y = x[list_dim_variables(x, dim=dim)]
+
+    # construct multi-index
+    year = dim + '.year'
+    doy = dim + '.doyofyear'
+    year_doy_idx = pd.MultiIndex.from_arrays([y[year], y[doy]])
+
+    # add new coordinate
+    y['year_dayofyear'] = (dim, year_doy_idx)
+
+    # apply weight and group
+    y = y.groupby('year_dayofyear').mean(dim=dim, keep_attrs=True)
+
+    return y

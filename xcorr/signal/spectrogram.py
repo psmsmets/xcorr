@@ -18,7 +18,7 @@ from scipy import signal
 from ..util.history import historicize
 
 
-__all__ = ['psd', 'psd_f_t']
+__all__ = ['psd']
 
 
 def psd(

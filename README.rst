@@ -40,14 +40,16 @@ Main xcorr features listed per submodule:
 
   - ``detrend``: demean and linear detrend.
   - ``mask``: mask coordinates of interest (one or two-dimensional).
-  - ``rms``: root-mean-square.
-  - ``snr``: signal-to-noise ratio.
-  - ``taper``: apply any window of :mod:`scipy.signal.windows`.
   - ``filter``: time-domain filter using a forward-backward (zero-phase) digital
     butterworth filter by cascaded second-order sections.
   - ``psd``: spectrogram.
+  - ``snr``: signal-to-noise ratio.
+  - ``rms``: root-mean-square.
   - ``stack``: stack over a full time period, or grouped per day, month, year,
     year-day, year-month. 
+  - ``taper``: apply a ``window`` to a dimension.
+  - ``window``: construct a taper window for a coordinate using any window of
+    :mod:`scipy.signal.windows` in an :func:`obspy.Trace.taper` like way.
 
 - **util**: Various utilities.
 
