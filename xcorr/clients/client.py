@@ -405,8 +405,10 @@ class Client(object):
         tmin = kwargs['endtime'] - kwargs['starttime'] - self.max_gap
         for sds in self.sds_read:
             stream = sds.get_waveforms(**kwargs)
-            duration = stream_duration(stream)
-            if duration[seedId]['time'] >= tmin:
+            if not stream:
+                continue
+            duration = stream_duration(stream, id=seedId)
+            if duration['time'] >= tmin:
                 if verb > 1:
                     print(_msg_loaded_archive.format(kwargs['starttime']))
                 return stream
@@ -906,27 +908,37 @@ def sum_stream_list(streams: list):
     return stream
 
 
-def stream_duration(stream: Stream):
+def stream_duration(stream: Stream, id: str = None):
     r"""Returns a dictionary with the total duration per SEED-id.
     """
     if not isinstance(stream, Stream):
         raise TypeError('``stream`` should be a :class:`obspy.Stream`.')
 
+    if id and not isinstance(id, str):
+        raise TypeError('``id`` should be a `str`.')
+
     duration = dict()
+
+    if id:
+        duration[id] = dict(gaps=[], npts=0, time=0.,
+                            starttime=None, endtime=None)
+
     for trace in stream:
-        if trace.id not in duration:
-            prev = dict(
-                sampling_rate=trace.stats.sampling_rate,
-                delta=trace.stats.delta, npts=0, time=None,
-                starttime=None, endtime=None, gaps=[],
-            )
-        else:
+
+        if id is not None and trace.id != id:
+            continue
+
+        if trace.id in duration:
             prev = duration[trace.id]
+        else:
+            prev = dict(gaps=[], npts=0, time=0.,
+                        starttime=None, endtime=None)
 
         prev['npts'] += trace.stats.npts
-        if trace.stats.starttime < prev['starttime']:
+        prev['time'] += trace.stats.npts * trace.stats.delta
+        if trace.stats.starttime < prev['starttime'] or not prev['starttime']:
             prev['starttime'] = trace.stats.starttime
-        if trace.stats.endtime < prev['endtime']:
+        if trace.stats.endtime < prev['endtime'] or not prev['endtime']:
             prev['endtime'] = trace.stats.endtime
 
         duration[trace.id] = prev
@@ -935,10 +947,14 @@ def stream_duration(stream: Stream):
         duration['.'.join(gap[:4])]['gaps'] += [gap[4:]]
 
     for seedId in duration:
-        overlap = sum([gap[-1] if gap[-1] < 0 else
-                       0 for gap in duration[seedId]['gaps']])
-        npts = duration[seedId]['npts'] + overlap
-        duration[seedId]['npts'] = npts
-        duration[seedId]['time'] = npts * duration[seedId]['delta']
+        npts_overlap = 0
+        time_overlap = 0.
+        for gap in duration[seedId]['gaps']:
+            if gap[-1] > 0:
+                npts_overlap += gap[-1]
+                time_overlap += gap[-2]
 
-    return duration
+        duration[seedId]['npts'] += npts_overlap
+        duration[seedId]['time'] += time_overlap
+
+    return duration[id] if id else duration
