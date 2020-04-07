@@ -282,7 +282,8 @@ class Client(object):
     def get_waveforms(
         self, receiver: str, time: pd.Timestamp, centered: bool = True,
         duration: float = 86400., buffer: float = 60.,
-        allow_wildcards: bool = False, verb: int = 0, **kwargs
+        allow_wildcards: bool = False, download: bool = True,
+        verb: int = 0
     ):
         r"""Get waveforms from the clients given a SEED-id.
 
@@ -313,11 +314,14 @@ class Client(object):
             Enable wildcards '*' and '?' in the ``receiver`` SEED-id string.
             Defaults to `False`, not allowing wildcards.
 
+        download : `bool`, optional
+            If `True` (default), automatically download waveforms missing in
+            all local SDS archives listed in ``self.sds_read`` using
+            ``self.fdsn`` and ``self.nms`` services. Data is added to
+            ``self.sds_write``.
+
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
-
-        **kwargs :
-            Parameters passed to :meth:`_get_waveforms_for_date`
 
         Returns:
         --------
@@ -359,7 +363,7 @@ class Client(object):
         )
 
         # 2. download remote per day
-        if not stream:
+        if not stream and download:
 
             # list of days
             days = get_dates(t0, t1)
@@ -370,7 +374,8 @@ class Client(object):
                 stream += self._get_waveforms_for_date(
                     receiver=receiver,
                     date=day,
-                    local=False
+                    download=True,
+                    scan_sds=False,
                 )
 
             # trim to asked time range
