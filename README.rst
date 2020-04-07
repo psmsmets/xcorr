@@ -49,7 +49,9 @@ Main xcorr features listed per submodule:
     year-day, year-month. 
   - ``taper``: apply a ``window`` to a dimension.
   - ``window``: construct a taper window for a coordinate using any window of
-    `scipy.signal.windows <https://docs.scipy.org/doc/scipy/reference/signal.windows.html>` in an `obspy.Trace.taper <https://docs.obspy.org/master/packages/autogen/obspy.core.trace.Trace.taper.html>` like way.
+    `scipy.signal.windows <https://docs.scipy.org/doc/scipy/reference/signal.windows.html>`_ 
+    in an `obspy.Trace.taper <https://docs.obspy.org/master/packages/autogen/obspy.core.trace.Trace.taper.html>`_
+    like way.
 
 - **util**: Various utilities.
 
