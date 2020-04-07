@@ -556,7 +556,7 @@ def write(
 
 
 def merge(
-    datasets: list, extract: bool = True, merge_versions: bool = False,
+    datasets: list, extract: bool = True, strict: bool = False,
     verb: int = 0, **kwargs
 ):
     r"""Merge a list of xcorr N-D labeled data arrays.
@@ -571,8 +571,9 @@ def merge(
         Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
 
-    merge_versions : `bool`, optional
-        Ignore data arrays with different `xcorr` versions.
+    strict : `bool`, optional
+        If `True`, do not merge data arrays with different `xcorr` versions.
+        Defaults to `False`.
 
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
@@ -586,6 +587,9 @@ def merge(
         The merged `xcorr` N-D labeled data array.
 
     """
+
+    # Todo: make a dask lazy load with open_mfdataset (less memory!)
+
     dsets = None
     for ds in datasets:
         if isinstance(ds, str):
@@ -623,7 +627,6 @@ def merge(
             ds.pair.preprocess['sha256_hash']
         ):
             warnings.warn(
-                'Dataset preprocess hash does not match. Item skipped.',
                 UserWarning
             )
             continue
@@ -635,18 +638,12 @@ def merge(
             )
             continue
 
-        if dsets.xcorr_version != ds.xcorr_version:
-            if merge_versions:
-                warnings.warn(
-                    'Dataset xcorr_version does not match.',
-                    UserWarning
-                )
-            else:
-                warnings.warn(
-                    'Dataset xcorr_version does not match. Item skipped.',
-                    UserWarning
-                )
-                continue
+        if dsets.xcorr_version != ds.xcorr_version and strict:
+            warnings.warn(
+                'Dataset xcorr_version does not match. Item skipped.',
+                UserWarning
+            )
+            continue
 
         try:
             dsets = dsets.merge(ds, join='outer')
@@ -763,7 +760,7 @@ def process(
                 time=t.values,
                 preprocess=o,
                 duration=t.window_length,
-                buffer=t.window_length/10,
+                buffer=t.window_length/20,  # 5%
                 inventory=inventory,
                 verb=verb-1,
                 **kwargs

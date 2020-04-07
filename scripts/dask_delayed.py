@@ -154,6 +154,7 @@ times = pd.date_range(start='2015-01-15', end='2015-01-18', freq='1D')
 # -----------------------------------------------------------------------------
 inventory = '../data/Monowai.xml'  # path to inventory
 root = '../data/results'           # path to output dir root
+threads = 2                        # set dask number of workers
 debug = False                      # run single-threaded
 replace = False                    # don't open existing files
 
@@ -267,6 +268,7 @@ print('-'*79)
 print('Config')
 print('    inventory :', inventory)
 print('    root      :', root)
+print('    threads   :', 1 if debug else threads)
 print('    debug     :', debug)
 print('    replace   :', replace)
 
@@ -334,5 +336,5 @@ else:
     with ProgressBar():
         results = dask.compute(
             lazy_processes(pairs, times, status, verb=0),
-            scheduler='processes'
+            scheduler='processes', num_workers=threads
         )

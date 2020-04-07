@@ -42,6 +42,7 @@ Main xcorr features listed per submodule:
   - ``mask``: mask coordinates of interest (one or two-dimensional).
   - ``rms``: root-mean-square.
   - ``snr``: signal-to-noise ratio.
+  - ``taper``: apply any window of :mod:`scipy.signal.windows`.
   - ``filter``: time-domain filter using a forward-backward (zero-phase) digital
     butterworth filter by cascaded second-order sections.
   - ``psd``: spectrogram.

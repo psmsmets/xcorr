@@ -25,13 +25,12 @@ _sides = ['left', 'right', 'both']
 
 
 def taper(
-    x: xr.DataArray, dim: str = 'lag', inplace: bool = False,
-    wtype: str = 'hann', max_percentage: float = None,
-    max_length: float = None, side: str = None
+    x: xr.DataArray, wtype: str = 'hann', max_percentage: float = None,
+    max_length: float = None, side: str = None, dim: str = 'lag',
+    inplace: bool = False,
+
 ):
     r"""Taper an N-D labeled array of data.
-
-
 
     Parameters:
     -----------

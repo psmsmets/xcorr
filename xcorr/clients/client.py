@@ -29,7 +29,8 @@ except ModuleNotFoundError:
 # Relative imports
 from ..clients.datafetch import stream2SDS
 from ..preprocess import preprocess as xcorr_preprocess
-from ..util.receiver import check_receiver, split_pair, receiver_to_dict
+from ..util.receiver import (check_receiver, split_pair, receiver_to_dict,
+                             receiver_to_str)
 from ..util.time import to_UTCDateTime, get_dates
 
 
@@ -263,7 +264,7 @@ class Client(object):
     def _check_daystream_length(
         self, stream: Stream, verb: int = 0
     ):
-        r"""Returns `True` if a stream (assuming a uniqe SEED-id) contains a
+        r"""Returns `True` if a stream (assuming a unique SEED-id) contains a
         day of data not exceeding the allowed ``max_gap``.
         """
         if not isinstance(stream, Stream) or len(stream) == 0:
@@ -345,30 +346,76 @@ class Client(object):
                 .format(receiver, t0, t1)
             )
 
+        # UTCDatetime
+        t0_obspy = to_UTCDateTime(t0)
+        t1_obspy = to_UTCDateTime(t1)
+
         # split receiver SEED-id to a dictionary
-        receiver = dict(zip(
-            ['network', 'station', 'location', 'channel'],
-            receiver.split('.')
-        ))
+        receiver = receiver_to_dict(receiver)
 
-        # list of days
-        days = get_dates(t0, t1)
+        # 1. scan local archives for exact period
+        stream = self._get_sds_waveforms(
+            **dict(**receiver, starttime=t0_obspy, endtime=t1_obspy)
+        )
 
-        # get streams per day
-        stream = Stream()
-        for day in days:
-            stream += self._get_waveforms_for_date(
-                receiver=receiver,
-                date=day
-            )
+        # 2. download remote per day
+        if not stream:
 
-        # trim to asked time range
-        stream.trim(starttime=to_UTCDateTime(t0), endtime=to_UTCDateTime(t1))
+            # list of days
+            days = get_dates(t0, t1)
+
+            # get streams per day
+            stream = Stream()
+            for day in days:
+                stream += self._get_waveforms_for_date(
+                    receiver=receiver,
+                    date=day,
+                    local=False
+                )
+
+            # trim to asked time range
+            stream.trim(starttime=t0_obspy, endtime=t1_obspy)
 
         return stream
 
-    def _get_waveforms_for_date(self, receiver: dict, date: pd.Timestamp,
-                                download: bool = True, verb: int = 0):
+    def _get_sds_waveforms(self, verb: int = 0, **kwargs):
+        r"""Get the local waveforms from any of the local sds_read archives.
+
+        Parameters:
+        -----------
+        verb : {0, 1, 2, 3, 4}, optional
+            Level of verbosity. Defaults to 0.
+
+        **kwargs :
+            Parameters passed to
+            :meth:`obspy.clients.filesystem.sds.get_waveforms`.
+            Required parameters are ``network``, ``station``, ``location``,
+            ``channel``, ``starttime``, and ``endtime``.
+
+        Returns:
+        --------
+        stream : :class:`obspy.Stream`
+            The requested waveforms.
+
+        """
+        seedId = receiver_to_str(kwargs)
+        if verb > 0:
+            print("Get waveforms for {} from {} until {}"
+                  .format(seedId, kwargs['starttime'], kwargs['endtime']))
+        tmin = kwargs['endtime'] - kwargs['starttime'] - self.max_gap
+        for sds in self.sds_read:
+            stream = sds.get_waveforms(**kwargs)
+            duration = stream_duration(stream)
+            if duration[seedId]['time'] >= tmin:
+                if verb > 1:
+                    print(_msg_loaded_archive.format(kwargs['starttime']))
+                return stream
+        return Stream()
+
+    def _get_waveforms_for_date(
+        self, receiver: dict, date: pd.Timestamp, scan_sds: bool = True,
+        download: bool = True, verb: int = 0
+    ):
         r"""Get the waveforms for a receiver and date.
 
         Parameters:
@@ -380,10 +427,15 @@ class Client(object):
         date : :class:`pd.Timestamp`
             The date.
 
+        scan_sds : `bool`, optional
+            If `True` (default), scan all local SDS archives listed in
+            ``self.sds_read``.
+
         download : `bool`, optional
-            If `True` (default) automatically download waveforms missing in the
-            local SDS archives ``self.sds_read`` using ``self.fdsn`` and
-            ``self.nms`` services. Data is added to ``self.sds_write``.
+            If `True` (default), automatically download waveforms missing in
+            all local SDS archives listed in ``self.sds_read`` using
+            ``self.fdsn`` and ``self.nms`` services. Data is added to
+            ``self.sds_write``.
 
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
@@ -394,8 +446,8 @@ class Client(object):
             The waveforms for ``receiver`` on ``date``.
 
         """
-        time = pd.to_datetime(date) + pd.offsets.DateOffset(0, normalize=True)
-        time = UTCDateTime(time)
+        time = UTCDateTime(pd.to_datetime(date) +
+                           pd.offsets.DateOffset(0, normalize=True))
         args = dict(**receiver, starttime=time, endtime=time + 86400)
 
         if verb > 0:
@@ -404,23 +456,21 @@ class Client(object):
                 "from {starttime} until {endtime}".format(**args)
             )
 
-        if verb > 1:
-            print(_msg_load_archive.format(time))
-
-        for sds in self.sds_read:
-            daystream = sds.get_waveforms(**args)
-            if self._check_daystream_length(daystream, verb > 2):
-                if verb > 1:
-                    print(_msg_loaded_archive.format(time))
-                return daystream
-        else:
+        if scan_sds:
             if verb > 1:
-                print(_msg_no_data.format(time))
+                print(_msg_load_archive.format(time))
+            for sds in self.sds_read:
+                daystream = sds.get_waveforms(**args)
+                if self._check_daystream_length(daystream, verb > 2):
+                    if verb > 1:
+                        print(_msg_loaded_archive.format(time))
+                    return daystream
+            else:
+                if verb > 1:
+                    print(_msg_no_data.format(time))
 
-            if not download:
-                return None
-
-            # get attempt via fdsn
+        if download:
+            # attempt via fdsn
             if self.fdsn:
                 if verb > 1:
                     print('Try FDSN.')
@@ -438,7 +488,7 @@ class Client(object):
                         print('an error occurred:')
                         print(e)
 
-            # get attempt via nms
+            # attempt via nms
             if self.nms:
                 if verb > 1:
                     print('Try NMS_Client')
@@ -454,7 +504,7 @@ class Client(object):
                     if verb > 0:
                         print('an error occurred:')
                         print(e)
-        return None
+        return Stream()
 
     def get_preprocessed_waveforms(
         self, receiver: str, time: pd.Timestamp, preprocess: dict,
@@ -535,7 +585,8 @@ class Client(object):
         if not isinstance(st, Stream) or len(st) == 0:
             return Stream()
 
-        st = xcorr_preprocess(st,
+        st = xcorr_preprocess(
+            waveforms=st,
             operations=preprocess[ch],
             inventory=inventory,
             starttime=t0,
@@ -825,3 +876,41 @@ def sum_stream_list(streams: list):
     for st in streams:
         stream = stream + st
     return stream
+
+
+def stream_duration(stream: Stream):
+    r"""Returns a dictionary with the total duration per SEED-id.
+    """
+    if not isinstance(stream, Stream):
+        raise TypeError('``stream`` should be a :class:`obspy.Stream`.')
+
+    duration = dict()
+    for trace in stream:
+        if trace.id not in duration:
+            prev = dict(
+                sampling_rate=trace.stats.sampling_rate,
+                delta=trace.stats.delta, npts=0, time=None,
+                starttime=None, endtime=None, gaps=[],
+            )
+        else:
+            prev = duration[trace.id]
+
+        prev['npts'] += trace.stats.npts
+        if trace.stats.starttime < prev['starttime']:
+            prev['starttime'] = trace.stats.starttime
+        if trace.stats.endtime < prev['endtime']:
+            prev['endtime'] = trace.stats.endtime
+
+        duration[trace.id] = prev
+
+    for gap in stream.get_gaps():
+        duration['.'.join(gap[:4])]['gaps'] += [gap[4:]]
+
+    for seedId in duration:
+        overlap = sum([gap[-1] if gap[-1] < 0 else
+                       0 for gap in duration[seedId]['gaps']])
+        npts = duration[seedId]['npts'] + overlap
+        duration[seedId]['npts'] = npts
+        duration[seedId]['time'] = npts * duration[seedId]['delta']
+
+    return duration
