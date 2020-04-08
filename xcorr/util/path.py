@@ -24,7 +24,7 @@ _pair_type_error = ('``pair`` should be a string or tuple with the '
                     'receiver couple SEED-ids.')
 
 
-def ncfile(pair, time:pd.Timestamp, root: str=None):
+def ncfile(pair, time: pd.Timestamp, root: str = None):
     r"""Return the netCDF filename and path.
 
     Parameters
@@ -74,7 +74,7 @@ def ncfile(pair, time:pd.Timestamp, root: str=None):
 
     # path and filename
     ncfile = os.path.join(root, '{p}.{y:04d}.{d:03d}.nc'.format(
-        p=pair,y=time.year,d=time.dayofyear
+        p=pair, y=time.year, d=time.dayofyear
     ))
-    
+
     return ncfile

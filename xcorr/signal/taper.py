@@ -10,8 +10,6 @@ Filter an N-D labeled array of data.
 
 # Mandatory imports
 import xarray as xr
-import numpy as np
-from scipy import signal
 
 
 # Relative imports

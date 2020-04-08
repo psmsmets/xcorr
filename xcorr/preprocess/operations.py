@@ -12,6 +12,7 @@ import warnings
 import xarray as xr
 import json
 from obspy import Inventory, Trace, Stream
+from obspy.core.util.obspy_types import ObsPyException
 
 
 # Relative imports
@@ -264,7 +265,8 @@ def apply_operation(
 
 def preprocess(
     waveforms, operations: list, inventory: Inventory = None,
-    starttime=None, endtime=None, verb: int = 0, **kwargs
+    starttime=None, endtime=None, raise_error: bool = False,
+    verb: int = 0, **kwargs
 ):
     r"""Preprocess waveforms given a list of operations.
 
@@ -288,6 +290,10 @@ def preprocess(
         End time of the stream, used for trimming and selecting the correct
         instrument response.
 
+    raise_error : `bool`, optional
+        If `True` raise when an error occurs. Otherwise a warning is given.
+        Defaults to `False`.
+
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
 
@@ -305,9 +311,13 @@ def preprocess(
 
     if not (isinstance(waveforms, Trace) or
             isinstance(waveforms, Stream)):
-        error = ('``waveforms`` is not of type '
-                 ':class:`obspy.Stream` or :class:`obspy.Trace`')
-        raise TypeError(error)
+        msg = ('``waveforms`` is not of type '
+               ':class:`obspy.Stream` or :class:`obspy.Trace`')
+        raise TypeError(msg)
+
+    if not isinstance(raise_error, bool):
+        msg = '``raise_error`` is not of type `bool`'
+        raise TypeError(msg)
 
     # make sure not to apply the operations in place
     operated_waveforms = waveforms.copy()
@@ -329,14 +339,20 @@ def preprocess(
         ):
             msg = ('Provided operation should be a tuple or list with '
                    'length 2 (method:str,params:dict).')
-            warnings.warn(msg, UserWarning)
-            continue
+            if raise_error:
+                raise TypeError(msg)
+            else:
+                warnings.warn(msg, UserWarning)
+                continue
         operation, parameters = operation_params
         if not is_operation(operation):
             msg = ('Provided operation "{}" is invalid thus ignored.'
                    .format(operation))
-            warnings.warn(msg, UserWarning)
-            continue
+            if raise_error:
+                raise ValueError(msg)
+            else:
+                warnings.warn(msg, UserWarning)
+                continue
         try:
             operated_waveforms = apply_operation(
                 waveforms=operated_waveforms,
@@ -346,12 +362,16 @@ def preprocess(
                 verb=verb,
                 stdout_prefix=' * ',
             )
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception as e:
+        except ObsPyException as error:
             msg = ('Failed to execute operation "{}". Skipped to next. '
-                   'Returned error: {}'.format(operation, e))
-            warnings.warn(msg, UserWarning)
+                   'Returned error: {}'.format(operation, error))
+            if raise_error:
+                raise RuntimeError(msg)
+            else:
+                warnings.warn(msg, UserWarning)
+                continue
+        except (KeyboardInterrupt, SystemExit):
+            raise InterruptedError
 
     if verb > 2:
         print(operated_waveforms)
