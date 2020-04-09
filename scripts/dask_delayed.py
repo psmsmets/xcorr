@@ -101,7 +101,6 @@ xcorr_init_args = {
             }),
             ('filter', {'type': 'highpass', 'freq': .05}),
             ('detrend', {'type': 'demean'}),
-            # ('remove_sensitivity', {}),
             ('remove_response', {}),
             ('decimate', {'factor': 5}),
             ('trim', {}),
@@ -152,11 +151,12 @@ times = pd.date_range(start='2015-01-15', end='2015-01-18', freq='1D')
 # -----------------------------------------------------------------------------
 # Mandatory parameters
 # -----------------------------------------------------------------------------
-inventory = '../data/Monowai.xml'  # path to inventory
-root = '../data/results'           # path to output dir root
-threads = 2                        # set dask number of workers
-debug = False                      # run single-threaded
-replace = False                    # don't open existing files
+inventory = '../data/Monowai.xml'	# path to inventory
+root = '../data/results'		# path to output dir root
+threads = 2				# set dask number of workers
+debug = False				# run single-threaded
+force_overwrite = False			# don't open existing files
+progressbar = True			# show dask delayed progress
 
 
 ##############################################################################
@@ -170,12 +170,12 @@ replace = False                    # don't open existing files
 def single_process(pair: str, time: pd.Timestamp, verb: int = 0, **kwargs):
     r"""Main xcorr processing sequence.
     """
-    global root, replace, status, inventory, xcorr_init_args
+    global root, force_overwrite, inventory, xcorr_init_args
 
     # File
     ncfile = xcorr.util.ncfile(pair, time, root)
 
-    if not replace:
+    if not force_overwrite:
         # Open
         data = xcorr.read(ncfile, fast=True)
 
@@ -215,7 +215,8 @@ def single_process(pair: str, time: pd.Timestamp, verb: int = 0, **kwargs):
         return False
 
 
-def lazy_processes(pairs: list, times: pd.DatetimeIndex, status: xr.DataArray,
+def lazy_processes(pairs: list, times: pd.DatetimeIndex,
+                   availability: xr.DataArray, preprocessing: xr.DataArray,
                    verb: int = 0, **kwargs):
     r"""Construct list of lazy single processes for dask.compute
     """
@@ -225,32 +226,56 @@ def lazy_processes(pairs: list, times: pd.DatetimeIndex, status: xr.DataArray,
 
     for pair in pairs:
 
+        # check preprocessing
+        pair_preprocessing = preprocessing.loc[{
+            'receiver': xcorr.util.split_pair(pair, substitute=False,
+                                              to_dict=False),
+            'time': preprocessing.time[0],
+        }] == 1
+        preprocessing_passed = np.all(pair_preprocessing.values == 1)
+        preprocessing_status = 'passed' if preprocessing_passed else 'failed'
+
+        # substituted receivers
         receivers = xcorr.util.split_pair(pair, substitute=True, to_dict=False)
 
         for time in times:
 
-            if verb:
+            if verb > 0:
                 print('    Check {} {}'.format(pair, time), end='. ')
 
+            # preprocessing status
+            if verb > 2:
+                print('Preprocessing', preprocessing_status)
+
+            # check availability
             start = time - pd.offsets.DateOffset(
                 seconds=xcorr_init_args['window_length']/2, normalize=True
             )
             end = time + pd.offsets.DateOffset(
                 seconds=xcorr_init_args['window_length']*3/2, normalize=True
             )
-            availability = status.loc[{
+            pair_availability = availability.loc[{
                 'receiver': receivers,
                 'time': pd.date_range(start, end, freq='D'),
             }] == 1
 
-            # all receivers required for any day
-            if any(availability.sum(dim='receiver') == len(receivers)):
-                if verb:
+            availability_passed = np.any(
+                pair_availability.sum(dim='receiver') == len(receivers)
+            )
+
+            # availability status
+            if verb > 2:
+                print('Availability',
+                      'passed' if availability_passed else 'failed', end='. ')
+
+            # preprocessing and availability passed
+            if preprocessing_passed and availability_passed:
+                if verb > 0:
                     print('Add lazy process.')
                 result = single_process(pair, time, verb, **kwargs)
                 results.append(result)
             else:
-                if verb:
+                if verb > 0:
                     print('Skip.')
 
     return results
@@ -263,15 +288,20 @@ def lazy_processes(pairs: list, times: pd.DatetimeIndex, status: xr.DataArray,
 ##############################################################################
 
 
+# -----------------------------------------------------------------------------
 # Print some config parameters
+# -----------------------------------------------------------------------------
 print('-'*79)
 print('Config')
-print('    inventory :', inventory)
-print('    root      :', root)
-print('    threads   :', 1 if debug else threads)
-print('    debug     :', debug)
-print('    replace   :', replace)
+print('    inventory       :', inventory)
+print('    root            :', root)
+print('    threads         :', 1 if debug else threads)
+print('    debug           :', debug)
+print('    force_overwrite :', force_overwrite)
 
+# -----------------------------------------------------------------------------
+# various inits
+# -----------------------------------------------------------------------------
 
 # init the waveform client
 client = xcorr.Client(**xcorr_client_args)
@@ -284,57 +314,85 @@ inventory = xcorr.util.get_pair_inventory(
 # minimize output to stdout in dask!
 warnings.filterwarnings("ignore")
 
-# Get waveform availability status
-status = client.init_data_availability(
+# waveform availability status
+availability = client.init_data_availability(
     pairs, times, extend_days=1, substitute=True
 )
-
-delayed_status = client.verify_data_availability(
-    status, download=True, compute=False
+lazy_availability = client.verify_data_availability(
+    availability, download=True, compute=False
 )
 
+# waveform preprocess status
+preprocessing = client.init_data_preprocessing(
+    pairs, times[0],
+    preprocess=xcorr_init_args['preprocess'], substitute=True
+)
+lazy_preprocessing = client.verify_data_preprocessing(
+    preprocessing, inventory=inventory, download=False, compute=False
+)
+
+# progressbar
+if progressbar:
+    pbar = ProgressBar()
+    pbar.register()
+
+# -----------------------------------------------------------------------------
 # Print main data parameters
+# -----------------------------------------------------------------------------
 print('-'*79)
 print('Data')
 print('    pairs : {}'.format(len(pairs)))
 for p in pairs:
     print('        {}'.format(p))
-print('    receivers : {}'.format(len(status.receiver)))
-for r in status.receiver:
-    print('        {}'.format(str(r.values)))
-print('    times : {} ({})'.format(len(times), len(status.time)))
+print('    times : {} ({})'.format(len(times), len(availability.time)))
 print('        start : {}'.format(str(times[0])))
 print('        end   : {}'.format(str(times[-1])))
 
-
+# -----------------------------------------------------------------------------
 # Evaluate data availability (parallel), and try to download missing data
+# -----------------------------------------------------------------------------
 print('-'*79)
 print('Verify availability')
-with ProgressBar():
-    verified = delayed_status.compute()
+verified = lazy_availability.compute()
 
 # Print data availability status (total and per receiver)
-print('Data availability')
-print('    Total : {:.2f}%'
-      .format(100 * np.sum(status.values == 1) / status.size))
-print('    Receiver :')
-for rec in status.receiver:
+print('    Overall availability : {:.2f}%'
+      .format(100 * np.sum(availability.values == 1) / availability.size))
+print('    Receiver availability')
+for rec in availability.receiver:
     pcnt = 100 * np.sum(
-        status.loc[{'receiver': rec}].values == 1
-    ) / status.time.size
+        availability.loc[{'receiver': rec}].values == 1
+    ) / availability.time.size
     print('        {} : {:.2f}%'.format(rec.values, pcnt))
 
-# Evaluate lazy process list
+# -----------------------------------------------------------------------------
+# Evaluate data preprocessing (parallel)
+# -----------------------------------------------------------------------------
 print('-'*79)
-print('Compute')
+print('Verify preprocessing')
+verified = lazy_preprocessing.compute()
+
+# Print data availability status (total and per receiver)
+print('    Overall preprocessing : {:.2f}% passed'
+      .format(100 * np.sum(preprocessing.values == 1) / preprocessing.size))
+print('    Receiver preprocessing')
+for rec in preprocessing.receiver:
+    passed = np.all(preprocessing.loc[{'receiver': rec}].values == 1)
+    print('        {} :'.format(rec.values),
+          'passed' if passed else 'failed')
+
+# -----------------------------------------------------------------------------
+# Evaluate lazy process list
+# -----------------------------------------------------------------------------
+print('-'*79)
+print('Compute lazy processes')
 if debug:
     results = dask.compute(
-        lazy_processes(pairs, times, status, verb=1),
+        lazy_processes(pairs, times, availability, preprocessing, verb=1),
         scheduler='single-threaded'
     )
 else:
-    with ProgressBar():
-        results = dask.compute(
-            lazy_processes(pairs, times, status, verb=0),
-            scheduler='processes', num_workers=threads
-        )
+    results = dask.compute(
+        lazy_processes(pairs, times, availability, preprocessing, verb=0),
+        scheduler='processes', num_workers=threads
+    )
