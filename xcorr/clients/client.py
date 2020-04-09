@@ -682,6 +682,37 @@ class Client(object):
             return Stream()
         return st
 
+    def _test_preprocessed_waveforms(self, sampling_rate = None, **kwargs):
+        r"""Test get_preprocessed_waveforms.
+
+        Parameters:
+        -----------
+        sampling_rate : `float`, optional
+            The desired final sampling rate of the stream (in Hz).
+
+        **kwargs :
+            Parameters passed :meth:`get_preprocessed_waveforms`.
+
+        Returns:
+        --------
+        flag : `int`
+            Flag meaning: -2=failed, -1=missing, 0=not_validated, 1=passed.
+
+        """
+        if not 'duration' in kwargs:
+            kwargs['duration'] = 86400.
+        kwargs['centered'] = False
+        kwargs['raise_error'] = True
+        try:
+            stream = self.get_preprocessed_waveforms(**kwargs)
+        except RuntimeError:
+            return -2
+        passed = self.check_stream_duration(
+            stream, duration=kwargs['duration'], receiver=kwargs['receiver'],
+            sampling_rate=sampling_rate
+        )
+        return 1 if passed else -1
+
     def get_pair_preprocessed_waveforms(
         self, pair, **kwargs
     ):
@@ -715,37 +746,6 @@ class Client(object):
         )
 
         return stream
-
-    def _test_preprocessed_waveforms(self, sampling_rate = None, **kwargs):
-        r"""Test get_preprocessed_waveforms.
-
-        Parameters:
-        -----------
-        sampling_rate : `float`, optional
-            The desired final sampling rate of the stream (in Hz).
-
-        **kwargs :
-            Parameters passed :meth:`get_preprocessed_waveforms`.
-
-        Returns:
-        --------
-        flag : `int`
-            Flag meaning: -2=failed, -1=missing, 0=not_validated, 1=passed.
-
-        """
-        if not 'duration' in kwargs:
-            kwargs['duration'] = 86400.
-        kwargs['centered'] = False
-        kwargs['raise_error'] = True
-        try:
-            stream = self.get_preprocessed_waveforms(**kwargs)
-        except RuntimeError:
-            return -2
-        passed = self.check_stream_duration(
-            stream, duration=kwargs['duration'], receiver=kwargs['receiver'],
-            sampling_rate=sampling_rate
-        )
-        return 1 if passed else -1
 
     def data_availability(
         self, pairs_or_receivers: list, times: pd.DatetimeIndex,

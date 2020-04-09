@@ -354,6 +354,6 @@ def lazy_process(
     )
     results = results[0]  # unpack tuple (only one variable returned)
     completed = sum(results)
-    pcnt = 100 * completed / len(results)
+    pcnt = 100 * completed / len(results) if len(results) > 0 else 0.
     print('    Completed : {} of {} ({:.1f}%)'
           .format(completed, len(results), pcnt))
