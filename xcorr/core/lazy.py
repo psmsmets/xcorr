@@ -301,8 +301,9 @@ def lazy_process(
     for p in pairs:
         print('        {}'.format(p))
     print('    times : {} ({})'.format(len(times), len(availability.time)))
-    print('        start : {}'.format(str(times[0])))
-    print('        end   : {}'.format(str(times[-1])))
+    print('        start  : {}'.format(str(times[0])))
+    print('        end    : {}'.format(str(times[-1])))
+    print('        extend : 1 day')
 
     # -------------------------------------------------------------------------
     # Evaluate data availability (parallel), and try to download missing data

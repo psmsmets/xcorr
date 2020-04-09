@@ -23,6 +23,9 @@ Main xcorr features listed per submodule:
 - **core**: Main functions of xcorr are `init`, `process`. `bias_correct`,
   `read`, `write` and `merge`. All of these return or are applied on an
   `xarray.Dataset`.
+  `lazy_process` multithreads a batch of crosscorrelations using
+  `dask <https://dask.org>`_ after verifying both data availability and
+  preprocessing.
 
 - **clients**: Load waveform data from a local SeisComP Data Structure (SDS)
   archive and automatically download missing or incomplete waveforms by the
