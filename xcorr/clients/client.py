@@ -1,7 +1,7 @@
 r"""
 
-:mod:`client.client` -- Client
-==============================
+:mod:`clients.client` -- Client
+===============================
 
 Load waveform data from a primary local sds archive, and automatically
 retrieve missing daily waveforms using fdsn and nms web request services.
@@ -247,10 +247,10 @@ class Client(object):
         --------
         status : `bool`
             Returns `False` if ``stream`` does not pass the day criteria of
-            :meth:'check_stream_length', otherwise returns `True`.
+            :meth:'check_stream_duration', otherwise returns `True`.
 
         """
-        if not self.check_stream_length(stream, verb=verb):
+        if not self.check_stream_duration(stream, verb=verb):
             return False
         stream2SDS(
             stream,
@@ -262,9 +262,9 @@ class Client(object):
             print(_msg_added_archive)
         return True
 
-    def check_stream_length(
-        self, stream: Stream, duration: float = None, id: str = None,
-        verb: int = 0
+    def check_stream_duration(
+        self, stream: Stream, duration: float = None, receiver: str = None,
+        verb: int = 0, **kwargs
     ):
         r"""Wrapper to write a day stream of data to the local SDS archive.
 
@@ -285,6 +285,9 @@ class Client(object):
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
+        **kwargs :
+            Parameters passed to :func:`stream_duration`.
+
         Returns:
         --------
         status : `bool`
@@ -298,8 +301,10 @@ class Client(object):
         assert isinstance(duration, float), (
             '``duration`` should be float seconds.'
         )
-        d = stream_duration(stream, id)
-        time = d['time'] if id else d[next(iter(d))]['time']
+        d = stream_duration(stream, receiver, **kwargs)
+        if len(d) == 0:
+           return False
+        time = d['time'] if receiver else d[next(iter(d))]['time']
         passed = time >= duration - self.max_gap
         if verb > 2:
             print(f'Time: {time}s, max gap: {self.max_gap}s, passed: {passed}')
@@ -429,17 +434,17 @@ class Client(object):
             The requested waveforms.
 
         """
-        seedId = receiver_to_str(kwargs)
+        receiver = receiver_to_str(kwargs)
         if verb > 0:
             print("Get waveforms for {} from {} until {}"
-                  .format(seedId, kwargs['starttime'], kwargs['endtime']))
+                  .format(receiver, kwargs['starttime'], kwargs['endtime']))
         dt = kwargs['endtime'] - kwargs['starttime']
         for sds in self.sds_read:
             stream = sds.get_waveforms(**kwargs)
             if not stream:
                 continue
-            if self.check_stream_length(stream, duration=dt,
-                                        id=seedId, verb=verb-1):
+            if self.check_stream_duration(stream, duration=dt,
+                                        receiver=receiver, verb=verb-1):
                 if verb > 1:
                     print(_msg_loaded_archive.format(kwargs['starttime']))
                 return stream
@@ -494,7 +499,7 @@ class Client(object):
                 print(_msg_load_archive.format(time))
             for sds in self.sds_read:
                 daystream = sds.get_waveforms(**args)
-                if self.check_stream_length(daystream, verb=verb-1):
+                if self.check_stream_duration(daystream, verb=verb-1):
                     if verb > 1:
                         print(_msg_loaded_archive.format(time))
                     return daystream
@@ -557,8 +562,8 @@ class Client(object):
             stream = self._get_waveforms_for_date(**kwargs)
         except RuntimeError:
             return -2
-        passed = self.check_stream_length(
-            stream, duration=86400., id=receiver_to_str(kwargs['receiver'])
+        passed = self.check_stream_duration(
+            stream, duration=86400., receiver=receiver_to_str(kwargs['receiver'])
         )
         return 1 if passed else -1
 
@@ -711,11 +716,14 @@ class Client(object):
 
         return stream
 
-    def _test_preprocessed_waveforms(self, **kwargs):
+    def _test_preprocessed_waveforms(self, sampling_rate = None, **kwargs):
         r"""Test get_preprocessed_waveforms.
 
         Parameters:
         -----------
+        sampling_rate : `float`, optional
+            The desired final sampling rate of the stream (in Hz).
+
         **kwargs :
             Parameters passed :meth:`get_preprocessed_waveforms`.
 
@@ -725,15 +733,17 @@ class Client(object):
             Flag meaning: -2=failed, -1=missing, 0=not_validated, 1=passed.
 
         """
-        kwargs['duration'] = 86400.
+        if not 'duration' in kwargs:
+            kwargs['duration'] = 86400.
         kwargs['centered'] = False
         kwargs['raise_error'] = True
         try:
             stream = self.get_preprocessed_waveforms(**kwargs)
         except RuntimeError:
             return -2
-        passed = self.check_stream_length(
-            stream, duration=86400., id=kwargs['receiver']
+        passed = self.check_stream_duration(
+            stream, duration=kwargs['duration'], receiver=kwargs['receiver'],
+            sampling_rate=sampling_rate
         )
         return 1 if passed else -1
 
@@ -952,7 +962,7 @@ class Client(object):
         preprocess: dict, inventory: Inventory, substitute: bool = False,
         three_components: str = None, verb: int = 0, **kwargs
     ):
-        r"""Verify the waveform data availability for receivers and times.
+        r"""Verify the waveform data preprocessing for receivers and time.
 
         Parameters:
         -----------
@@ -992,8 +1002,8 @@ class Client(object):
         Returns:
         --------
         status : :class:`xarray.DataArray`
-            Data availability status N-D labelled array with dimensions
-            ``time`` and ``receivers``.
+            Data preprocessing status N-D labelled array with dimensions
+            ``time`` and ``receiver``.
 
         """
         status = self.init_data_preprocessing(
@@ -1047,8 +1057,8 @@ class Client(object):
         Returns:
         --------
         status : :class:`xarray.DataArray`
-            Data availability status N-D labelled array with dimensions
-            ``time`` and ``receivers``.
+            Data preprocessing status N-D labelled array with dimensions
+            ``time`` and ``receiver``.
 
         """
         assert isinstance(time, pd.Timestamp), (
@@ -1107,7 +1117,7 @@ class Client(object):
         Parameters:
         -----------
         status : :class:`xarray.DataArray`
-            Data availability status N-D labelled array with dimensions
+            Data preprocessing status N-D labelled array with dimensions
             ``status.time`` and ``status.receiver``. ``status`` is updated in
             place.
 
@@ -1213,24 +1223,31 @@ def set_status_flag(
         return inc + 1
 
 
-def stream_duration(stream: Stream, id: str = None):
-    r"""Returns a dictionary with the total duration per SEED-id.
+def stream_duration(stream: Stream, receiver: str = None,
+                    sampling_rate: float = None):
+    r"""Returns a dictionary with the total duration per receiver SEED-id,
+    optionally filtered for a dedicated sampling rate.
     """
     if not isinstance(stream, Stream):
         raise TypeError('``stream`` should be a :class:`obspy.Stream`.')
 
-    if id and not isinstance(id, str):
-        raise TypeError('``id`` should be a `str`.')
+    if receiver and not isinstance(receiver, str):
+        raise TypeError('``receiver`` should be a `str`.')
+
+    if sampling_rate and not isinstance(sampling_rate, float):
+        raise TypeError('``sampling_rate`` should be float Hz.')
 
     duration = dict()
 
-    if id:
-        duration[id] = dict(gaps=[], npts=0, time=0.,
-                            starttime=None, endtime=None)
+    if receiver:
+        duration[receiver] = dict(gaps=[], npts=0, time=0.,
+                                  starttime=None, endtime=None)
 
     for trace in stream:
+        if sampling_rate and trace.stats.sampling_rate != sampling_rate:
+            continue
 
-        if id is not None and trace.id != id:
+        if receiver is not None and trace.id != receiver:
             continue
 
         if trace.id in duration:
@@ -1251,15 +1268,15 @@ def stream_duration(stream: Stream, id: str = None):
     for gap in stream.get_gaps():
         duration['.'.join(gap[:4])]['gaps'] += [gap[4:]]
 
-    for seedId in duration:
+    for rec in duration:
         npts_overlap = 0
         time_overlap = 0.
-        for gap in duration[seedId]['gaps']:
+        for gap in duration[rec]['gaps']:
             if gap[-1] > 0:
                 npts_overlap += gap[-1]
                 time_overlap += gap[-2]
 
-        duration[seedId]['npts'] += npts_overlap
-        duration[seedId]['time'] += time_overlap
+        duration[rec]['npts'] += npts_overlap
+        duration[rec]['time'] += time_overlap
 
-    return duration[id] if id else duration
+    return duration[receiver] if receiver else duration

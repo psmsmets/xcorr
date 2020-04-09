@@ -42,7 +42,7 @@ from xcorr.clients.client import Client
 
 # Make only a selection available to __all__ to not clutter the namespace
 # Maybe also to discourage the use of `from xcorr import *`.
-__all__ = ['Client', 'core', 'postprocess']
+__all__ = ['Client', 'core']
 
 # Version
 try:
