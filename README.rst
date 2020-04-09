@@ -20,10 +20,10 @@ Features
 
 Main xcorr features listed per submodule:
 
-- **core**: Main functions of xcorr are ``init``, ``process``. ``bias_correct``,
+- **core**: Main functions of xcorr are ``init``, ``process``, ``bias_correct``,
   ``read``, ``write`` and ``merge``. All of these return or are applied on an
   `xarray.Dataset`.
-  Batch process crosscorrelations by ``lazy_process``, multithreading and lazy
+  Batch process crosscorrelations by ``lazy_process``: multithreading and lazy
   scheduling using `dask <https://dask.org>`_ after first verifying both data
   availability and preprocessing.
 

@@ -3,7 +3,7 @@
 # Mandatory imports
 from pandas import date_range
 from obspy import read_inventory
-from xcorr.core.lazy import lazy_process
+from xcorr import lazy_process
 
 
 ##############################################################################
