@@ -29,7 +29,8 @@ Main xcorr features listed per submodule:
 
 - **clients**: Load waveform data from a local SeisComP Data Structure (SDS)
   archive and automatically download missing or incomplete waveforms by the
-  FDSN web service and/or NMS Client.
+  FDSN web service and the `CTBTO <https://www.ctbto.org>`_ Verification Data
+  Messaging System (VDMS, via `nms_tools` wrapping the command line client).
 
 - **preprocess**: Process waveforms before correlation given a dictionary with
   operations per channel id. Channel operations and parameters are added to the
@@ -114,5 +115,5 @@ License information
 
 Copyright 2020 Pieter Smets.
 
-Licensed under the MIT License. See the ``LICENSE``- and ``NOTICE``-files or
-the documentation for more information.
+Licensed under the GNU GPLv3 License. See the ``LICENSE``- and ``NOTICE``-files
+or the documentation for more information.

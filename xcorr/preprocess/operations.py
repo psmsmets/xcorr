@@ -199,7 +199,8 @@ def inject_dynamic_parameters(
 
 def apply_operation(
     waveforms, operation: str, parameters: dict,
-    dynamic_parameters: dict = None, stdout_prefix: str = '', verb: int = 0
+    dynamic_parameters: dict = None, raise_error: bool = False,
+    stdout_prefix: str = '', verb: int = 0
 ):
     r"""Apply an in-place operation with the provided parameters.
 
@@ -222,6 +223,10 @@ def apply_operation(
         Dictionary with all dynamic parameters that will be injected into
         ``parameters`` if required by ``operation``.
 
+    raise_error : `bool`, optional
+        If `True` raise when an error occurs. Otherwise a warning is given.
+        Defaults to `False`.
+
     stdout_prefix : `str`, optional
         Add a prefix before printing to stdout.
 
@@ -236,13 +241,29 @@ def apply_operation(
     """
     if not (isinstance(waveforms, Trace) or
             isinstance(waveforms, Stream)):
-        error = ('``waveforms`` is not of type '
-                 ':class:`obspy.Stream` or :class:`obspy.Trace`')
-        raise TypeError(error)
+        msg = ('``waveforms`` is not of type '
+              ':class:`obspy.Stream` or :class:`obspy.Trace`')
+        if raise_error:
+            raise TypeError(msg)
+        else:
+            warnings.warn(msg, UserWarning)
+            return False 
+
+    if len(waveforms) == 0:
+        msg = '``waveforms`` is emtpy.'
+        if raise_error:
+            raise ValueError(msg)
+        else:
+            warnings.warn(msg, UserWarning)
+            return False
 
     if not is_operation(operation):
-        error = '"{}" is not an operation.'.format(operation)
-        raise NotImplementedError(error)
+        msg = f'"{operation}" is not an operation.'
+        if raise_error:
+            raise NotImplementedError(msg)
+        else:
+            warnings.warn(msg, UserWarning)
+            return False
 
     method = _operations[operation]['method']
     params = inject_dynamic_parameters(
@@ -250,12 +271,21 @@ def apply_operation(
     ) if dynamic_parameters else parameters
 
     if verb > 0:
-        print('{}{} :'.format(stdout_prefix, operation), params)
+        print(f'{stdout_prefix}{operation} :', params)
 
-    operated_waveforms = (
-        eval(f'waveforms.{operation}(**params)') if method == _self
-        else method(waveforms, **params)
-    )
+    try:
+        operated_waveforms = (
+            eval(f'waveforms.{operation}(**params)') if method == _self
+            else method(waveforms, **params)
+        )
+    except ObsPyException as error:
+        msg = ('Failed to execute operation "{}". Returned error: {}'
+               .format(operation, error))
+        if raise_error:
+            raise RuntimeError(msg)
+        else:
+            warnings.warn(msg, UserWarning)
+            return False
 
     if verb > 3:
         print(operated_waveforms)
@@ -359,19 +389,21 @@ def preprocess(
                 operation=operation,
                 parameters=parameters,
                 dynamic_parameters=dyn_params,
+                raise_error=raise_error,
                 verb=verb,
                 stdout_prefix=' * ',
             )
-        except ObsPyException as error:
-            msg = ('Failed to execute operation "{}". Skipped to next. '
-                   'Returned error: {}'.format(operation, error))
+        except Exception as error:
+            msg = 'Failed to execute operation "{}". Error: {}'.format(error)
             if raise_error:
                 raise RuntimeError(msg)
             else:
                 warnings.warn(msg, UserWarning)
-                continue
+                operated_waveforms = False
         except (KeyboardInterrupt, SystemExit):
             raise InterruptedError
+        if operated_waveforms == False:
+            return Stream() if isinstance(waveforms, Stream) else Trace()
 
     if verb > 2:
         print(operated_waveforms)
