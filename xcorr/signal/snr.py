@@ -46,10 +46,10 @@ def snr(
     snr : :class:`xarray.DataArray`
         The snr output of ``x``.
     """
-    s = x.where(signal)
+    s = xr.ufuncs.fabs(x.where(signal), dim=dim)
     n = x.where(noise)
 
-    snr = abs(s.max(dim=dim)) / rms(n, dim=dim)
+    snr = s.max(dim=dim) / rms(n, dim=dim)
     snr.name = 'snr'
     snr.attrs = {
         'long_name': 'signal-to-noise ratio',
