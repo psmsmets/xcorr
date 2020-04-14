@@ -313,9 +313,9 @@ def lazy_process(
     # -------------------------------------------------------------------------
 
     # init waveform preprocessing status for a day with max availability
-    nofreceivers = len(availability.receiver)
+    nofrec = len(availability.receiver)
     for time in availability.time:
-        if availability.loc[{'time': time}].values == nofreceivers:
+        if np.sum(availability.loc[{'time': time}].values == 1) == nofrec:
             break
     else:
         raise RuntimeError(
