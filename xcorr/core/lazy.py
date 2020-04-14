@@ -266,29 +266,14 @@ def lazy_process(
             pbar.register()
 
     # -------------------------------------------------------------------------
-    # status inits
+    # Init data availability
     # -------------------------------------------------------------------------
-    # waveform availability status
     availability = client.init_data_availability(
         pairs, times, extend_days=1, substitute=True
     )
     lazy_availability = client.verify_data_availability(
         availability,
         download=True,
-        compute=False
-    )
-
-    # waveform preprocessing status
-    preprocessing = client.init_data_preprocessing(
-        pairs, times[0],
-        preprocess=init_args['preprocess'], substitute=True
-    )
-    lazy_preprocessing = client.verify_data_preprocessing(
-        preprocessing,
-        inventory=inventory,
-        duration=init_args['window_length'],
-        sampling_rate=init_args['sampling_rate'],
-        download=False,
         compute=False
     )
 
@@ -324,12 +309,37 @@ def lazy_process(
         print('        {} : {:.2f}%'.format(rec.values, pcnt))
 
     # -------------------------------------------------------------------------
-    # Evaluate data preprocessing (parallel)
+    # Data preprocessing (parallel)
     # -------------------------------------------------------------------------
+
+    # init waveform preprocessing status for a day with max availability
+    nofreceivers = len(availability.receiver)
+    for time in availability.time:
+        if availability.loc[{'time': time}].values == nofreceivers:
+            break
+    else
+        raise RuntimeError(
+            'Your pairs contain a receiver without data availability...'
+        )
+    preprocessing = client.init_data_preprocessing(
+        pairs, time.values,
+        preprocess=init_args['preprocess'], substitute=True
+    )
+    lazy_preprocessing = client.verify_data_preprocessing(
+        preprocessing,
+        inventory=inventory,
+        duration=init_args['window_length'],
+        sampling_rate=init_args['sampling_rate'],
+        download=False,
+        compute=False
+    )
+
+    # evaluate availability
     print('-'*79)
     print('Verify preprocessing')
     verified = lazy_preprocessing.compute(**compute_args)
     pcnt = 100 * verified / preprocessing.size
+    print('    Reference time : {}'.format(str(time)))
     print('    Verified : {} of {} ({:.1f}%)'
           .format(verified, preprocessing.size, pcnt))
     print('    Overall preprocessing : {:.2f}% passed'
