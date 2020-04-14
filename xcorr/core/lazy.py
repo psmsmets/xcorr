@@ -317,7 +317,7 @@ def lazy_process(
     for time in availability.time:
         if availability.loc[{'time': time}].values == nofreceivers:
             break
-    else
+    else:
         raise RuntimeError(
             'Your pairs contain a receiver without data availability...'
         )
