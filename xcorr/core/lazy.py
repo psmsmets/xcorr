@@ -339,9 +339,9 @@ def lazy_process(
     # evaluate availability
     print('-'*79)
     print('Verify preprocessing')
-    print('    Reference time : {}'.format(str(time)))
     verified = lazy_preprocessing.compute(**compute_args)
     pcnt = 100 * verified / preprocessing.size
+    print('    Reference time : {}'.format(str(time)))
     print('    Verified : {} of {} ({:.1f}%)'
           .format(verified, preprocessing.size, pcnt))
     print('    Overall preprocessing : {:.2f}% passed'
