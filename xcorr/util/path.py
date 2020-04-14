@@ -14,7 +14,7 @@ import os
 
 
 # Relative imports
-from ..util.receiver import (check_receiver, split_pair, receiver_to_str)
+from ..util.receiver import check_receiver, split_pair, receiver_to_str
 
 
 __all__ = ['ncfile']
