@@ -1061,12 +1061,10 @@ class Client(object):
             ``time`` and ``receiver``.
 
         """
-        assert isinstance(time, pd.Timestamp), (
-            '``time`` should be of type `pandas.Timestamp`.'
-        )
         assert isinstance(preprocess, dict), (
             '``preprocess`` should be of type `dict`.'
         )
+        time = pd.to_datetime(time)
 
         # get all receivers from pairs
         receivers = []
