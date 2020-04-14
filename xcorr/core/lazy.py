@@ -268,8 +268,9 @@ def lazy_process(
     # -------------------------------------------------------------------------
     # Init data availability
     # -------------------------------------------------------------------------
+    extend_days = 1
     availability = client.init_data_availability(
-        pairs, times, extend_days=1, substitute=True
+        pairs, times, extend_days=extend_days, substitute=True
     )
     lazy_availability = client.verify_data_availability(
         availability,
@@ -286,8 +287,8 @@ def lazy_process(
     for p in pairs:
         print('        {}'.format(p))
     print('    times : {} ({})'.format(len(times), len(availability.time)))
-    print('        start  : {}'.format(str(times[0])))
-    print('        end    : {}'.format(str(times[-1])))
+    print('        start  : {}'.format(times[0]))
+    print('        end    : {}'.format(times[-1]))
     print('        extend : 1 day')
 
     # -------------------------------------------------------------------------
@@ -314,15 +315,16 @@ def lazy_process(
 
     # init waveform preprocessing status for a day with max availability
     nofrec = len(availability.receiver)
-    for time in availability.time:
+    for time in availability.time[extend_days:-extend_days]:
         if np.sum(availability.loc[{'time': time}].values == 1) == nofrec:
             break
     else:
         raise RuntimeError(
             'Your pairs contain a receiver without data availability...'
         )
+    time = pd.to_datetime(time.values)
     preprocessing = client.init_data_preprocessing(
-        pairs, time.values,
+        pairs, time,
         preprocess=init_args['preprocess'], substitute=True
     )
     lazy_preprocessing = client.verify_data_preprocessing(
@@ -337,9 +339,9 @@ def lazy_process(
     # evaluate availability
     print('-'*79)
     print('Verify preprocessing')
+    print('    Reference time : {}'.format(str(time)))
     verified = lazy_preprocessing.compute(**compute_args)
     pcnt = 100 * verified / preprocessing.size
-    print('    Reference time : {}'.format(str(time)))
     print('    Verified : {} of {} ({:.1f}%)'
           .format(verified, preprocessing.size, pcnt))
     print('    Overall preprocessing : {:.2f}% passed'
