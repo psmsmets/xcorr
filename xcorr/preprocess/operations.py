@@ -394,7 +394,8 @@ def preprocess(
                 stdout_prefix=' * ',
             )
         except Exception as error:
-            msg = 'Failed to execute operation "{}". Error: {}'.format(error)
+            msg = ('Failed to execute operation "{}". Error: {}'
+                   .format(operation, error))
             if raise_error:
                 raise RuntimeError(msg)
             else:

@@ -473,10 +473,6 @@ def write(
     path : `str`
         The netCDF4 filename.
 
-    extract : `bool`, optional
-        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
-        `True`. Defaults to `False`.
-
     close : `bool`, optional
         Close the data `True` (default).
 
@@ -497,7 +493,7 @@ def write(
         )
         return
 
-    # Verify metadata hash
+    # verify metadata hash
     sha256_hash_metadata = (
         util.hasher.hash_Dataset(dataset, metadata_only=True, debug=False)
     )
@@ -510,15 +506,17 @@ def write(
 
     if verb:
         print('Write dataset as "{}"'.format(path), end=': ')
+
+    # folders and tmp name
     abspath, file = os.path.split(os.path.abspath(path))
     if not os.path.exists(abspath):
         os.makedirs(abspath)
-
     tmp = os.path.join(
         abspath,
         '{f}.{t}'.format(f=file, t=int(pd.to_datetime('now').timestamp()*1e3))
     )
 
+    # close dataset 
     if close:
         if verb:
             print('Close', end='. ')
@@ -531,12 +529,12 @@ def write(
         util.hasher.hash_Dataset(dataset, metadata_only=False, debug=False)
     )
 
-    # Convert preprocess operations
+    # convert preprocess operations
     if verb > 1:
         print('Operations to json.', end='. ')
     preprocess_operations_to_json(dataset.pair)
 
-    # Write to temporary file
+    # write to temporary file
     if verb:
         print('To temporary netcdf', end='. ')
     dataset.to_netcdf(path=tmp, mode='w', format='NETCDF4')
