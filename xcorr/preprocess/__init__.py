@@ -1,12 +1,19 @@
 # -*- coding: utf-8 -*-
-r"""
+"""
+xcorr.preprocess init
 """
 
+# Import main functions
+from ..preprocess.operations import (help, list_operations, is_operation,
+                                     hash_operations, check_operations_hash,
+                                     operations_to_dict, operations_to_json,
+                                     preprocess_operations_to_json,
+                                     preprocess_operations_to_dict,
+                                     preprocess)
+from ..preprocess.running_rms import running_rms
 
-# import all modules
-from ..preprocess import operations
-from ..preprocess import running_rms
 
-# Import __all__ functions
-from ..preprocess.operations import *
-from ..preprocess.running_rms import *
+__all__ = ['help', 'list_operations', 'is_operation', 'hash_operations',
+           'check_operations_hash', 'operations_to_dict', 'operations_to_json',
+           'preprocess_operations_to_json', 'preprocess_operations_to_dict',
+           'preprocess', 'running_rms']

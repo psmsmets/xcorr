@@ -35,13 +35,14 @@ def single_threaded_process(
 ):
     r"""Single thread xcorr processing sequence.
 
-    Parameters:
+    Parameters
     ----------
 
-    Returns:
+    Returns
     -------
     processed : `bool`
         `True` if data is processed, otherwise `False`.
+
     """
     data = None
 
@@ -91,10 +92,11 @@ def lazy_processes(
     preprocessing: xr.DataArray, init_args: dict, verb: int = 0,
     **kwargs
 ):
-    r"""Construct list of lazy single processes for dask.compute
+    """
+    Construct list of lazy single processes for dask.compute
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     pairs : `list`
         Expects a list of `str`, with receiver couple SEED-id's separated
         by a dash ('-').
@@ -117,10 +119,11 @@ def lazy_processes(
     **kwargs :
         Paramaters passed to :func:`single_threaded_process`.
 
-    Returns:
+    Returns
     -------
     lazy_processess : `list`
         List with :class:`dask.delayed` function calls.
+
     """
     results = []
 
@@ -188,10 +191,11 @@ def lazy_process(
     progressbar: bool = True, force_fresh: bool = False, debug: bool = False,
     **kwargs
 ):
-    r'''Lazy process a lot of data with xcorr and dask.
+    """
+    Lazy process a lot of data with xcorr and dask.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     pairs : `list`
         Expects a list of `str`, with receiver couple SEED-id's separated
         by a dash ('-').
@@ -229,7 +233,8 @@ def lazy_process(
 
     **kwargs :
         Parameters passed to :func:`lazy_processes`.
-    '''
+
+    """
     # -------------------------------------------------------------------------
     # Print some config parameters
     # -------------------------------------------------------------------------

@@ -22,10 +22,11 @@ __all__ = ['rms']
 def rms(
     x: xr.DataArray, dim: str = 'lag', inplace: bool = False
 ):
-    r"""Root-mean-square an N-D labeled array of data.
+    """
+    Root-mean-square an N-D labeled array of data.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The array of data to be root-mean-squared.
 
@@ -35,8 +36,8 @@ def rms(
     inplace : `bool`, optional
         If `True`, filter in place and avoid a copy. Default is `False`.
 
-    Returns:
-    --------
+    Returns
+    -------
     y : :class:`xarray.DataArray` or `None`
         The windowed output of ``x`` if ``inplace`` is `False`.
     """

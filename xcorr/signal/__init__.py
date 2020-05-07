@@ -1,25 +1,19 @@
 # -*- coding: utf-8 -*-
-r"""
+"""
+xcorr.signal init
 """
 
-# import all modules
-from ..signal import detrend
-from ..signal import filter
-from ..signal import mask
-from ..signal import rms
-from ..signal import snr
-from ..signal import spectrogram
-from ..signal import stack
-from ..signal import taper
-from ..signal import window
+# Import all main functions
+from ..signal.detrend import detrend, demean
+from ..signal.filter import filter
+from ..signal.mask import mask, multi_mask
+from ..signal.rms import rms
+from ..signal.snr import snr
+from ..signal.spectrogram import psd
+from ..signal.stack import stack
+from ..signal.taper import taper
+from ..signal.window import window
 
-# Import all functions
-from ..signal.detrend import *
-from ..signal.filter import *
-from ..signal.mask import *
-from ..signal.rms import *
-from ..signal.snr import *
-from ..signal.spectrogram import *
-from ..signal.stack import *
-from ..signal.taper import *
-from ..signal.window import *
+
+__all__ = ['detrend', 'demean', 'filter', 'mask', 'multi_mask', 'rms', 'snr',
+           'psd', 'stack', 'taper', 'window']

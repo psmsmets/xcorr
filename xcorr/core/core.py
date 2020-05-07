@@ -44,10 +44,11 @@ def init(
     dtype: np.dtype = np.float32, inventory: obspy.Inventory = None,
     stationary_poi: dict = None, hash_waveforms: bool = False,
 ):
-    r"""Initiate an xcorr N-D labeled data array.
+    """
+    Initiate an xcorr N-D labeled data array.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     pair : `str`
         Receiver couple separated by a '-'. Each receiver is specified by its
         SEED-id string: '{network}.{station}.{location}.{channel}'.
@@ -109,8 +110,8 @@ def init(
         Create a sha256 hash of the preprocessed waveforms used for each
         correlation step. Caution: hashing can take some time (~10s per step).
 
-    Returns:
-    --------
+    Returns
+    -------
     dataset : :class:`xarray.Dataset`
         The initiated `xcorr` N-D labeled data array.
 
@@ -341,10 +342,11 @@ def read(
     fast: bool = False, quick_and_dirty: bool = False,
     metadata_hash: str = None, verb: int = 0
 ):
-    r"""Read an xcorr N-D labeled data array from a netCDF4 file.
+    """
+    Read an xcorr N-D labeled data array from a netCDF4 file.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     path : `str`
         NetCDF4 filename.
 
@@ -369,8 +371,8 @@ def read(
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
 
-    Returns:
-    --------
+    Returns
+    -------
     dataset : :class:`xarray.Dataset`
         The initiated `xcorr` N-D labeled data array.
 
@@ -459,14 +461,15 @@ def write(
     dataset: xr.Dataset, path: str, close: bool = True,
     force_write: bool = False, verb: int = 1
 ):
-    r"""Write an xcorr N-D labeled data array to a netCDF4 file using a
+    """
+    Write an xcorr N-D labeled data array to a netCDF4 file using a
     temporary file and replacing the final destination.
 
     Before writing the dataset metadata and data hash hashes are verified and
     updated if necessary. This changes the dataset attributes in place.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     dataset : :class:`xarray.Dataset`
         The `xcorr` N-D labeled data array.
 
@@ -516,7 +519,7 @@ def write(
         '{f}.{t}'.format(f=file, t=int(pd.to_datetime('now').timestamp()*1e3))
     )
 
-    # close dataset 
+    # close dataset
     if close:
         if verb:
             print('Close', end='. ')
@@ -557,10 +560,11 @@ def merge(
     datasets: list, extract: bool = True, strict: bool = False,
     verb: int = 0, **kwargs
 ):
-    r"""Merge a list of xcorr N-D labeled data arrays.
+    """
+    Merge a list of xcorr N-D labeled data arrays.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     datasets : `list`
         A list with either a `str` specifying the netCDF4 path or a
         :class:`xarray.Dataset` containing the `xcorr` N-D labeled data array.
@@ -579,8 +583,8 @@ def merge(
     **kwargs :
         Additional parameters provided to :func:`read`.
 
-    Returns:
-    --------
+    Returns
+    -------
     datasets : :class:`xarray.Dataset`
         The merged `xcorr` N-D labeled data array.
 
@@ -682,7 +686,8 @@ def process(
     hash_waveforms: bool = True, metadata_hash: str = None,
     verb: int = 1, **kwargs
 ):
-    r"""Process the xcorr N-D labeled data array.
+    """
+    Process the xcorr N-D labeled data array.
 
     Parameters
     ----------
@@ -827,7 +832,8 @@ def bias_correct(
     dataset: xr.Dataset, biased_var: str = 'cc', unbiased_var: str = None,
     weight_var: str = 'w'
 ):
-    r"""Bias correct the xcorr N-D labeled data array.
+    """
+    Bias correct the xcorr N-D labeled data array.
 
     Parameters
     ----------
@@ -887,7 +893,7 @@ def bias_correct(
 def get_weights(
     lag: xr.DataArray, name: str = 'w'
 ):
-    r"""Construct the unbiased crosscorrelation weight vector from the lag vector.
+    """Construct the unbiased crosscorrelation weight vector from the lag vector.
 
     Parameters
     ----------
@@ -918,7 +924,7 @@ def get_weights(
 
 
 def dependencies_version(as_str: bool = False):
-    r"""Returns a `dict` with core dependencies and its version.
+    """Returns a `dict` with core dependencies and its version.
     """
     versions = {
         json.__name__: json.__version__,

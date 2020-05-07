@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-r"""
+"""
+xcorr.core init
 """
 
-# import all modules
-from ..core import core
-from ..core import lazy
+# Import main functions
+from ..core.core import init, read, write, merge, process, bias_correct
+from ..core.lazy import lazy_process
 
-# Import all functions
-from ..core.core import *
-from ..core.lazy import *
+
+__all__ = ['init', 'read', 'write', 'merge', 'process', 'bias_correct',
+           'lazy_process']

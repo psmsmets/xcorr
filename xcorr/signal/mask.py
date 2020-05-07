@@ -39,10 +39,11 @@ def mask(
     x: xr.DataArray, lower=None, upper=None, scalar=None,
     name: str = None, invert: bool = False, to_where: bool = False, **kwargs
 ):
-    r"""Construct a one-dimensional N-D labeled mask array.
+    """
+    Construct a one-dimensional N-D labeled mask array.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The one-dimensional array of data or coordinate to be masked.
 
@@ -68,8 +69,8 @@ def mask(
     to_where : `bool`, optional
         Apply the masked output ``x.where(mask)``.
 
-    Returns:
-    --------
+    Returns
+    -------
     mask : :class:`xarray.DataArray`
         The masked output of ``coord``. Values inside the mask criteria become
         `True`, else `False`. If ``to_where`` is `True`, masked values are

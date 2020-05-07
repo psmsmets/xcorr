@@ -26,10 +26,11 @@ def taper(
     inplace: bool = False,
 
 ):
-    r"""Taper an N-D labeled array of data.
+    """
+    Taper an N-D labeled array of data.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The array of data to be windowed.
 
@@ -53,8 +54,8 @@ def taper(
     inplace : `bool`, optional
         If `True`, filter in place and avoid a copy. Default is `False`.
 
-    Returns:
-    --------
+    Returns
+    -------
     y : :class:`xarray.DataArray` or `None`
         The windowed output of ``x`` if ``inplace`` is `False`.
     """

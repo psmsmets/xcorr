@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
-r"""
 """
-
+xcorr.util init
+"""
 
 # import all modules
 from ..util import hasher
 from ..util import history
-from ..util import path 
+from ..util import path
 from ..util import receiver
+from ..util import stream
 from ..util import time
 
-# Import all functions
-from ..util.hasher import *
-from ..util.history import *
-from ..util.path import *
-from ..util.receiver import *
-from ..util.time import *
+
+__all__ = ['hasher', 'history', 'path', 'receiver', 'stream', 'time']

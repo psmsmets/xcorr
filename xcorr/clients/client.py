@@ -16,26 +16,30 @@ from obspy import UTCDateTime, Stream, Inventory
 from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
+from warnings import warn
+# VDMS client for IMS waveforms?
 try:
-    from nms_tools.nms_client import Client as nmsClient
+    from pyvdms import Client as vdmsClient
 except ModuleNotFoundError:
-    nmsClient = None
+    vdmsClient = False
+# Dask?
 try:
     import dask
 except ModuleNotFoundError:
-    dask = None
+    dask = False
 
 
 # Relative imports
-from ..clients.datafetch import stream2SDS
+from ..clients.stream2SDS import stream2SDS
 from ..preprocess import preprocess as xcorr_preprocess
 from ..preprocess import operations_to_json, operations_to_dict
 from ..util.receiver import (check_receiver, split_pair, receiver_to_dict,
                              receiver_to_str)
 from ..util.time import to_UTCDateTime, get_dates
+from ..util.stream import duration as stream_duration
 
 
-__all__ = []
+__all__ = ['Client']
 
 
 # client messages
@@ -54,15 +58,13 @@ class Client(object):
     def __init__(
         self, sds_root: str = None, sds_root_write: str = None,
         sds_root_read: list = None, fdsn_service='IRIS',
-        nms_service: bool = True, max_gap: float = None,
+        vdms_service: bool = True, max_gap: float = None,
         parallel: bool = True,
     ):
-        r"""Initialize a `xcorr` waveform request client.
+        """Initialize a `xcorr` waveform request client.
 
-        >>> client = Client('/tmp')
-
-        Parameters:
-        -----------
+        Parameters
+        ----------
         sds_root : `str`
             Path to the local SeisComP Data Structure (SDS) archive. All
             downloaded waveforms will be added to this archive if
@@ -70,21 +72,22 @@ class Client(object):
 
         sds_root_write: `str`, optional
             Specify an SDS archive to store automatically downloaded
-            waveforms by the FDSN web service and/or NMS Client.
+            waveforms by the FDSN web-service and/or NMS Client.
 
         sds_root_read: `list`, optional
             Scan multiple SDS archives.
 
         fdsn_service : `str` or :class:`obspy.clients.fdsn.Client`, optional
-            FDSN web service base URL. If `None` or `False`, FDSN web service
-            is disabled. Default web service is 'IRIS'.
+            FDSN web-service base URL. If `None` or `False`, FDSN web-service
+            is disabled. Default web-service is 'IRIS'.
 
-        nms_service : `bool`, optional
-            Enable the NMS Client to access restricted IMS waveform data of the
-            Comprehensive Nuclear-Test-Ban Treaty Organization (CTBTO)
-            if `True` (default). If no :class:`nms_tools.nms_client.Client`
-            is found or credentials are invalid, ``nms_service`` will be
-            disabled.
+        vdms_service : `bool` or :class:`pyvdms.Client`, optional
+           Enable VDMS web-service client to request restricted IMS data (if
+           granted) for the verification of the Comprehensive Nuclear-Test-Ban
+           Treaty (CTBT). Data access is restricted to principal users only!
+           If `None` or `False`, VDMS web-service is disabled. Defaults to
+           `True`, initializing a default pyvdms.Client(). If `pyvdms` is not
+           found or credentials are invalid, ``vdms_service`` is disabled.
 
         max_gap : `float`, optional
             Specify the maximum time gap in seconds that is allowed in a day.
@@ -93,6 +96,11 @@ class Client(object):
         dask : `bool`, optional
             Parallelize workflows using :class:`dask.delayed`. Defaults to
             `True` if `dask` is found.
+
+        Examples
+        --------
+        >>> from xcorr import client
+        >>> client = Client(sds_root='/tmp')
 
         """
         if (
@@ -103,31 +111,52 @@ class Client(object):
                 'At least `sds_root` or `sds_root_read` and '
                 '`sds_root_write` are required.'
             )
+
+        # set sds roots for reading and writing
         self._sds_root_write = sds_root_write if sds_root_write else sds_root
         self._sds_root_read = (sds_root_read if sds_root_read else [sds_root])
+
         if sds_root_write:
             self._sds_root_read += [sds_root_write]
         else:
             self._sds_root_read += [sds_root]
+
         self._sds_root_read = list(set(self._sds_root_read))
 
         self._sds_read = []
         for _sds_root_read in self._sds_root_read:
             self._sds_read.append(sdsClient(_sds_root_read))
 
+        # fdsn web-service
         if fdsn_service:
             if isinstance(fdsn_service, str):
                 self._fdsn = fdsnClient(fdsn_service)
             elif isinstance(fdsn_service, fdsnClient):
                 self._fdsn = fdsn_service
             else:
-                raise TypeError(
-                    '`fdsn_service` should be of type str or '
-                    ':class:`obspy.clients.fdsn.Client`!'
-                )
+                raise TypeError('`fdsn_service` should be of type str or '
+                                ':class:`obspy.clients.fdsn.Client`!')
         else:
-            self._fdsn = None
-        self._nms = nmsClient() if nms_service and nmsClient else None
+            self._fdsn = False
+
+        # vdms web-service
+        if vdmsClient:
+            if isinstance(vdms_service, bool):
+                self._vdms = vdmsClient() if vdms_service else False
+            elif isinstance(vdms_service, vdmsClient):
+                self._vdms = vdms_service
+            else:
+                raise TypeError('`vdms_service` should be of type bool or '
+                                ':class:`pyvdms.Client`!')
+            if self._vdms:
+                test = self._vdms.get_stations('*H1', 'BDF')
+                if not isinstance(test, Inventory):
+                    self._vdms = False
+                    warn('VDMS Client test failed. Service shall be disabled.')
+        else:
+            self._vdms = False
+
+        # other parameters
         self._max_gap = abs(max_gap or 300.)
         self._parallel = dask and parallel
 
@@ -139,118 +168,79 @@ class Client(object):
 
     @property
     def sds_root_read(self):
-        r"""sds_root_read.
-
-        Returns:
-        --------
-        sds_read : `list`
-            List of SDS client roots used to initiate ``self.sds_read``.
+        """List of SDS client roots used to initiate ``self.sds_read``.
         """
         return self._sds_root_read
 
     @property
     def sds_root_write(self):
-        r""""sds_root_read
-
-        Returns:
-        --------
-        sds_root_write : `str`
-            SDS client root used to initiate ``self.sds_write``.
+        r""""SDS client root used to initiate ``self.sds_write``.
         """
         return self._sds_root_write
 
     @property
     def sds_read(self):
-        r"""sds_read
-
-        Returns:
-        --------
-        sds_read : `list` of :class:`obspy.clients.filesystem.sds.Client`
-            List of SDS client objects used to get local waveforms.
+        """List of SDS client objects used to get local waveforms.
         """
         return self._sds_read
 
     @property
     def sds_write(self):
-        r"""sds_write
-
-        Returns:
-        --------
-        sds_write : :class:`obspy.clients.filesystem.sds.Client`
-            SDS client object used to write waveforms.
+        """SDS client object used to write waveforms.
         """
         return self._sds_write
 
     @property
     def fdsn(self):
-        r"""fdsn
-
-        Returns:
-        --------
-        fdsn : :class:`obspy.clients.fdsn.Client`
-            FDSN web service object used to download missing waveforms.
+        """FDSN web-service object used to download missing waveforms.
         """
         return self._fdsn
 
     @property
-    def nms(self):
-        r"""fdsn
-
-        Returns:
-        --------
-        nms : :class:`nms_tools.nms_client.Client`
-            NMS Client to access restricted IMS waveform data of the
-            Comprehensive Nuclear-Test-Ban Treaty Organization (CTBTO),
-            used to download missing waveforms.
+    def vdms(self):
+        """VDMS web-service client to request restricted IMS data (if granted)
+        for the verification of the Comprehensive Nuclear-Test-Ban Treaty
+        (CTBT). Data access is restricted to principal users only!
         """
-        return self._nms
+        return self._vdms
 
     @property
     def max_gap(self):
-        r"""max_gap
-
-        Returns:
-        --------
-        max_gap : `float`
-            Maximum number of seconds that are allowed to be missing in a
-            day of data.
+        """Maximum number of seconds that are allowed to be missing in a day
+        of data.
         """
         return self._max_gap
 
     @property
     def parallel(self):
-        r"""parallel
-
-        Returns:
-        --------
-        parallel : `bool`
-            `True` if :mod:`dask` is loaded and :class:`Client` is initiated
-            ``parallel``=`True`. All routines of :class:`Client` will default
-            to this value.
+        """Returns `True` if :mod:`dask` is loaded and :class:`Client` is
+        initiated with ``parallel``=`True`. All routines of :class:`Client`
+        will default to this value.
         """
         return self._parallel
 
     def _sds_write_daystream(
         self, stream: Stream, verb: int = 0
     ):
-        r"""Wrapper to write a day stream of data to the local SDS archive.
+        """
+        Wrapper to write a day stream of data to the local SDS archive.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         stream : :class:`obspy.Stream`
             Stream with a day of data.
 
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
-        Returns:
-        --------
+        Returns
+        -------
         status : `bool`
             Returns `False` if ``stream`` does not pass the day criteria of
-            :meth:'check_stream_duration', otherwise returns `True`.
+            :meth:'check_duration', otherwise returns `True`.
 
         """
-        if not self.check_stream_duration(stream, verb=verb):
+        if not self.check_duration(stream, verb=verb):
             return False
         stream2SDS(
             stream,
@@ -262,14 +252,15 @@ class Client(object):
             print(_msg_added_archive)
         return True
 
-    def check_stream_duration(
+    def check_duration(
         self, stream: Stream, duration: float = None, receiver: str = None,
         verb: int = 0, **kwargs
     ):
-        r"""Wrapper to write a day stream of data to the local SDS archive.
+        """
+        Wrapper to write a day stream of data to the local SDS archive.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         stream : :class:`obspy.Stream`
             Stream waveform data (assuming a unique SEED-id). If multiple
             receivers (SEED-ids) are present specify ``id``.
@@ -286,28 +277,37 @@ class Client(object):
             Level of verbosity. Defaults to 0.
 
         **kwargs :
-            Parameters passed to :func:`stream_duration`.
+            Parameters passed to :func:`duration`.
 
-        Returns:
-        --------
+        Returns
+        -------
         status : `bool`
             Returns `True` if stream duration is equal or greater than
             ``duration`` - ``self.max_gap`` and `False` otherwise.
 
         """
+
         if not isinstance(stream, Stream) or len(stream) == 0:
             return False
+
         duration = duration or 86400.
+
         assert isinstance(duration, float), (
             '``duration`` should be float seconds.'
         )
+
         d = stream_duration(stream, receiver, **kwargs)
+
         if len(d) == 0:
-           return False
+            return False
+
         time = d['time'] if receiver else d[next(iter(d))]['time']
+
         passed = time >= duration - self.max_gap
+
         if verb > 2:
             print(f'Time: {time}s, max gap: {self.max_gap}s, passed: {passed}')
+
         return passed
 
     def get_waveforms(
@@ -316,10 +316,11 @@ class Client(object):
         allow_wildcards: bool = False, download: bool = True,
         verb: int = 0
     ):
-        r"""Get waveforms from the clients given a SEED-id.
+        """
+        Get waveforms from the clients given a SEED-id.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         receiver : `str`
             Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
 
@@ -354,8 +355,8 @@ class Client(object):
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
-        Returns:
-        --------
+        Returns
+        -------
         stream : :class:`obspy.Stream`
             The requested waveforms.
 
@@ -415,10 +416,11 @@ class Client(object):
         return stream
 
     def _get_sds_waveforms(self, verb: int = 0, **kwargs):
-        r"""Get the local waveforms from any of the local sds_read archives.
+        """
+        Get the local waveforms from any of the local sds_read archives.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
@@ -428,8 +430,8 @@ class Client(object):
             Required parameters are ``network``, ``station``, ``location``,
             ``channel``, ``starttime``, and ``endtime``.
 
-        Returns:
-        --------
+        Returns
+        -------
         stream : :class:`obspy.Stream`
             The requested waveforms.
 
@@ -443,8 +445,8 @@ class Client(object):
             stream = sds.get_waveforms(**kwargs)
             if not stream:
                 continue
-            if self.check_stream_duration(stream, duration=dt,
-                                        receiver=receiver, verb=verb-1):
+            if self.check_duration(stream, duration=dt,
+                                   receiver=receiver, verb=verb-1):
                 if verb > 1:
                     print(_msg_loaded_archive.format(kwargs['starttime']))
                 return stream
@@ -454,10 +456,11 @@ class Client(object):
         self, receiver: dict, date: pd.Timestamp, scan_sds: bool = True,
         download: bool = True, verb: int = 0
     ):
-        r"""Get the waveforms for a receiver and date.
+        """
+        Get the waveforms for a receiver and date.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         receiver : `dict`
             Receiver dictionary with SEED-id keys:
             ['network', 'station', 'location', 'channel'].
@@ -478,8 +481,8 @@ class Client(object):
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
-        Returns:
-        --------
+        Returns
+        -------
         stream : :class:`obspy.Stream`
             The waveforms for ``receiver`` on ``date``.
 
@@ -499,7 +502,7 @@ class Client(object):
                 print(_msg_load_archive.format(time))
             for sds in self.sds_read:
                 daystream = sds.get_waveforms(**args)
-                if self.check_stream_duration(daystream, verb=verb-1):
+                if self.check_duration(daystream, verb=verb-1):
                     if verb > 1:
                         print(_msg_loaded_archive.format(time))
                     return daystream
@@ -545,15 +548,16 @@ class Client(object):
         return Stream()
 
     def _test_waveforms_for_date(self, **kwargs):
-        r"""Test get_waveforms_for_date.
+        """
+        Test get_waveforms_for_date.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         **kwargs :
             Parameters passed to :meth:`_get_waveforms_for_date`.
 
-        Returns:
-        --------
+        Returns
+        -------
         flag : `int`
             Flag meaning: -2=failed, -1=missing, 0=not_validated, 1=passed.
 
@@ -562,8 +566,10 @@ class Client(object):
             stream = self._get_waveforms_for_date(**kwargs)
         except RuntimeError:
             return -2
-        passed = self.check_stream_duration(
-            stream, duration=86400., receiver=receiver_to_str(kwargs['receiver'])
+        passed = self.check_duration(
+            stream,
+            duration=86400.,
+            receiver=receiver_to_str(kwargs['receiver'])
         )
         return 1 if passed else -1
 
@@ -574,11 +580,12 @@ class Client(object):
         three_components: str = '12Z', raise_error: bool = False,
         verb: int = 0, **kwargs
     ):
-        r"""Get preprocessed waveforms from the clients given a SEED-id and
-        an operations dictionary.
+        """
+        Get preprocessed waveforms from the clients given a SEED-id and an
+        operations dictionary.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         receiver : `str`
             Receiver SEED-id string '{network}.{station}.{location}.{channel}'.
 
@@ -618,8 +625,8 @@ class Client(object):
         **kwargs :
             Parameters passed to :meth:`get_waveforms`.
 
-        Returns:
-        --------
+        Returns
+        -------
         stream : :class:`obspy.Stream`
             The requested waveforms after preprocessing.
 
@@ -682,45 +689,51 @@ class Client(object):
             return Stream()
         return st
 
-    def _test_preprocessed_waveforms(self, sampling_rate = None, **kwargs):
-        r"""Test get_preprocessed_waveforms.
+    def _test_preprocessed_waveforms(self, sampling_rate: float = None,
+                                     **kwargs):
+        """
+        Test get_preprocessed_waveforms.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         sampling_rate : `float`, optional
             The desired final sampling rate of the stream (in Hz).
 
         **kwargs :
             Parameters passed :meth:`get_preprocessed_waveforms`.
 
-        Returns:
-        --------
+        Returns
+        -------
         flag : `int`
             Flag meaning: -2=failed, -1=missing, 0=not_validated, 1=passed.
 
         """
-        if not 'duration' in kwargs:
+        if 'duration' not in kwargs:
             kwargs['duration'] = 86400.
+
         kwargs['centered'] = False
         kwargs['raise_error'] = True
+
         try:
             stream = self.get_preprocessed_waveforms(**kwargs)
         except RuntimeError:
             return -2
-        passed = self.check_stream_duration(
-            stream, duration=kwargs['duration'], receiver=kwargs['receiver'],
-            sampling_rate=sampling_rate
-        )
+
+        passed = self.check_duration(stream, duration=kwargs['duration'],
+                                     receiver=kwargs['receiver'],
+                                     sampling_rate=sampling_rate)
+
         return 1 if passed else -1
 
     def get_pair_preprocessed_waveforms(
         self, pair, **kwargs
     ):
-        r"""Get preprocessed waveforms from the clients given a receiver couple
+        """
+        Get preprocessed waveforms from the clients given a receiver couple
         SEED-id and an operations dictionary.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         pair : str or :mod:`~xarray.DataArray`
             Receiver couple separated by `separator`. Each receiver is
             specified by a SEED-id string:
@@ -730,8 +743,8 @@ class Client(object):
             Parameters passed to :meth:`get_waveforms` via
             :meth:`get_preprocessed_waveforms`.
 
-        Returns:
-        --------
+        Returns
+        -------
         stream : :class:`obspy.Stream`
             The requested waveforms after preprocessing.
 
@@ -752,10 +765,11 @@ class Client(object):
         extend_days: int = None, substitute: bool = False,
         three_components: str = None, verb: int = 0, **kwargs
     ):
-        r"""Verify the waveform data availability for receivers and times.
+        """
+        Verify the waveform data availability for receivers and times.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         pairs_or_receivers : `list`
             List of receivers or pairs (receiver couple separated by a '-').
             Each receiver should be specified by a SEED-id string of format
@@ -782,8 +796,8 @@ class Client(object):
         **kwargs :
             Parameters passed to :meth:`verify_data_availability`.
 
-        Returns:
-        --------
+        Returns
+        -------
         status : :class:`xarray.DataArray`
             Data availability status N-D labelled array with dimensions
             ``time`` and ``receiver``.
@@ -809,11 +823,12 @@ class Client(object):
         extend_days: int = None, substitute: bool = False,
         three_components: str = None
     ):
-        r"""Create a new N-D labelled array to verify the waveform data
+        """
+        Create a new N-D labelled array to verify the waveform data
         availability for receivers and times.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         pairs_or_receivers : `list`
             List of receivers or pairs (receiver couple separated by a '-').
             Each receiver should be specified by a SEED-id string of format
@@ -834,8 +849,8 @@ class Client(object):
             Set the three-component orientation characters for ``substitute``.
             Defaults to '12Z'.
 
-        Returns:
-        --------
+        Returns
+        -------
         status : :class:`xarray.DataArray`
             Data availability status N-D labelled array with dimensions
             ``times`` and ``receivers``.
@@ -893,10 +908,10 @@ class Client(object):
         self, status: xr.DataArray, count_verified: bool = False,
         parallel: bool = None, compute: bool = True, **kwargs
     ):
-        r"""Verify daily waveform availability for receivers and times.
+        """Verify daily waveform availability for receivers and times.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         status : :class:`xarray.DataArray`
             Data availability status N-D labelled array with dimensions
             ``status.time`` and ``status.receiver``. ``status`` is updated in
@@ -919,8 +934,8 @@ class Client(object):
         **kwargs :
             Parameters passed to :meth:`_get_waveforms_for_date`
 
-        Returns:
-        --------
+        Returns
+        -------
         verified : `int`, optional
             The number of verified (receiver, time) couples. If
             ``count_verified`` is `True`, otherwise `None`.
@@ -962,10 +977,11 @@ class Client(object):
         preprocess: dict, inventory: Inventory, substitute: bool = False,
         three_components: str = None, verb: int = 0, **kwargs
     ):
-        r"""Verify the waveform data preprocessing for receivers and time.
+        """
+        Verify the waveform data preprocessing for receivers and time.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         pairs_or_receivers : `list`
             List of receivers or pairs (receiver couple separated by a '-').
             Each receiver should be specified by a SEED-id string of format
@@ -999,8 +1015,8 @@ class Client(object):
         **kwargs :
             Parameters passed to :meth:`verify_data_availability`.
 
-        Returns:
-        --------
+        Returns
+        -------
         status : :class:`xarray.DataArray`
             Data preprocessing status N-D labelled array with dimensions
             ``time`` and ``receiver``.
@@ -1025,11 +1041,12 @@ class Client(object):
         preprocess: dict, substitute: bool = False,
         three_components: str = None
     ):
-        r"""Create a new N-D labelled array to verify the waveform data
+        """
+        Create a new N-D labelled array to verify the waveform data
         preprocessing for receivers and and time.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         pairs_or_receivers : `list`
             List of receivers or pairs (receiver couple separated by a '-').
             Each receiver should be specified by a SEED-id string of format
@@ -1054,8 +1071,8 @@ class Client(object):
             Set the three-component orientation characters for ``substitute``.
             Defaults to '12Z'.
 
-        Returns:
-        --------
+        Returns
+        -------
         status : :class:`xarray.DataArray`
             Data preprocessing status N-D labelled array with dimensions
             ``time`` and ``receiver``.
@@ -1110,10 +1127,11 @@ class Client(object):
         count_verified: bool = False, parallel: bool = None,
         compute: bool = True, **kwargs
     ):
-        r"""Verify daily waveform availability for receivers and times.
+        """
+        Verify daily waveform availability for receivers and times.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         status : :class:`xarray.DataArray`
             Data preprocessing status N-D labelled array with dimensions
             ``status.time`` and ``status.receiver``. ``status`` is updated in
@@ -1139,8 +1157,8 @@ class Client(object):
         **kwargs :
             Parameters passed to :meth:`_get_waveforms_for_date`
 
-        Returns:
-        --------
+        Returns
+        -------
         verified : `int`, optional
             The number of verified (receiver, time) couples. If
             ``count_verified`` is `True`, otherwise `None`.
@@ -1191,10 +1209,11 @@ def set_status_flag(
     status: xr.DataArray, receiver: xr.DataArray, time: xr.DataArray,
     flag: int, inc: int = None
 ):
-    r"""Set status flag for receiver and time.
+    """
+    Set status flag for receiver and time.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     status : :class:`xarray.DataArray`
         Data availability status N-D labelled array with dimensions
         ``status.time`` and ``status.receiver``, updated in place.
@@ -1211,70 +1230,12 @@ def set_status_flag(
     inc : `int`, optional
         Counter to be increased by one.
 
-    Returns:
-    --------
+    Returns
+    -------
     inc_one : `int`
         Counter ``inc`` increased by one.
+
     """
     status.loc[{'receiver': receiver, 'time': time}] = flag
     if isinstance(inc, int):
         return inc + 1
-
-
-def stream_duration(stream: Stream, receiver: str = None,
-                    sampling_rate: float = None):
-    r"""Returns a dictionary with the total duration per receiver SEED-id,
-    optionally filtered for a dedicated sampling rate.
-    """
-    if not isinstance(stream, Stream):
-        raise TypeError('``stream`` should be a :class:`obspy.Stream`.')
-
-    if receiver and not isinstance(receiver, str):
-        raise TypeError('``receiver`` should be a `str`.')
-
-    if sampling_rate and not isinstance(sampling_rate, float):
-        raise TypeError('``sampling_rate`` should be float Hz.')
-
-    duration = dict()
-
-    if receiver:
-        duration[receiver] = dict(gaps=[], npts=0, time=0.,
-                                  starttime=None, endtime=None)
-
-    for trace in stream:
-        if sampling_rate and trace.stats.sampling_rate != sampling_rate:
-            continue
-
-        if receiver is not None and trace.id != receiver:
-            continue
-
-        if trace.id in duration:
-            prev = duration[trace.id]
-        else:
-            prev = dict(gaps=[], npts=0, time=0.,
-                        starttime=None, endtime=None)
-
-        prev['npts'] += trace.stats.npts
-        prev['time'] += trace.stats.npts * trace.stats.delta
-        if trace.stats.starttime < prev['starttime'] or not prev['starttime']:
-            prev['starttime'] = trace.stats.starttime
-        if trace.stats.endtime < prev['endtime'] or not prev['endtime']:
-            prev['endtime'] = trace.stats.endtime
-
-        duration[trace.id] = prev
-
-    for gap in stream.get_gaps():
-        duration['.'.join(gap[:4])]['gaps'] += [gap[4:]]
-
-    for rec in duration:
-        npts_overlap = 0
-        time_overlap = 0.
-        for gap in duration[rec]['gaps']:
-            if gap[-1] > 0:
-                npts_overlap += gap[-1]
-                time_overlap += gap[-2]
-
-        duration[rec]['npts'] += npts_overlap
-        duration[rec]['time'] += time_overlap
-
-    return duration[receiver] if receiver else duration

@@ -242,12 +242,12 @@ def apply_operation(
     if not (isinstance(waveforms, Trace) or
             isinstance(waveforms, Stream)):
         msg = ('``waveforms`` is not of type '
-              ':class:`obspy.Stream` or :class:`obspy.Trace`')
+               ':class:`obspy.Stream` or :class:`obspy.Trace`')
         if raise_error:
             raise TypeError(msg)
         else:
             warnings.warn(msg, UserWarning)
-            return False 
+            return False
 
     if len(waveforms) == 0:
         msg = '``waveforms`` is emtpy.'
@@ -403,7 +403,7 @@ def preprocess(
                 operated_waveforms = False
         except (KeyboardInterrupt, SystemExit):
             raise InterruptedError
-        if operated_waveforms == False:
+        if not operated_waveforms:
             return Stream() if isinstance(waveforms, Stream) else Trace()
 
     if verb > 2:

@@ -24,13 +24,14 @@ def filter(
     x: xr.DataArray, frequency, btype: str, order: int = 2,
     dim: str = 'lag', inplace: bool = False, **kwargs
 ):
-    r"""Butterworth filter an N-D labeled array of data.
+    """
+    Butterworth filter an N-D labeled array of data.
 
     Implementation of :func:`scipy.signal.butter` and
     :func:`scipy.signal.sosfiltfilt` to a :class:`xarray.DataArray`.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The array of data to be filtered.
 
@@ -49,8 +50,8 @@ def filter(
     inplace : `bool`, optional
         If `True`, filter in place and avoid a copy. Default is `False`.
 
-    Returns:
-    --------
+    Returns
+    -------
     y : :class:`xarray.DataArray` or `None`
         The windowed output of ``x`` if ``inplace`` is `False`.
     """

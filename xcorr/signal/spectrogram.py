@@ -25,8 +25,8 @@ def psd(
     x: xr.DataArray, duration: float = None, padding_factor: int = 2,
     dim: str = 'lag', **kwargs
 ):
-    r"""Compute an N-D labelaled spectrogram with consecutive Fourier
-    transforms.
+    """
+    Compute an N-D labelaled spectrogram with consecutive Fourier transforms.
 
     Implementation of :func:`scipy.signal.spectrogram` to a
     :class:`xarray.DataArray`.
@@ -38,8 +38,8 @@ def psd(
     Nyquist ``dim.sampling_rate/2``. Spectrogram time segments correspond to
     the samples in ``dim``, with `NaN` at the outer edges (``duration/2``).
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The array of data to be filtered.
 
@@ -56,8 +56,8 @@ def psd(
     **kwargs
         Extra arguments passed on to :func:`scipy.signal.spectrogram`.
 
-    Returns:
-    --------
+    Returns
+    -------
     y : :class:`xarray.DataArray`
         The computed spectrogram for ``x``.
     """
@@ -157,8 +157,9 @@ def psd_f_t(
     x: xr.DataArray, duration: float = None, padding_factor: int = None,
     overlap: float = None, dim: str = 'lag', **kwargs
 ):
-    r"""Compute an N-D labelaled spectrogram with consecutive Fourier
-    transforms with manual time segment control.
+    """
+    Compute an N-D labelaled spectrogram with consecutive Fourier transforms
+    with manual time segment control.
 
     Implementation of :func:`scipy.signal.spectrogram` to a
     :class:`xarray.DataArray`.
@@ -171,8 +172,8 @@ def psd_f_t(
     ranging from dc up to Nyquist ``dim.sampling_rate/2`` and with time
     segments depending on ``dim``, ``duration`` and ``overlap``, respectively.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The array of data to be filtered.
 
@@ -192,8 +193,8 @@ def psd_f_t(
     **kwargs
         Extra arguments passed on to :func:`scipy.signal.spectrogram`.
 
-    Returns:
-    --------
+    Returns
+    -------
     y : :class:`xarray.DataArray`
         The computed spectrogram for ``x``.
     """

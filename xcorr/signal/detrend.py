@@ -24,13 +24,14 @@ def detrend(
     x: xr.DataArray, type: str = 'constant', bp=0, dim: str = 'lag',
     inplace: bool = True
 ):
-    r"""Detrend an N-D labeled array of data.
+    """
+    Detrend an N-D labeled array of data.
 
     Implementation of :func:`scipy.signal.detrend` to a
     :class:`xarray.DataArray`.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The array of data to be detrended.
 
@@ -50,8 +51,8 @@ def detrend(
     inplace : `bool`, optional
         If `True` (default), detrend in place and avoid a copy.
 
-    Returns:
-    --------
+    Returns
+    -------
     y : `None` or :class:`xarray.DataArray`
         The detrended output of ``x`` if ``inplace`` is `False`.
     """

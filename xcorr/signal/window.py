@@ -28,10 +28,11 @@ def window(
     x: xr.DataArray, wtype: str = None, max_percentage: float = None,
     max_length: float = None, side: str = None
 ):
-    r"""Return a window for the given coordinate of N-D labeled array of data.
+    """
+    Return a window for the given coordinate of N-D labeled array of data.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The coordinate to be windowed.
 
@@ -49,8 +50,8 @@ def window(
         Specify if both sides should be tapered (default, 'both') or if only
         the left half ('left') or right half ('right') should be tapered.
 
-    Returns:
-    --------
+    Returns
+    -------
     w : :class:`xarray.DataArray` or `None`
         The window for coordinates ``x``.
     """

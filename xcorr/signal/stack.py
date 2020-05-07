@@ -14,7 +14,7 @@ import pandas as pd
 
 
 # Relative imports
-from ..util import get_dpm
+from ..util.time import get_dpm
 
 
 __all__ = ['stack']
@@ -25,10 +25,11 @@ _grouping = ['all', 'year_month', 'year_doy']
 def stack(
     x: xr.Dataset, group: str = None, dim: str = None, **kwargs
 ):
-    r"""Stack a an N-D labeled array of data over a (grouped) dimension.
+    """
+    Stack a an N-D labeled array of data over a (grouped) dimension.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The array of data to be stacked.
 
@@ -38,8 +39,8 @@ def stack(
     dim : `str`, optional
         The coordinates name of ``x`` to be stacked over. Default is 'time'.
 
-    Returns:
-    --------
+    Returns
+    -------
     y : :class:`xarray.DataArray` or `None`
         The stacked output of ``x``.
     """
@@ -118,7 +119,7 @@ def stack_year_month(
     )
     w = (month_length.groupby(month)/month_length).groupby(month).sum()
 
-    # apply weight and group
+    # apply weight and groupby
     y = (w*y).groupby('year_month').sum(dim=dim, keep_attrs=True)
 
     return y
@@ -139,13 +140,13 @@ def stack_year_doy(
 
     # construct multi-index
     year = dim + '.year'
-    doy = dim + '.doyofyear'
+    doy = dim + '.dayofyear'
     year_doy_idx = pd.MultiIndex.from_arrays([y[year], y[doy]])
 
     # add new coordinate
     y['year_dayofyear'] = (dim, year_doy_idx)
 
-    # apply weight and group
+    # apply groupby
     y = y.groupby('year_dayofyear').mean(dim=dim, keep_attrs=True)
 
     return y

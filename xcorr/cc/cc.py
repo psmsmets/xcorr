@@ -30,7 +30,8 @@ def cc(
     x: np.ndarray, y: np.ndarray, normalize: bool = True,
     pad: bool = True, unbiased: bool = True, dtype: np.dtype = None
 ):
-    r"""Crosscorrelate two vectors `x` and `y` in the frequency domain.
+    """
+    Crosscorrelate two vectors `x` and `y` in the frequency domain.
 
     Parameters
     ----------
@@ -88,7 +89,8 @@ def cc(
 def lag(
     n: int, delta: float, pad: bool = True
 ):
-    r"""Construct the crosscorrelation lag vector.
+    """
+    Construct the crosscorrelation lag vector.
 
     Parameters
     ----------
@@ -116,7 +118,8 @@ def lag(
 def weight(
     n: int, pad: bool = True, clip: float = None
 ):
-    r"""Construct the unbiased crosscorrelation weight vector.
+    """
+    Construct the unbiased crosscorrelation weight vector.
 
     Parameters
     ----------
@@ -148,7 +151,8 @@ def weight(
 def extract_shift(
     Rxy: np.ndarray, delta: float = None
 ):
-    r"""Extract crosscorrelation shift.
+    """
+    Extract crosscorrelation shift.
 
     Returns the sample (or time) shift at the maximum of the
     crosscorrelation estimate `Rxy`.
@@ -177,7 +181,8 @@ def extract_shift(
 def extract_shift_and_max(
     Rxy: np.ndarray, delta: float = None
 ):
-    r"""Extract crosscorrelation shift.
+    """
+    Extract crosscorrelation shift.
 
     Returns the sample (or time) shift at the maximum of the
     crosscorrelation estimate `Rxy` and the maximum itself.
@@ -211,7 +216,8 @@ def extract_shift_and_max(
 def compute_shift(
     x: np.ndarray, y: np.ndarray, delta: float = None, **kwargs
 ):
-    r"""Calculate crosscorrelation shift.
+    """
+    Calculate crosscorrelation shift.
 
     Calculate the sample (or time) shift at the maximum of the
     crosscorrelation estimate `Rxy` of vectors `x` and `y` in the frequency
@@ -246,7 +252,8 @@ def compute_shift(
 def compute_shift_and_max(
     x: np.ndarray, y: np.ndarray, delta: float = None, **kwargs
 ):
-    r"""Calculate crosscorrelation shift.
+    """
+    Calculate crosscorrelation shift.
 
     Calculate the sample (or time) shift at the maximum of the
     crosscorrelation estimate `Rxy` of vectors `x` and `y` in the frequency

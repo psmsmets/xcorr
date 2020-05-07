@@ -75,7 +75,7 @@ Create a clone, or copy of the xcorr repository
 
 .. code-block:: console
 
-    git clone https://github.com/psmsmets/xcorr.git
+    git clone https://gitlab.com/psmsmets/xcorr.git
 
 Run ``git pull`` to update the local repository to this master repository.
 
@@ -87,15 +87,16 @@ Install xcorr via ``pip``:
    cd xcorr
    pip install -e .
 
-Required are Python version 3.5 or higher and the modules `NumPy`, `SciPy`,
-`ObsPy`, `Pandas`, and `xarray`.
-Old versions of `ObsPy` (<1.2.0) and `NumPy` tend to cause problems which
-kills the `remove_response` function of `ObsPy`.
+
+Required are Python version 3.5 or higher and the modules `NumPy`_, `SciPy`_,
+`ObsPy`_, `Pandas`_, and `xarray`_.
+Old versions of `ObsPy`_ (<1.2.0) and `NumPy`_ tend to cause problems which
+kills the `remove_response`_ function of `ObsPy`_.
 Create a working (non-conflicting) Python 3.7 environment in conda as follows:
 
 .. code-block:: console
 
-    conda env create -f xcorr.yml
+    conda env create -f environment.yml
 
 
 Citation

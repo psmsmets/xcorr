@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-r"""
+"""
+xcorr.cc init
 """
 
+# Import main functions
+from ..cc.cc import cc, lag, weight
 
-# import all modules
-from ..cc import cc
 
-# Import __all__ functions
-from ..cc.cc import *
+__all__ = ['cc', 'lag', 'weight']

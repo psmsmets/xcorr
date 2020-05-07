@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
-r"""
+"""
+xcorr.client init
 """
 
-# import all modules
-from ..clients import datafetch
-from ..clients import client
-
-# Import all functions
-from ..clients.datafetch import *
-from ..clients.client import *
-
-# Import some classes
+# Import main classes
 from ..clients.client import Client
+
+
+__all__ = ['Client']

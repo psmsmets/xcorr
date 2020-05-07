@@ -24,11 +24,12 @@ def snr(
     x: xr.DataArray, signal: xr.DataArray, noise: xr.DataArray,
     dim: str = 'lag'
 ):
-    r"""Compute the signal-to-noise ratio of an N-D labeled array of data
-    given a signal mask and a noise mask.
+    """
+    Compute the signal-to-noise ratio of an N-D labeled array of data given a
+    signal mask and a noise mask.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
         The array of data to be root-mean-squared.
 
@@ -41,8 +42,8 @@ def snr(
     dim : `str`, optional
         The coordinates name of ``x`` to be filtered over. Default is 'lag'.
 
-    Returns:
-    --------
+    Returns
+    -------
     snr : :class:`xarray.DataArray`
         The snr output of ``x``.
     """

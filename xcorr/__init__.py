@@ -26,23 +26,20 @@ analysis tools.
     (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 
-# import all modules
-from xcorr import util
-from xcorr import clients
-from xcorr import preprocess 
-from xcorr import cc 
-from xcorr import signal 
-from xcorr import core
+# Import main modules
+from xcorr import cc, preprocess, signal
 
-# Import all functions
-from xcorr.core import *
+# Import all core functions
+from xcorr.core import (init, read, write, merge, process, lazy_process,
+                        bias_correct)
 
-# Import some classes
+# Import client class
 from xcorr.clients.client import Client
 
 # Make only a selection available to __all__ to not clutter the namespace
 # Maybe also to discourage the use of `from xcorr import *`.
-__all__ = ['Client', 'core']
+__all__ = ['Client', 'cc', 'signal', 'preprocess', 'init', 'read', 'write',
+           'merge', 'process', 'lazy_process', 'bias_correct']
 
 # Version
 try:
@@ -56,4 +53,3 @@ except ImportError:
     # rare. empymod should be installed properly!
     from datetime import datetime
     __version__ = 'unknown-'+datetime.today().strftime('%Y%m%d')
-
