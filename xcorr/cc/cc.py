@@ -142,7 +142,7 @@ def weight(
     """
     nn = n*2-1 if pad else n
     n = np.int((nn+1)/2)
-    w = n / (n - np.abs(np.arange(1-n, nn+1-n, 1, np.float64)))
+    w = n / (n - np.abs(np.arange(1-n, nn-n-1, 1, np.float64)))
     if clip is not None:
         w[np.where(w > clip)] = clip
     return w

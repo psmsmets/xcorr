@@ -23,7 +23,6 @@ __all__ = ['taper']
 def taper(
     x: xr.DataArray, wtype: str = None, max_percentage: float = None,
     max_length: float = None, side: str = None, dim: str = 'lag',
-    inplace: bool = False,
 
 ):
     """
@@ -51,16 +50,14 @@ def taper(
     dim : `str`, optional
         The coordinates name of ``x`` to be filtered over. Default is 'lag'.
 
-    inplace : `bool`, optional
-        If `True`, filter in place and avoid a copy. Default is `False`.
-
     Returns
     -------
     y : :class:`xarray.DataArray` or `None`
         The windowed output of ``x`` if ``inplace`` is `False`.
+
     """
     assert dim in x.dims, (
-        'x has no dimension "{}"!'.format(dim)
+        f'x has no dimension "{dim}"!'
     )
 
     w = window(x[dim], wtype, max_percentage, max_length, side)
@@ -76,11 +73,6 @@ def taper(
         'max_length': max_length,
         'side': side,
         'dim': dim,
-        'inplace': inplace,
     })
 
-    if inplace:
-        x.values = y.values
-        x.attrs = y.attrs
-
-    return None if inplace else y
+    return y

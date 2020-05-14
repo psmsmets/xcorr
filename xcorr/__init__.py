@@ -30,16 +30,17 @@ analysis tools.
 from xcorr import cc, preprocess, signal
 
 # Import all core functions
-from xcorr.core import (init, read, write, merge, process, lazy_process,
-                        bias_correct)
+from xcorr.core import (init, validate, read, write, merge, mread, process,
+                        lazy_process, bias_correct)
 
 # Import client class
-from xcorr.clients.client import Client
+from xcorr.client import Client
 
 # Make only a selection available to __all__ to not clutter the namespace
 # Maybe also to discourage the use of `from xcorr import *`.
-__all__ = ['Client', 'cc', 'signal', 'preprocess', 'init', 'read', 'write',
-           'merge', 'process', 'lazy_process', 'bias_correct']
+__all__ = ['Client', 'cc', 'signal', 'preprocess', 'init', 'validate', 'read',
+           'write', 'merge', 'mread', 'process', 'lazy_process',
+           'bias_correct']
 
 # Version
 try:

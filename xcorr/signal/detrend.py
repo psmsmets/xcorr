@@ -11,6 +11,10 @@ Detrend an N-D labeled array of data.
 # Mandatory imports
 import xarray as xr
 from scipy import signal
+try:
+    import dask
+except ModuleNotFoundError:
+    dask = False
 
 
 # Relative imports
@@ -22,18 +26,18 @@ __all__ = ['detrend', 'demean']
 
 def detrend(
     x: xr.DataArray, type: str = 'constant', bp=0, dim: str = 'lag',
-    inplace: bool = True
+    **kwargs
 ):
     """
     Detrend an N-D labeled array of data.
 
     Implementation of :func:`scipy.signal.detrend` to a
-    :class:`xarray.DataArray`.
+    :class:`xarray.DataArray` using :func:`xarray.apply_ufunc`.
 
     Parameters
     ----------
     x : :class:`xarray.DataArray`
-        The array of data to be detrended.
+        The data array to be detrended.
 
     type : `str` {‘constant’, ‘linear’}, optional
        The type of detrending. If type == 'constant' (default), only the
@@ -48,36 +52,56 @@ def detrend(
     dim : `str`, optional
         The coordinates name of ``x`` to be detrended over. Default is 'lag'.
 
-    inplace : `bool`, optional
-        If `True` (default), detrend in place and avoid a copy.
+    **kwargs :
+        Additional parameters provided to :func:`xarray.apply_ufunc`.
 
     Returns
     -------
     y : `None` or :class:`xarray.DataArray`
-        The detrended output of ``x`` if ``inplace`` is `False`.
+        The detrended data array.
+
     """
     assert dim in x.dims, 'Dimension not found!'
 
-    y = x if inplace else x.copy()
-    y.data = signal.detrend(
-        x=y.data,
-        axis=y.dims.index(dim),
-        type='linear',
-        bp=0
-    )
+    # get index of dim
+    axis = x.dims.index(dim)
+    axis = -1 if axis == len(x.dims) - 1 else axis
 
+    # detrend wrapper to simplify ufinc input
+    def _detrend(obj):
+        return signal.detrend(
+            data=obj.data,
+            axis=axis,
+            type='linear',
+            bp=0
+        )
+
+    # dask collection?
+    dargs = {}
+    if dask and dask.is_dask_collection(x):
+        dargs = dict(dask='parallelized', output_dtypes=[x.dtype])
+
+    # apply sosfiltfilt as ufunc (and optional dask distributed)
+    y = xr.apply_ufunc(_detrend, x,
+                       input_core_dims=[[dim]],
+                       output_core_dims=[[dim]],
+                       keep_attrs=True,
+                       vectorize=False,
+                       **dargs,
+                       **kwargs)
+
+    # log workflow
     historicize(y, f='detrend', a={
-        'x': x.name,
+        'x': y.name,
         'type': type,
         'bp': bp,
         'dim': dim,
-        'inplace': inplace,
     })
 
-    return None if inplace else y
+    return y
 
 
-def demean(x: xr.DataArray, dim: str = 'lag', inplace: bool = True):
+def demean(x: xr.DataArray, dim: str = 'lag', **kwargs):
     r"""Demean  an N-D labeled array of data.
 
     Wrapper function for :func:`xcorr.signal.detrend` with arguments
@@ -91,13 +115,14 @@ def demean(x: xr.DataArray, dim: str = 'lag', inplace: bool = True):
     dim : `str`, optional
         The coordinates name of ``x`` to be demeaned over. Default is 'lag'.
 
-    inplace : `bool`, optional
-        If `True` (default), demean in place and avoid a copy.
+    **kwargs :
+        Additional parameters provided to :func:`xarray.apply_ufunc`.
 
     Returns:
     --------
     y : `None` or :class:`xarray.DataArray`
-        The demeaned output of ``x`` if ``inplace`` is `False`.
+        The demeaned array of data.
+
     """
     assert dim in x.dims, 'Dimension not found!'
-    return detrend(x, type='constant', dim=dim, inplace=inplace)
+    return detrend(x, type='constant', dim=dim, **kwargs)

@@ -17,7 +17,8 @@ from obspy.core.util.obspy_types import ObsPyException
 
 # Relative imports
 from ..preprocess.running_rms import running_rms
-from ..util import to_UTCDateTime, hash_obj
+from ..util.time import to_UTCDateTime
+from ..util.hasher import hash_obj
 
 
 __all__ = ['help', 'list_operations', 'is_operation', 'preprocess',

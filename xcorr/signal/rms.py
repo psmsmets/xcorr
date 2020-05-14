@@ -1,9 +1,9 @@
 r"""
 
-:mod:`signal.extract` -- Extract
-================================
+:mod:`signal.rms` -- RMS
+========================
 
-Extract lag time windows of interest.
+Root-mean-square and N-D labeled array of data.
 
 """
 
@@ -20,7 +20,7 @@ __all__ = ['rms']
 
 
 def rms(
-    x: xr.DataArray, dim: str = 'lag', inplace: bool = False
+    x: xr.DataArray, dim: str = 'lag'
 ):
     """
     Root-mean-square an N-D labeled array of data.
@@ -33,29 +33,29 @@ def rms(
     dim : `str`, optional
         The coordinates name of ``x`` to be filtered over. Default is 'lag'.
 
-    inplace : `bool`, optional
-        If `True`, filter in place and avoid a copy. Default is `False`.
-
     Returns
     -------
     y : :class:`xarray.DataArray` or `None`
-        The windowed output of ``x`` if ``inplace`` is `False`.
+        The rms of ``x``.
+
     """
     assert dim in x.dims, (
-        'x has no dimension "{}"!'.format(dim)
+        f'x has no dimension "{dim}"!'
     )
-    y = x if inplace else x.copy()
+
     # square
-    y = xr.ufuncs.square(y)
+    y = xr.ufuncs.square(x)
+
     # mean
     y = y.mean(dim=dim, skipna=True, keep_attrs=True)
+
     # root
     y = xr.ufuncs.sqrt(y)
 
+    # log workflow
     historicize(y, f='rms', a={
         'x': x.name,
         'dim': dim,
-        'inplace': inplace,
     })
 
-    return None if inplace else y
+    return y

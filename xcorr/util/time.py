@@ -11,20 +11,22 @@ Utilities for ``xcorr`` for time conversions.
 # Mandatory imports
 import numpy as np
 import pandas as pd
+import xarray as xr
 from xarray import DataArray
-from datetime import datetime
 from obspy import UTCDateTime
 
 
-__all__ = ['_one_second', 'to_seconds', 'to_UTCDateTime', 'get_dates',
-           '_dpm', 'leap_year', 'get_dpm', 'get_dpy']
+__all__ = ['_one_second', 'to_seconds', 'to_datetime', 'to_UTCDateTime',
+           'get_dates', '_dpm', 'leap_year', 'get_dpm', 'get_dpy',
+           'update_lag_indices']
 
 
 _one_second = pd.to_timedelta(1, unit='s')
 
 
 def to_seconds(time):
-    r"""Convert dtype timedelta64[ns] to float seconds
+    """
+    Convert dtype timedelta64[ns] to float seconds
 
     Parameters
     ----------
@@ -45,8 +47,35 @@ def to_seconds(time):
         return time / _one_second
 
 
+def to_datetime(time):
+    """
+    Extends :meth:`pandas.to_datetime` with some more date time format
+    conversions.
+
+    Parameters
+    ----------
+    time : mixed
+        A string or various datetime object.
+
+    Returns
+    -------
+    time : :class:`pandas.Timestamp`
+        Pandas datetime object.
+
+    """
+
+    if time is None:
+        return
+
+    if isinstance(time, object) and hasattr(time, 'datetime'):
+        time = time.datetime
+
+    return pd.to_datetime(time)
+
+
 def to_UTCDateTime(time):
-    r"""Convert various datetime formats to obspy UTC-based datetime object.
+    """
+    Convert various datetime formats to obspy UTC-based datetime object.
 
     Parameters
     ----------
@@ -59,20 +88,32 @@ def to_UTCDateTime(time):
         Obspy UTC-based datetime object.
 
     """
-    if isinstance(time, UTCDateTime):
-        return time
-    elif (
-        isinstance(time, str) or
-        isinstance(time, datetime) or
-        isinstance(time, pd.Timestamp)
-    ):
-        return UTCDateTime(time)
-    elif isinstance(time, np.datetime64):
-        return UTCDateTime(pd.to_datetime(time))
+    return UTCDateTime(to_datetime(time))
+
+
+def update_lag_indices(lag: xr.DataArray):
+    """
+    """
+    for attr in ['sampling_rate', 'delta', 'npts', 'index_min', 'index_max']:
+
+        assert attr in lag.attrs, (
+            f'Lag has no attribute "{attr}"!'
+        )
+
+    assert lag.units == 's', ('Lag time unit should be seconds.')
+
+    lag_max = (lag.attrs['npts']-1)*lag.attrs['delta']
+
+    srate = lag.attrs['sampling_rate']
+
+    lag.attrs['index_min'] = int((lag.values[0]+lag_max)*srate)
+    lag.attrs['index_max'] = int((lag.values[-1]+lag_max)*srate+1)
 
 
 def get_dates(start: pd.Timestamp, end: pd.Timestamp):
-    r"""Get the dates for the outer span of days from start to end time.
+    """
+    Get the dates for the outer span of days from start to end time.
+
     Parameters:
     -----------
     start : :class:`pd.Timestamp`

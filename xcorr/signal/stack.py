@@ -43,6 +43,7 @@ def stack(
     -------
     y : :class:`xarray.DataArray` or `None`
         The stacked output of ``x``.
+
     """
     group = group or 'all'
     assert group in _grouping, f'"{group}" is not a group method!'

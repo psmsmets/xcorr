@@ -3,7 +3,7 @@ r"""
 :mod:`signal.snr` -- SNR
 ========================
 
-Estimate the Signal-to-noise ratio of an N-D labeled array of data.
+Estimate the signal-to-noise ratio of an N-D labeled array of data.
 
 """
 
@@ -31,7 +31,7 @@ def snr(
     Parameters
     ----------
     x : :class:`xarray.DataArray`
-        The array of data to be root-mean-squared.
+        The array of data to compute the snr for.
 
     signal : :class:`xarray.DataArray`
         The boolean array masking the signal window of ``x``.
@@ -46,6 +46,7 @@ def snr(
     -------
     snr : :class:`xarray.DataArray`
         The snr output of ``x``.
+
     """
     s = xr.ufuncs.fabs(x.where(signal, drop=True))
     n = x.where(noise, drop=True)

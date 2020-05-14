@@ -12,8 +12,9 @@ from ..signal.snr import snr
 from ..signal.spectrogram import psd
 from ..signal.stack import stack
 from ..signal.taper import taper
+from ..signal.unbias import unbias
 from ..signal.window import window
 
 
-__all__ = ['detrend', 'demean', 'filter', 'mask', 'multi_mask', 'rms', 'snr',
-           'psd', 'stack', 'taper', 'window']
+__all__ = ['detrend', 'demean', 'filter', 'mask', 'multi_mask', 'psd', 'rms',
+           'snr', 'stack', 'taper', 'unbias', 'window']

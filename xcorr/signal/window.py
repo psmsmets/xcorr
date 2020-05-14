@@ -54,6 +54,7 @@ def window(
     -------
     w : :class:`xarray.DataArray` or `None`
         The window for coordinates ``x``.
+
     """
 
     assert len(x.coords) == 1 and x.name in x.dims, (

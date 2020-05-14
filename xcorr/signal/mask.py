@@ -23,7 +23,8 @@ __all__ = ['mask', 'multi_mask']
 def get_scalar_value(
     x: xr.DataArray, x0=None
 ):
-    r"""Convert a dimensionless array to a scalar value.
+    """
+    Convert a dimensionless array to a scalar value.
     """
     assert not (not x and not x0), (
         'Input parameter cannot be empty without a default value!'
@@ -75,9 +76,10 @@ def mask(
         The masked output of ``coord``. Values inside the mask criteria become
         `True`, else `False`. If ``to_where`` is `True`, masked values are
         returned whereas non-masked values become `NaN`.
+
     """
     assert len(x.coords) == 1, (
-        '``x`` should be a coordinate or variable with a single dimension!'
+        'x should be a coordinate or variable with a single dimension!'
     )
     scalar = get_scalar_value(scalar, 1.)
     lower = get_scalar_value(lower) if lower else None
@@ -92,10 +94,10 @@ def mask(
     up = up * scalar if up else x.max().values
 
     mask = (x >= lo) & (x <= up)
-    mask.name = name or 'mask_{}'.format(x.name)
+    mask.name = name or f'mask_{x.name}'
 
     historicize(mask, f='mask', a={
-        'x': '{} ({})'.format(x.name, x.dims[0]),
+        'x': f'{x.name} ({x.dims[0]})',
         'lower': lower,
         'upper': upper,
         'scalar': scalar,
@@ -112,10 +114,11 @@ def multi_mask(
     x: xr.DataArray, y: xr.DataArray, lower=None, upper=None,
     invert: bool = False, name: str = None
 ):
-    r"""Construct a two-dimensional N-D labeled mask array.
+    """
+    Construct a two-dimensional N-D labeled mask array.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : :class:`xarray.DataArray`
 
     y : :class:`xarray.DataArray`
@@ -141,11 +144,12 @@ def multi_mask(
         Sets ``mask.name``. If `None` (default), the name is set to
         'mask_{x.name}_{y.name}'.
 
-    Returns:
-    --------
+    Returns
+    -------
     mask : :class:`xarray.DataArray`
         The masked output of ``x``. Values inside the mask criteria
         become `True`, else `False`.
+
     """
     assert len(x.coords) == 1, (
         '``x`` should be a coordinate or variable with a single dimension!'
@@ -169,12 +173,12 @@ def multi_mask(
         m.append(m0.assign_coords(coord=y0[d]))
 
     m = xr.concat(m, dim=d)
-    m.name = 'mask_{}_{}'.format(x.name, y.name)
+    m.name = f'mask_{x.name}_{y.name}'
     m.attrs.pop('history')
 
     historicize(m, f='multi_mask', a={
-        'x': '{} ({})'.format(x.name, x.dims[0]),
-        'y': '{} ({})'.format(y.name, y.dims[0]),
+        'x': f'{x.name} ({x.dims[0]})',
+        'y': f'{y.name} ({y.dims[0]})',
         'lower': lower,
         'upper': upper,
         'invert': invert,

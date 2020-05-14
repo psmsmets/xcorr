@@ -4,7 +4,7 @@ r"""
 ===============================
 
 Load waveform data from a primary local sds archive, and automatically
-retrieve missing daily waveforms using fdsn and nms web request services.
+retrieve missing daily waveforms using fdsn and vdms web request services.
 
 """
 
@@ -17,6 +17,7 @@ from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
 from warnings import warn
+from tabulate import tabulate
 # VDMS client for IMS waveforms?
 try:
     from pyvdms import Client as vdmsClient
@@ -30,13 +31,9 @@ except ModuleNotFoundError:
 
 
 # Relative imports
-from ..clients.stream2SDS import stream2SDS
-from ..preprocess import preprocess as xcorr_preprocess
-from ..preprocess import operations_to_json, operations_to_dict
-from ..util.receiver import (check_receiver, split_pair, receiver_to_dict,
-                             receiver_to_str)
-from ..util.time import to_UTCDateTime, get_dates
-from ..util.stream import duration as stream_duration
+from .preprocess import preprocess as xcorr_preprocess
+from .preprocess import operations_to_json, operations_to_dict
+from . import util
 
 
 __all__ = ['Client']
@@ -149,8 +146,8 @@ class Client(object):
                 raise TypeError('`vdms_service` should be of type bool or '
                                 ':class:`pyvdms.Client`!')
             if self._vdms:
-                test = self._vdms.get_stations('*H1', 'BDF')
-                if not isinstance(test, Inventory):
+                test = self._vdms.get_channels('*H1', 'BDF')
+                if not isinstance(test, pd.DataFrame):
                     self._vdms = False
                     warn('VDMS Client test failed. Service shall be disabled.')
         else:
@@ -159,6 +156,26 @@ class Client(object):
         # other parameters
         self._max_gap = abs(max_gap or 300.)
         self._parallel = dask and parallel
+
+    def __str__(self):
+        """Get the formatted xcorr client overview.
+        """
+        out = []
+
+        out += [['sds read', self.sds_root_read]]
+        out += [['sds write', self.sds_root_write]]
+        out += [['fdsn', 'Yes' if self.fdsn else 'No']]
+        if self.fdsn:
+            out += [['fdsn base url', self.fdsn.base_url]]
+        out += [['vdms', 'Yes' if self.vdms else 'No']]
+        if self.vdms:
+            out += [['vdms client', self.vdms._request.clc]]
+        out += [['max gap', f'{self.max_gap}s']]
+
+        return tabulate(out)
+
+    def _repr_pretty_(self, p, cycle):
+        p.text(self.__str__())
 
     @property
     def sds_root(self):
@@ -242,7 +259,7 @@ class Client(object):
         """
         if not self.check_duration(stream, verb=verb):
             return False
-        stream2SDS(
+        util.stream.stream2SDS(
             stream,
             sds_path=self.sds_root_write,
             force_override=True,
@@ -296,7 +313,7 @@ class Client(object):
             '``duration`` should be float seconds.'
         )
 
-        d = stream_duration(stream, receiver, **kwargs)
+        d = util.stream.duration(stream, receiver, **kwargs)
 
         if len(d) == 0:
             return False
@@ -349,7 +366,7 @@ class Client(object):
         download : `bool`, optional
             If `True` (default), automatically download waveforms missing in
             all local SDS archives listed in ``self.sds_read`` using
-            ``self.fdsn`` and ``self.nms`` services. Data is added to
+            ``self.fdsn`` and ``self.vdms`` webservices. Data is added to
             ``self.sds_write``.
 
         verb : {0, 1, 2, 3, 4}, optional
@@ -362,7 +379,7 @@ class Client(object):
 
         """
         # check if receiver SEED-id is valid
-        check_receiver(
+        util.receiver.check_receiver(
             receiver,
             allow_wildcards=allow_wildcards,
             raise_error=True
@@ -383,11 +400,11 @@ class Client(object):
             )
 
         # UTCDatetime
-        t0_obspy = to_UTCDateTime(t0)
-        t1_obspy = to_UTCDateTime(t1)
+        t0_obspy = util.time.to_UTCDateTime(t0)
+        t1_obspy = util.time.to_UTCDateTime(t1)
 
         # split receiver SEED-id to a dictionary
-        receiver = receiver_to_dict(receiver)
+        receiver = util.receiver.receiver_to_dict(receiver)
 
         # 1. scan local archives for exact period
         stream = self._get_sds_waveforms(
@@ -398,7 +415,7 @@ class Client(object):
         if not stream and download:
 
             # list of days
-            days = get_dates(t0, t1)
+            days = util.time.get_dates(t0, t1)
 
             # get streams per day
             stream = Stream()
@@ -436,7 +453,7 @@ class Client(object):
             The requested waveforms.
 
         """
-        receiver = receiver_to_str(kwargs)
+        receiver = util.receiver.receiver_to_str(kwargs)
         if verb > 0:
             print("Get waveforms for {} from {} until {}"
                   .format(receiver, kwargs['starttime'], kwargs['endtime']))
@@ -475,7 +492,7 @@ class Client(object):
         download : `bool`, optional
             If `True` (default), automatically download waveforms missing in
             all local SDS archives listed in ``self.sds_read`` using
-            ``self.fdsn`` and ``self.nms`` services. Data is added to
+            ``self.fdsn`` and ``self.vdms`` webservices. Data is added to
             ``self.sds_write``.
 
         verb : {0, 1, 2, 3, 4}, optional
@@ -529,12 +546,12 @@ class Client(object):
                         print('an error occurred:')
                         print(e)
 
-            # attempt via nms
-            if self.nms:
+            # attempt via vdms
+            if self.vdms:
                 if verb > 1:
-                    print('Try NMS_Client')
+                    print('Try VDMS')
                 try:
-                    daystream = self.nms.get_waveforms(**args)
+                    daystream = self.vdms.get_waveforms(**args)
                     if self._sds_write_daystream(daystream, verb=verb-2):
                         return daystream
                     if verb > 1:
@@ -569,7 +586,7 @@ class Client(object):
         passed = self.check_duration(
             stream,
             duration=86400.,
-            receiver=receiver_to_str(kwargs['receiver'])
+            receiver=util.receiver.receiver_to_str(kwargs['receiver'])
         )
         return 1 if passed else -1
 
@@ -632,7 +649,8 @@ class Client(object):
 
         """
         # check if receiver SEED-id is valid
-        check_receiver(receiver, allow_wildcards=False, raise_error=True)
+        util.receiver.check_receiver(receiver, allow_wildcards=False,
+                                     raise_error=True)
 
         three_components = three_components or '12Z'
         assert three_components == '12Z' or three_components == 'NEZ', (
@@ -669,9 +687,9 @@ class Client(object):
             return Stream()
 
         if centered:
-            t0 = to_UTCDateTime(time) - duration/2
+            t0 = util.time.to_UTCDateTime(time) - duration/2
         else:
-            t0 = to_UTCDateTime(time)
+            t0 = util.time.to_UTCDateTime(time)
         t1 = t0 + duration
 
         st = xcorr_preprocess(
@@ -750,7 +768,7 @@ class Client(object):
 
         """
         # split
-        rA, rB = split_pair(pair)
+        rA, rB = util.receiver.split_pair(pair)
 
         # get streams per receiver
         stream = (
@@ -867,8 +885,12 @@ class Client(object):
         # get all receivers from pairs
         receivers = []
         for p in pairs_or_receivers:
-            receivers += split_pair(p, to_dict=False, substitute=substitute,
-                                    three_components=three_components)
+            receivers += util.receiver.split_pair(
+                p,
+                to_dict=False,
+                substitute=substitute,
+                three_components=three_components,
+            )
         receivers = sorted(list(set(receivers)))
 
         # time
@@ -948,7 +970,7 @@ class Client(object):
         verified = 0
 
         for receiver in status.receiver:
-            rec_dict = receiver_to_dict(str(receiver.values))
+            rec_dict = util.receiver.receiver_to_dict(str(receiver.values))
             for time in status.time:
                 if status.loc[{'receiver': receiver, 'time': time}] == 1:
                     continue
@@ -1086,7 +1108,9 @@ class Client(object):
         # get all receivers from pairs
         receivers = []
         for p in pairs_or_receivers:
-            receivers += split_pair(p, to_dict=False, substitute=False)
+            receivers += util.receiver.split_pair(
+                p, to_dict=False, substitute=False
+            )
         receivers = sorted(list(set(receivers)))
 
         # time

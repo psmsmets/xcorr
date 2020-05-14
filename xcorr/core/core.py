@@ -21,8 +21,9 @@ import os
 
 # Relative imports
 from ..version import version as __version__
-from ..clients import Client
-from .. import cc as correlate
+from ..client import Client
+from ..import cc as correlate
+from ..signal.unbias import unbias, get_weights
 from .. import util
 from ..preprocess import (
     hash_operations,
@@ -33,7 +34,8 @@ from ..preprocess import (
 )
 
 
-__all__ = ['init', 'read', 'write', 'merge', 'process', 'bias_correct']
+__all__ = ['init', 'validate', 'read', 'write', 'merge', 'mread',
+           'process', 'bias_correct']
 
 
 def init(
@@ -45,7 +47,7 @@ def init(
     stationary_poi: dict = None, hash_waveforms: bool = False,
 ):
     """
-    Initiate an xcorr N-D labeled data array.
+    Initiate an xcorr N-D labeled set of data arrays.
 
     Parameters
     ----------
@@ -113,7 +115,7 @@ def init(
     Returns
     -------
     dataset : :class:`xarray.Dataset`
-        The initiated `xcorr` N-D labeled data array.
+        The initiated `xcorr` N-D labeled set of data arrays.
 
     """
     # check
@@ -225,7 +227,7 @@ def init(
     # pair distance
     dataset['distance'] = (
         ('pair'),
-        np.ones((1), dtype=np.float64) * util.get_pair_distance(
+        np.ones((1), dtype=np.float64) * util.receiver.get_pair_distance(
             pair=pair,
             inventory=inventory,
             poi=stationary_poi,
@@ -327,7 +329,7 @@ def init(
     )
 
     if unbiased_cc:
-        dataset['w'] = get_weights(dataset.lag, dtype=dtype)
+        dataset['w'] = get_weights(dataset.lag)
 
     # add metadata hash
     dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
@@ -338,12 +340,10 @@ def init(
 
 
 def read(
-    path: str, extract: bool = False, load_and_close: bool = False,
-    fast: bool = False, quick_and_dirty: bool = False,
-    metadata_hash: str = None, verb: int = 0
+    path: str, extract: bool = False, verb: int = 0, **kwargs
 ):
     """
-    Read an xcorr N-D labeled data array from a netCDF4 file.
+    Open an xcorr N-D labeled set of data arrays from a netCDF4 file.
 
     Parameters
     ----------
@@ -354,8 +354,111 @@ def read(
         Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
 
-    load_and_close : `bool`, optional
-        Load file to memory and close if `True` (default).
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
+
+    Any additional keyword arguments will be passed to the :func:`validate`.
+
+    Returns
+    -------
+    dataset : :class:`xarray.Dataset`
+        The `xcorr` N-D labeled set of data arrays read from netCDF4.
+
+    """
+    # open if exists
+    if not os.path.isfile(path):
+
+        return None
+
+    # validate
+    dataset = validate(xr.open_dataset(path), verb=verb, **kwargs)
+
+    # verbose status
+    if verb > 0:
+
+        print('{s} #(status==1): {n} of {m}'.format(
+            s=dataset.encoding['source'],
+            n=np.sum(dataset.status.data == 1),
+            m=dataset.time.size,
+        ))
+
+    # missing/unprocessed to NaN
+    if extract:
+
+        dataset['cc'] = dataset.cc.where(dataset.status == 1)
+
+    return dataset
+
+
+def mread(
+    paths, extract: bool = False, parallel: bool = True, chunks=None, **kwargs
+):
+    """
+    Open multiple xcorr N-D labelled files as a single dataset using
+    :func:`xarray.open_mfdataset`.
+
+    Parameters
+    ----------
+    paths : `str` or sequence
+        Either a string glob in the form "path/to/my/files/*.nc" or an explicit
+        list of files to open. Paths can be given as strings or as pathlib
+        Paths.
+
+    extract : `bool`, optional
+        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
+        `True`. Defaults to `False`.
+
+    parallel : `bool`, optional
+
+    chunks : `int` or `dict` , optional
+        Dictionary with keys given by dimension names and values given by
+        chunk sizes. In general, these should divide the dimensions of each
+        dataset. If int, chunk each dimension by chunks. By default, chunks
+        will be chosen to load entire input files into memory at once. This
+        has a major impact on performance: see :func:`xarray.open_mfdataset`
+        for more details.
+
+    Any additional keyword arguments will be passed to the :func:`validate`.
+
+    Returns
+    -------
+    dataset : :class:`xarray.Dataset`
+        The `xcorr` N-D labeled set of data arrays read from netCDF4.
+
+    """
+
+    # validate wrapper to pass arguments
+    def _validate(ds):
+        return validate(ds, **kwargs)
+
+    # open multiple files using dask
+    dataset = xr.open_mfdataset(
+        paths,
+        combine='by_coords',
+        chunks=chunks,
+        data_vars='minimal',
+        join='outer',
+        parallel=parallel,
+        preprocess=_validate,
+    )
+
+    if extract:
+        dataset['cc'] = dataset.cc.where(dataset.status == 1)
+
+    return dataset
+
+
+def validate(
+    dataset: xr.Dataset, fast: bool = False, quick_and_dirty: bool = False,
+    metadata_hash: str = None, verb: int = 0
+):
+    """
+    Read an xcorr N-D labeled data array from a netCDF4 file.
+
+    Parameters
+    ----------
+    dataset : :class:`xarray.Dataset`
+        The `xcorr` N-D labeled set of data arrays to be validated.
 
     fast : `bool`, optional
         Omit verifying the `sha256_hash` if `True`. Default is `False`.
@@ -374,13 +477,9 @@ def read(
     Returns
     -------
     dataset : :class:`xarray.Dataset`
-        The initiated `xcorr` N-D labeled data array.
+        The validated `xcorr` N-D labeled set of data arrays.
 
     """
-    # open dataset if it exists
-    if not os.path.isfile(path):
-        return None
-    dataset = xr.open_dataset(path)
 
     # check existance of main attributes
     if (
@@ -390,11 +489,18 @@ def read(
     ):
         return None
 
+    # extract source
+    source = dataset.encoding['source']
+
     # Verify metadata_hash input
     if metadata_hash:
+
         if not isinstance(metadata_hash, str):
+
             raise TypeError('``metadata_hash`` should be a string.')
+
         if not len(metadata_hash) == 64:
+
             raise ValueError('``metadata_hash`` should be of length 64.')
 
     # convert preprocess operations
@@ -402,15 +508,21 @@ def read(
 
     # calculate some hashes
     if not quick_and_dirty:
+
         sha256_hash_metadata = util.hasher.hash_Dataset(
             dataset, metadata_only=True, debug=False
         )
+
         if sha256_hash_metadata != dataset.sha256_hash_metadata:
+
             warnings.warn(
-                'Dataset metadata sha256 hash is inconsistent.',
+                f'Dataset metadata sha256 hash in {source} is inconsistent.',
                 UserWarning
             )
+
             if verb > 1:
+
+                print('source :', source)
                 print(
                     'sha256 hash metadata in ncfile :',
                     dataset.sha256_hash_metadata
@@ -419,40 +531,37 @@ def read(
                     'sha256 hash metadata computed  :',
                     sha256_hash_metadata
                 )
+
+            return None
+
     if not (quick_and_dirty or fast):
+
         sha256_hash = util.hasher.hash_Dataset(
             dataset, metadata_only=False, debug=False
         )
+
         if sha256_hash != dataset.sha256_hash:
+
             warnings.warn(
-                'Dataset sha256 hash is inconsistent.',
+                f'Dataset sha256 hash in {source} is inconsistent.',
                 UserWarning
             )
+
             if verb > 1:
+
+                print('source :', source)
                 print('sha256 hash in ncfile :', dataset.sha256_hash)
                 print('sha256 hash computed  :', sha256_hash)
 
-    # verbose status
-    if verb > 0:
-        print('{p} #(status==1): {n} of {m}'.format(
-            p=path,
-            n=np.sum(dataset.status.data == 1),
-            m=dataset.time.size,
-        ))
+            return None
 
     # compare metadata_hash with template
     if metadata_hash:
+
         if dataset.sha256_hash_metadata is not metadata_hash:
+
             dataset.close()
             return None
-
-    # missing/unprocessed to NaN
-    if extract:
-        dataset['cc'] = dataset.cc.where(dataset.status == 1)
-
-    # push to memory and close
-    if load_and_close:
-        dataset.load().close()
 
     return dataset
 
@@ -471,7 +580,7 @@ def write(
     Parameters
     ----------
     dataset : :class:`xarray.Dataset`
-        The `xcorr` N-D labeled data array.
+        The `xcorr` N-D labeled set of data array.
 
     path : `str`
         The netCDF4 filename.
@@ -586,7 +695,7 @@ def merge(
     Returns
     -------
     datasets : :class:`xarray.Dataset`
-        The merged `xcorr` N-D labeled data array.
+        The merged `xcorr` N-D labeled set of data array.
 
     """
 
@@ -687,12 +796,12 @@ def process(
     verb: int = 1, **kwargs
 ):
     """
-    Process the xcorr N-D labeled data array.
+    Process the xcorr N-D labeled set of data arrays.
 
     Parameters
     ----------
     dataset: :class:`xarray.Dataset`
-        The data array to process.
+        The `xcorr` N-D labeled set of data arrays to process.
 
     client : :class:`xcorr.Client`
         The initiated client to the local and remote data archives.
@@ -729,6 +838,9 @@ def process(
         check_operations_hash(o, raise_error=True)
     else:
         o = operations_to_dict(dataset.pair.preprocess)
+
+    # check lag indices and update if necessary
+    util.time.update_lag_indices(dataset.lag)
 
     # hash?
     hash_waveforms = hash_waveforms and 'hash' in dataset.variables
@@ -850,9 +962,6 @@ def bias_correct(
     weight_var: `str`, optional
         The name of unbiased correlation weight variable. Defaults to 'w'.
 
-    verb : {0, 1, 2, 3, 4}, optional
-        Level of verbosity. Defaults to 0.
-
     """
     if dataset[biased_var].unbiased != 0:
         print('No need to bias correct again.')
@@ -862,24 +971,13 @@ def bias_correct(
     if weight_var not in dataset.data_vars:
         dataset[weight_var] = get_weights(dataset.lag, name=weight_var)
 
-    # create unbiased_var in dataset
-    if biased_var != unbiased_var:
-        dataset[unbiased_var] = dataset[biased_var].copy()
-    dataset[unbiased_var].data = (
-        dataset[unbiased_var] *
-        dataset[weight_var].astype(dataset[unbiased_var].dtype)
+    dataset[unbiased_var] = unbias(
+        x=dataset[biased_var],
+        w=dataset[weight_var],
+        name=unbiased_var
     )
 
-    # update attributes
-    dataset[unbiased_var].attrs['unbiased'] = np.byte(True)
-    dataset[unbiased_var].attrs['long_name'] = (
-        'Unbiased ' + dataset[unbiased_var].attrs['long_name']
-    )
-    dataset[unbiased_var].attrs['standard_name'] = (
-        'unbiased_' + dataset[unbiased_var].attrs['standard_name']
-    )
-
-    # update history
+    # update dataset history
     dataset.attrs['history'] += (
         ', Bias corrected CC @ {}'.format(pd.to_datetime('now'))
     )
@@ -887,39 +985,6 @@ def bias_correct(
     # update metadata hash
     dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
         dataset, metadata_only=True, debug=False
-    )
-
-
-def get_weights(
-    lag: xr.DataArray, name: str = 'w'
-):
-    """Construct the unbiased crosscorrelation weight vector from the lag vector.
-
-    Parameters
-    ----------
-    lag: :class:`xarray.DataArray`
-        The lag coordinate.
-
-    name : `str`, optional
-        Weight variable name. Defaults to 'w'.
-
-    Returns
-    -------
-       w : :class:`DataArray`
-           Unbiased crosscorrelation weight vector.
-
-    """
-    return xr.DataArray(
-        data=correlate.weight(
-            lag.attrs['npts'], pad=True
-        )[lag.attrs['index_min']:lag.attrs['index_max']],
-        dims=('lag'),
-        coords={'lag': lag},
-        name=name,
-        attrs={
-            'long_name': 'Unbiased CC estimate scale factor',
-            'units': '-',
-        }
     )
 
 

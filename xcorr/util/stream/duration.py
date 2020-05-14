@@ -1,7 +1,7 @@
 r"""
 
-:mod:`util.stream` -- Stream utilities
-======================================
+:mod:`util.stream.duration` -- Stream utilities
+===============================================
 
 Common stream methods.
 

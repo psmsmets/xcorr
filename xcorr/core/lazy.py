@@ -19,8 +19,8 @@ from dask.diagnostics import ProgressBar
 
 # Relative imports
 from ..core import core
-from ..clients.client import Client
-from ..util import ncfile, split_pair, get_pair_inventory
+from ..client import Client
+from .. import util
 
 
 __all__ = ['lazy_process']
@@ -47,7 +47,7 @@ def single_threaded_process(
     data = None
 
     # filename
-    nc = ncfile(pair, time, root)
+    nc = util.ncfile(pair, time, root)
 
     if not force_fresh:
         # open
@@ -131,14 +131,16 @@ def lazy_processes(
 
         # check preprocessing
         pair_preprocessing = preprocessing.loc[{
-            'receiver': split_pair(pair, substitute=False, to_dict=False),
+            'receiver': util.receiver.split_pair(pair, substitute=False,
+                                                 to_dict=False),
             'time': preprocessing.time[0],
         }] == 1
         preprocessing_passed = np.all(pair_preprocessing.values == 1)
         preprocessing_status = 'passed' if preprocessing_passed else 'failed'
 
         # substituted receivers
-        receivers = split_pair(pair, substitute=True, to_dict=False)
+        receivers = util.receiver.split_pair(pair, substitute=True,
+                                             to_dict=False)
 
         for time in times:
 
@@ -253,7 +255,7 @@ def lazy_process(
     client = Client(**client_args)
 
     # Read and filter inventory
-    inventory = get_pair_inventory(pairs, inventory, times)
+    inventory = util.receiver.get_pair_inventory(pairs, inventory, times)
 
     # minimize output to stdout in dask!
     warnings.filterwarnings("ignore")
