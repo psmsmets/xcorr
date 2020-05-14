@@ -3,7 +3,7 @@ r"""
 :mod:`signal.mask` -- Mask
 ==========================
 
-Construct a labeled mask array.
+Construct a labelled mask array.
 
 """
 
@@ -41,7 +41,7 @@ def mask(
     name: str = None, invert: bool = False, to_where: bool = False, **kwargs
 ):
     """
-    Construct a one-dimensional N-D labeled mask array.
+    Construct a one-dimensional N-D labelled mask array.
 
     Parameters
     ----------
@@ -115,7 +115,7 @@ def multi_mask(
     invert: bool = False, name: str = None
 ):
     """
-    Construct a two-dimensional N-D labeled mask array.
+    Construct a two-dimensional N-D labelled mask array.
 
     Parameters
     ----------

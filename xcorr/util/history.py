@@ -24,7 +24,7 @@ __all__ = ['historicize']
 
 def historicize(x: DataArray, f: str, a: dict = {}):
     r"""Append an applied function and its arguments to the history attrs of
-    an N-D labeled array of data.
+    an N-D labelled array of data.
 
     Parameters
     ----------

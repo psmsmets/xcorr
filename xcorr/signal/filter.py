@@ -3,7 +3,7 @@ r"""
 :mod:`signal.filter` -- Filter
 ==============================
 
-Filter an N-D labeled array of data.
+Filter an N-D labelled array of data.
 
 """
 
@@ -29,7 +29,7 @@ def filter(
     dim: str = 'lag', **kwargs
 ):
     """
-    Butterworth filter an N-D labeled array of data.
+    Butterworth filter an N-D labelled array of data.
 
     Implementation of :func:`scipy.signal.butter` and
     :func:`scipy.signal.sosfiltfilt` to a :class:`xarray.DataArray` using

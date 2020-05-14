@@ -4,7 +4,7 @@ r"""
 ========================
 
 Main functions of xcorr to init, process. bias_correct,
-read, write and merge N-D labeled arrays of data.
+read, write and merge N-D labelled arrays of data.
 
 """
 
@@ -47,7 +47,7 @@ def init(
     stationary_poi: dict = None, hash_waveforms: bool = False,
 ):
     """
-    Initiate an xcorr N-D labeled set of data arrays.
+    Initiate an xcorr N-D labelled set of data arrays.
 
     Parameters
     ----------
@@ -115,7 +115,7 @@ def init(
     Returns
     -------
     dataset : :class:`xarray.Dataset`
-        The initiated `xcorr` N-D labeled set of data arrays.
+        The initiated `xcorr` N-D labelled set of data arrays.
 
     """
     # check
@@ -343,7 +343,7 @@ def read(
     path: str, extract: bool = False, verb: int = 0, **kwargs
 ):
     """
-    Open an xcorr N-D labeled set of data arrays from a netCDF4 file.
+    Open an xcorr N-D labelled set of data arrays from a netCDF4 file.
 
     Parameters
     ----------
@@ -362,7 +362,7 @@ def read(
     Returns
     -------
     dataset : :class:`xarray.Dataset`
-        The `xcorr` N-D labeled set of data arrays read from netCDF4.
+        The `xcorr` N-D labelled set of data arrays read from netCDF4.
 
     """
     # open if exists
@@ -423,7 +423,7 @@ def mread(
     Returns
     -------
     dataset : :class:`xarray.Dataset`
-        The `xcorr` N-D labeled set of data arrays read from netCDF4.
+        The `xcorr` N-D labelled set of data arrays read from netCDF4.
 
     """
 
@@ -453,12 +453,12 @@ def validate(
     metadata_hash: str = None, verb: int = 0
 ):
     """
-    Read an xcorr N-D labeled data array from a netCDF4 file.
+    Read an xcorr N-D labelled data array from a netCDF4 file.
 
     Parameters
     ----------
     dataset : :class:`xarray.Dataset`
-        The `xcorr` N-D labeled set of data arrays to be validated.
+        The `xcorr` N-D labelled set of data arrays to be validated.
 
     fast : `bool`, optional
         Omit verifying the `sha256_hash` if `True`. Default is `False`.
@@ -477,7 +477,7 @@ def validate(
     Returns
     -------
     dataset : :class:`xarray.Dataset`
-        The validated `xcorr` N-D labeled set of data arrays.
+        The validated `xcorr` N-D labelled set of data arrays.
 
     """
 
@@ -571,7 +571,7 @@ def write(
     force_write: bool = False, verb: int = 1
 ):
     """
-    Write an xcorr N-D labeled data array to a netCDF4 file using a
+    Write an xcorr N-D labelled data array to a netCDF4 file using a
     temporary file and replacing the final destination.
 
     Before writing the dataset metadata and data hash hashes are verified and
@@ -580,7 +580,7 @@ def write(
     Parameters
     ----------
     dataset : :class:`xarray.Dataset`
-        The `xcorr` N-D labeled set of data array.
+        The `xcorr` N-D labelled set of data array.
 
     path : `str`
         The netCDF4 filename.
@@ -670,13 +670,13 @@ def merge(
     verb: int = 0, **kwargs
 ):
     """
-    Merge a list of xcorr N-D labeled data arrays.
+    Merge a list of xcorr N-D labelled data arrays.
 
     Parameters
     ----------
     datasets : `list`
         A list with either a `str` specifying the netCDF4 path or a
-        :class:`xarray.Dataset` containing the `xcorr` N-D labeled data array.
+        :class:`xarray.Dataset` containing the `xcorr` N-D labelled data array.
 
     extract : `bool`, optional
         Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
@@ -695,7 +695,7 @@ def merge(
     Returns
     -------
     datasets : :class:`xarray.Dataset`
-        The merged `xcorr` N-D labeled set of data array.
+        The merged `xcorr` N-D labelled set of data array.
 
     """
 
@@ -796,12 +796,12 @@ def process(
     verb: int = 1, **kwargs
 ):
     """
-    Process the xcorr N-D labeled set of data arrays.
+    Process the xcorr N-D labelled set of data arrays.
 
     Parameters
     ----------
     dataset: :class:`xarray.Dataset`
-        The `xcorr` N-D labeled set of data arrays to process.
+        The `xcorr` N-D labelled set of data arrays to process.
 
     client : :class:`xcorr.Client`
         The initiated client to the local and remote data archives.
@@ -945,7 +945,7 @@ def bias_correct(
     weight_var: str = 'w'
 ):
     """
-    Bias correct the xcorr N-D labeled data array.
+    Bias correct the xcorr N-D labelled data array.
 
     Parameters
     ----------

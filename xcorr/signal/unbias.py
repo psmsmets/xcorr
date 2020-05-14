@@ -3,7 +3,7 @@
 :mod:`signal.unbias` -- Unbias
 ==============================
 
-Bias correct an N-D labeled cc array of data.
+Bias correct an N-D labelled cc array of data.
 
 """
 
@@ -31,7 +31,7 @@ def unbias(
     x: xr.DataArray, w: xr.DataArray = None, dim: str = 'lag', name: str = None
 ):
     """
-    Bias correct the xcorr N-D labeled cc array of data.
+    Bias correct the xcorr N-D labelled cc array of data.
 
     Parameters
     ----------

@@ -3,7 +3,7 @@ r"""
 :mod:`signal.detrend` -- Detrend
 ================================
 
-Detrend an N-D labeled array of data.
+Detrend an N-D labelled array of data.
 
 """
 
@@ -29,7 +29,7 @@ def detrend(
     **kwargs
 ):
     """
-    Detrend an N-D labeled array of data.
+    Detrend an N-D labelled array of data.
 
     Implementation of :func:`scipy.signal.detrend` to a
     :class:`xarray.DataArray` using :func:`xarray.apply_ufunc`.
@@ -102,7 +102,7 @@ def detrend(
 
 
 def demean(x: xr.DataArray, dim: str = 'lag', **kwargs):
-    r"""Demean  an N-D labeled array of data.
+    r"""Demean  an N-D labelled array of data.
 
     Wrapper function for :func:`xcorr.signal.detrend` with arguments
     ``type``='constant' and ``bp``=0.

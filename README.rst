@@ -5,7 +5,7 @@ xcorr - xarray contained correlations
 
 **xcorr** is an open-source project existing of tools to crosscorrelate
 waveform timeseries (`obspy.Stream` objects) contained in a self-describing
-N-D labeled `xarray.Dataset` following CF-1.9 Conventions and FAIR data
+N-D labelled `xarray.Dataset` following CF-1.9 Conventions and FAIR data
 guidelines. Data and metadata can be stored as `netCDF4` and read/postprocessed
 in other languages, packages, machines or platforms.
 
@@ -26,11 +26,14 @@ Main xcorr features listed per submodule:
   Batch process crosscorrelations by ``lazy_process``: multithreading and lazy
   scheduling using `dask <https://dask.org>`_ after first verifying both data
   availability and preprocessing.
+  ``mread`` is a multi-file merge and read combining the `xcorr.read` with
+  `xarray.open_mfdataset` including **Dask** features like parallelization
+  and memory chunking.
 
-- **clients**: Load waveform data from a local SeisComP Data Structure (SDS)
+- **client**: Load waveform data from a local SeisComP Data Structure (SDS)
   archive and automatically download missing or incomplete waveforms by the
   FDSN web service and the `CTBTO <https://www.ctbto.org>`_ Verification Data
-  Messaging System (VDMS, via `nms_tools` wrapping the command line client).
+  Messaging System (VDMS, via `pyvdms` wrapping the command line client).
 
 - **preprocess**: Process waveforms before correlation given a dictionary with
   operations per channel id. Channel operations and parameters are added to the
@@ -40,18 +43,20 @@ Main xcorr features listed per submodule:
   unbiased `weight` vectors.
 
 - **signal**: Postprocess crosscorrelation estimates, or any `xarray.DataArray`
-  with a (lag) time dimension.
+  with a (lag) time dimension. Each signal routine is **Dask** capable for
+  large datasets.
 
   - ``detrend``: demean and linear detrend.
-  - ``mask``: mask coordinates of interest (one or two-dimensional).
   - ``filter``: time-domain filter using a forward-backward (zero-phase) digital
     butterworth filter by cascaded second-order sections.
-  - ``psd``: spectrogram.
-  - ``snr``: signal-to-noise ratio.
+  - ``mask``: mask coordinates of interest (one or two-dimensional).
   - ``rms``: root-mean-square.
+  - ``snr``: signal-to-noise ratio.
+  - ``spectrogram``: compute the power spectrogram (density or spectrum).
   - ``stack``: stack over a full time period, or grouped per day, month, year,
     year-day, year-month. 
   - ``taper``: apply a ``window`` to a dimension.
+  - ``unbias``: bias correct the correlation estimate.
   - ``window``: construct a taper window for a coordinate using any window of
     `scipy.signal.windows <https://docs.scipy.org/doc/scipy/reference/signal.windows.html>`_ 
     in an `obspy.Trace.taper <https://docs.obspy.org/master/packages/autogen/obspy.core.trace.Trace.taper.html>`_

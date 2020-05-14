@@ -7,7 +7,7 @@ from setuptools import setup, find_namespace_packages
 README = open('README.rst').read()
 README = re.sub('----.*marker', '----', README, flags=re.DOTALL)
 
-DESCRIPTION = 'Correlate timeseries in a self-describing N-D labeled dataset'
+DESCRIPTION = 'Correlate timeseries in a self-describing N-D labelled dataset'
 
 setup(
     name='xcorr',

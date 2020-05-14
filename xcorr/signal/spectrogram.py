@@ -3,7 +3,7 @@ r"""
 :mod:`signal.spectrogram` -- Spectrogram
 ========================================
 
-Generate a spectrogram of an N-D labeled array of data.
+Generate a spectrogram of an N-D labelled array of data.
 
 """
 
@@ -21,15 +21,15 @@ except ModuleNotFoundError:
 from ..util.history import historicize
 
 
-__all__ = ['psd']
+__all__ = ['spectrogram']
 
 
-def psd(
+def spectrogram(
     x: xr.DataArray, duration: float = None, padding_factor: int = 2,
-    dim: str = 'lag', **kwargs
+    scaling: str = None, dim: str = 'lag', **kwargs
 ):
     """
-    Compute an N-D labelaled spectrogram with consecutive Fourier transforms.
+    Compute an N-D labelled spectrogram with consecutive Fourier transforms.
 
     Implementation of :func:`scipy.signal.spectrogram` to a
     :class:`xarray.DataArray`.
@@ -52,6 +52,12 @@ def psd(
     padding_factor : `int`, optional
         Factor applied to duration, if a zero padded FFT is desired. If `None`,
         the FFT length is duration. Defaults to None. Default is 2.
+
+    scaling : {'density', 'spectrum'}, optional
+        Selects between computing the power spectral density (‘density’) where
+        ``y`` has units of V**2/Hz and computing the power spectrum
+        ('spectrum') where ``y`` has units of V**2, if ``x`` is measured in V.
+        Defaults to ‘density’.
 
     dim : `str`, optional
         The time coordinates name of ``x`` used to compute the spectrogram.
@@ -76,13 +82,23 @@ def psd(
         'Dimension has no attribute "{delta}"!'
     )
 
+    duration = duration if (
+        duration and duration > x[dim].delta
+    ) else x[dim].delta
+
     padding_factor = padding_factor if (
         padding_factor and padding_factor >= 1
     ) else 1
 
-    duration = duration if (
-        duration and duration > x[dim].delta
-    ) else x[dim].delta
+    scaling = scaling or 'density'
+    assert scaling in ['density', 'spectrum'], (
+        'Scaling should be either "density" or "spectrum"!'
+    )
+    if scaling == 'density':
+        units = f'{x[dim].units}-1'
+        units = f'{x.units}2 {units}' if x.units != '-' else units
+    else:
+        units = f'{x.units}2' if x.units != '-' else '-'
 
     sampling_rate = x[dim].attrs['sampling_rate']
 
@@ -107,7 +123,7 @@ def psd(
             nperseg=win_len,
             noverlap=win_len-1,
             nfft=nfft,
-            scaling='density',
+            scaling=scaling,
             mode='psd',
             axis=axis,
             **kwargs
@@ -149,7 +165,7 @@ def psd(
         'name': 'freq',
         'long_name': 'Frequency',
         'standard_name': 'frequency',
-        'units': 'Hz',
+        'units': f'{x[dim].units}-1',
     }
 
     # set attributes
@@ -158,9 +174,9 @@ def psd(
         **x.attrs,
         'long_name': 'Power Spectral Density',
         'standard_name': 'power_spectral_density',
-        'units': 'Hz**-1',
+        'units': units,
         'from_variable': x.name,
-        'scaling': 'density',
+        'scaling': scaling,
         'mode': 'psd',
         'duration': duration,
         'padding_factor': padding_factor,
@@ -173,6 +189,7 @@ def psd(
         'x': x.name,
         'duration': duration,
         'padding_factor': padding_factor,
+        'scaling': scaling,
         'dim': dim,
         '**kwargs': kwargs,
     })
@@ -180,12 +197,12 @@ def psd(
     return y
 
 
-def psd_f_t(
+def spectrogram_mtc(
     x: xr.DataArray, duration: float = None, padding_factor: int = None,
     overlap: float = None, dim: str = 'lag', **kwargs
 ):
     """
-    Compute an N-D labelaled spectrogram with consecutive Fourier transforms
+    Compute an N-D labelled spectrogram with consecutive Fourier transforms
     with manual time segment control.
 
     Implementation of :func:`scipy.signal.spectrogram` to a
@@ -202,7 +219,7 @@ def psd_f_t(
     Parameters
     ----------
     x : :class:`xarray.DataArray`
-        The array of data to be filtered.
+        The array of data for which to compute the spectrogram.
 
     duration : `float`
        The duration of each segment, in seconds.
@@ -224,6 +241,7 @@ def psd_f_t(
     -------
     y : :class:`xarray.DataArray`
         The computed spectrogram for ``x``.
+
     """
     assert dim in x.dims, (
         f'x has no dimension "{dim}"!'
