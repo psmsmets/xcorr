@@ -97,8 +97,12 @@ def spectrogram(
     if scaling == 'density':
         units = f'{x[dim].units}-1'
         units = f'{x.units}2 {units}' if x.units != '-' else units
+        long_name = 'Power Spectral Density'
+        standard_name = 'power_spectral_density'
     else:
         units = f'{x.units}2' if x.units != '-' else '-'
+        long_name = 'Power Spectrum'
+        standard_name = 'power_spectrum'
 
     sampling_rate = x[dim].attrs['sampling_rate']
 
@@ -172,8 +176,8 @@ def spectrogram(
     y.name = 'psd'
     y.attrs = {
         **x.attrs,
-        'long_name': 'Power Spectral Density',
-        'standard_name': 'power_spectral_density',
+        'long_name': long_name,
+        'standard_name': standard_name,
         'units': units,
         'from_variable': x.name,
         'scaling': scaling,
