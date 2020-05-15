@@ -568,20 +568,20 @@ def validate(
 
 
 def write(
-    dataset: xr.Dataset, path: str, close: bool = True,
+    data, path: str, close: bool = True,
     force_write: bool = False, verb: int = 1
 ):
     """
     Write an xcorr N-D labelled data array to a netCDF4 file using a
     temporary file and replacing the final destination.
 
-    Before writing the dataset metadata and data hash hashes are verified and
-    updated if necessary. This changes the dataset attributes in place.
+    Before writing the data, metadata and data hash hashes are verified and
+    updated if necessary. This changes the data attributes in place.
 
     Parameters
     ----------
-    dataset : :class:`xarray.Dataset`
-        The `xcorr` N-D labelled set of data array.
+    data : :class:`xarray.Dataset` or :class:`xarray.DataArray`
+        The `xcorr` N-D labelled data array or set of arrays.
 
     path : `str`
         The netCDF4 filename.
@@ -596,61 +596,74 @@ def write(
         Level of verbosity. Defaults to 1.
 
     """
-    if (
-        np.sum(dataset.status.data == 1) == 0 or
-        (np.sum(dataset.status.values == -1) == 0 and force_write)
-    ):
+    isdataset = isinstance(data, xr.Dataset)
+
+    if not (isdataset or isinstance(data, xr.DataArray)):
+        raise TypeError('data should be an xarray DataArray or Dataset.')
+
+    # metadata hash
+    metadata_hash = util.hasher.hash(data, metadata_only=True)
+
+    if 'sha256_hash_metadata' not in data.attrs:
+        data.attrs['sha256_hash_metadata'] = metadata_hash
+
+    if metadata_hash != data.attrs['sha256_hash_metadata']:
         warnings.warn(
-            'Dataset contains no data. No need to save it.',
+            'Data metadata sha256 hash is updated.',
             UserWarning
         )
-        return
 
-    # verify metadata hash
-    sha256_hash_metadata = (
-        util.hasher.hash_Dataset(dataset, metadata_only=True, debug=False)
-    )
-    if sha256_hash_metadata != dataset.sha256_hash_metadata:
-        warnings.warn(
-            'Dataset metadata sha256 hash is updated.',
-            UserWarning
-        )
-        dataset.attrs['sha256_hash_metadata'] = sha256_hash_metadata
+    # check status?
+    if isdataset and 'status' in data.variables:
 
-    if verb:
-        print('Write dataset as "{}"'.format(path), end=': ')
+        if (
+            np.sum(data.status.data == 1) == 0 or
+            (np.sum(data.status.values == -1) == 0 and force_write)
+        ):
+            warnings.warn(
+                'Dataset contains no data. No need to save it.',
+                UserWarning
+            )
+            return
+
+    # start verbose
+    if verb > 0:
+        print('Write data as "{}"'.format(path), end=': ')
 
     # folders and tmp name
     abspath, file = os.path.split(os.path.abspath(path))
+
     if not os.path.exists(abspath):
+
         os.makedirs(abspath)
+
     tmp = os.path.join(
         abspath,
         '{f}.{t}'.format(f=file, t=int(pd.to_datetime('now').timestamp()*1e3))
     )
 
-    # close dataset
+    # close data
     if close:
-        if verb:
+        if verb > 0:
             print('Close', end='. ')
-        dataset.close()
+        data.close()
 
-    # calculate dataset hash
-    if verb:
+    # calculate data hash
+    if verb > 0:
         print('Hash', end='. ')
-    dataset.attrs['sha256_hash'] = (
-        util.hasher.hash_Dataset(dataset, metadata_only=False, debug=False)
-    )
+    data.attrs['sha256_hash'] = util.hasher.hash(data, metadata_only=False)
 
     # convert preprocess operations
     if verb > 1:
         print('Operations to json.', end='. ')
-    preprocess_operations_to_json(dataset.pair)
+
+    if 'pair' in data.dims:
+        preprocess_operations_to_json(data.pair)
 
     # write to temporary file
-    if verb:
+    if verb > 0:
         print('To temporary netcdf', end='. ')
-    dataset.to_netcdf(path=tmp, mode='w', format='NETCDF4')
+    data.to_netcdf(path=tmp, mode='w', format='NETCDF4')
 
     # Replace file
     if verb:
@@ -660,9 +673,12 @@ def write(
     # convert preprocess operations
     if verb > 1:
         print('Operations to dict.', end='. ')
-    preprocess_operations_to_dict(dataset.pair)
 
-    if verb:
+    if 'pair' in data.dims:
+        preprocess_operations_to_dict(data.pair)
+
+    # final message
+    if verb > 0:
         print('Done.')
 
 

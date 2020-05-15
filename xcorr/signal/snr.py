@@ -57,7 +57,7 @@ def snr(
         'long_name': 'signal-to-noise ratio',
         'standard_name': 'signal_to_noise_ratio',
         'units': '-',
-        'from_variable': x.name,
+        'from_variable': f'{x.long_name} ({x.units})',
     }
     if 'history' in x.attrs:
         snr.attrs['history'] = x.history

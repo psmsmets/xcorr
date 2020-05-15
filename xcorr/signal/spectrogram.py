@@ -317,7 +317,6 @@ def spectrogram_mtc(
             'long_name': 'Power Spectral Density',
             'standard_name': 'power_spectral_density',
             'units': 'Hz**-1',
-            'from_variable': x.name,
             'scaling': 'density',
             'mode': 'psd',
             'duration': duration,
