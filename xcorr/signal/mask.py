@@ -166,16 +166,24 @@ def multi_mask(
     lower = get_scalar_value(lower) if lower else None
     upper = get_scalar_value(upper) if upper else None
 
+    # coord name from y
     d = y.dims[0]
-    m = []
-    for y0 in y:
-        m0 = mask(x, lower=lower, upper=upper, scalar=y0.values, invert=invert)
-        m.append(m0.assign_coords(coord=y0[d]))
 
-    m = xr.concat(m, dim=d)
+    # empty list of masks
+    m = []
+
+    # mask for each value in y
+    for y0 in y:
+
+        m0 = mask(x, lower=lower, upper=upper, scalar=y0.values, invert=invert)
+        m.append(m0.assign_coords({d: y0[d]}))
+
+    # concat masks and set attributes
+    m = xr.concat(m, dim=d, coords='minimal')
     m.name = f'mask_{x.name}_{y.name}'
     m.attrs.pop('history')
 
+    # track history
     historicize(m, f='multi_mask', a={
         'x': f'{x.name} ({x.dims[0]})',
         'y': f'{y.name} ({y.dims[0]})',

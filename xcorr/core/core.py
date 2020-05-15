@@ -17,6 +17,7 @@ import scipy
 import json
 import warnings
 import os
+from glob import glob
 
 
 # Relative imports
@@ -34,7 +35,7 @@ from ..preprocess import (
 )
 
 
-__all__ = ['init', 'validate', 'read', 'write', 'merge', 'mread',
+__all__ = ['init', 'validate', 'read', 'write', 'merge', 'mfread',
            'process', 'bias_correct']
 
 
@@ -390,7 +391,7 @@ def read(
     return dataset
 
 
-def mread(
+def mfread(
     paths, extract: bool = False, parallel: bool = True, chunks=None, **kwargs
 ):
     """
@@ -675,7 +676,7 @@ def merge(
     Parameters
     ----------
     datasets : `list`
-        A list with either a `str` specifying the netCDF4 path or a
+        A list with either a `str` specifying the path as a glob string or a
         :class:`xarray.Dataset` containing the `xcorr` N-D labelled data array.
 
     extract : `bool`, optional
@@ -699,11 +700,34 @@ def merge(
 
     """
 
-    # Todo: make a dask lazy load with open_mfdataset (less memory!)
+    valErr = 'Datasets should be either a list of paths or xarray datasets.'
 
+    # expand path list with glob
+    paths = []
+
+    for path in datasets:
+
+        if isinstance(path, str):
+
+            paths += glob(path)
+
+        elif isinstance(path, xr.Dataset):
+
+            if len(paths) > 0:
+
+                raise ValueError(valErr)
+
+        else:
+
+            raise ValueError(valErr)
+
+    datasets = sorted(paths) if paths else datasets
     dsets = None
+
     for ds in datasets:
+
         if isinstance(ds, str):
+
             if not os.path.isfile(ds):
                 warnings.warn(
                     'Datasets item "{}" does not exists. Item skipped.'
@@ -711,58 +735,71 @@ def merge(
                     UserWarning
                 )
                 continue
+
             ds = read(ds, extract=False, **kwargs)
-        elif isinstance(ds, xr.Dataset):
-            preprocess_operations_to_dict(ds.pair)
+
         else:
-            warnings.warn(
-                (
-                    'Datasets item should be of type `str` '
-                    'or :class:`xarray.DataSet`! Item skipped.'
-                ),
-                UserWarning
-            )
+
+            preprocess_operations_to_dict(ds.pair)
+
+        if not isinstance(ds, xr.Dataset):
+
             continue
+
         if verb > 1:
+
             print("\n# Open and inspect xcorr dataset:\n\n", ds, "\n")
 
-        if ds is False:
+        # set base dataset
+        if not isinstance(dsets, xr.Dataset):
+
+            dsets = ds.copy()
+
             continue
 
-        if not isinstance(dsets, xr.Dataset):
-            dsets = ds.copy()
+        # check before merging
+        if (
+            dsets.pair.attrs['preprocess']['sha256_hash'] !=
+            ds.pair.attrs['preprocess']['sha256_hash']
+        ):
+            warnings.warn(
+                'Dataset preprocess hash does not match. Item skipped.',
+                UserWarning
+            )
             continue
 
         if (
-            dsets.pair.preprocess['sha256_hash'] !=
-            ds.pair.preprocess['sha256_hash']
+            dsets.attrs['sha256_hash_metadata'] !=
+            ds.attrs['sha256_hash_metadata']
         ):
-            warnings.warn(
-                UserWarning
-            )
-            continue
-
-        if dsets.sha256_hash_metadata != ds.sha256_hash_metadata:
             warnings.warn(
                 'Dataset metadata hash does not match. Item skipped.',
                 UserWarning
             )
             continue
 
-        if dsets.xcorr_version != ds.xcorr_version and strict:
+        if (
+            dsets.attrs['xcorr_version'] != ds.attrs['xcorr_version'] and
+            strict
+        ):
             warnings.warn(
                 'Dataset xcorr_version does not match. Item skipped.',
                 UserWarning
             )
             continue
 
+        # try to merge
         try:
+
             dsets = dsets.merge(ds, join='outer')
+
         except xr.MergeError:
+
             warnings.warn(
                 'Dataset could not be merged. Item skipped.',
                 RuntimeWarning
             )
+
             continue
 
     # fix status dtype change

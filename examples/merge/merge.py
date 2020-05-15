@@ -6,82 +6,167 @@ xcorr signal.
 
 """
 
+import xarray as xr
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-import os
 import xcorr
 
 
 ###############################################################################
-# Merged results
+# Read and merge
 # --------------
 
 # results data root
-data = '../../data/results'
+root = '../../data/results'
 
-# filter to select data
-filt = ''
-
-# list of files
-ncfiles = []
-for root, dirs, files in os.walk(data):
-    path = root.split(os.sep)
-    for f in files:
-        if f[1] != '.' and f[-3:] == '.nc' and filt in f if filt else f:
-            ncfiles += [os.path.join(root, f)]
-
-# open merged list
-ds = xcorr.merge(sorted(ncfiles), extract=False, strict=False, fast=True)
+# get merged datasets using glob wildcards
+# returns radial and vertical components of RAR.10
+ds = xcorr.merge([f'{root}/*/*H10N1.*.RAR.10.BH?.2015.015.nc'], fast=True)
 assert ds, 'No data found!'
 
+# select a single time and receiver pair
+t = ds.time[0]
+p = ds.pair[-1]
+
+
 ###############################################################################
-# Signal
-# ------
+# Postprocessing
+# --------------
 
-# parameters
-vel = dict(min=1.46, max=1.50)
-filter_params = dict(frequency=3., btype='highpass', order=2, inplace=True)
-taper_params = dict(max_length=2/3., inplace=True)
-
-# apply signal processing
-xcorr.signal.filter(ds.cc, **filter_params)
-xcorr.signal.taper(ds.cc, **taper_params)
-xcorr.bias_correct(ds)
+ds['cc'] = xcorr.signal.filter(ds.cc, frequency=3., btype='highpass', order=2)
+ds['cc'] = xcorr.signal.taper(ds.cc, max_length=2/3.)
+ds['cc_w'] = xcorr.signal.unbias(ds.cc)
 
 
 ###############################################################################
 # Mask windows
 # ------------
 
-noise_mask = xcorr.signal.mask(
+# max valid domain
+valid_win = xcorr.signal.mask(
     x=ds.lag,
-    lower=6./24.,
-    upper=9./.24,
+    upper=9/.24,
     scalar=ds.time.window_length
 )
 
-signal_mask = xcorr.signal.multi_mask(
-    x=ds.lag, y=ds.distance,
-    lower=vel['min'], upper=vel['max'], invert=True,
+# noise
+noise_win = xcorr.signal.mask(
+    x=ds.lag,
+    lower=6./24.,
+    upper=9./24.,
+    scalar=ds.time.window_length
 )
+
+# signal
+vel = dict(min=1.46, max=1.50)
+signal_win = xcorr.signal.mask(
+    x=ds.lag,
+    lower=1/vel['max'],
+    upper=1/vel['min'],
+    scalar=ds.distance.values[0]
+)
+
+# some short-cuts
+pt = dict(pair=p, time=t)
+tn = dict(time=t, lag=ds.lag[noise_win])
+ts = dict(time=t, lag=ds.lag[signal_win])
+tv = dict(time=t, lag=ds.lag[valid_win])
+
+
+###############################################################################
+# Basic figures
+# -------------
+
+# default xarray plot settings
+plotset = dict(aspect=2.5, size=4)
+
+# (un)weighted cc.
+# Manual figure combining two dataArray variables.
+fig, ax = plt.subplots(ncols=1, nrows=1, figsize=[10, 4])
+line1, = xr.plot.line(ds.cc_w.loc[pt], x='lag', ax=ax)
+line2, = xr.plot.line(ds.cc.loc[pt], x='lag', ax=ax, _labels=False)
+plt.legend((line1, line2), ('unbiased', 'biased'))
+ax.set_ylabel('Crosscorrelation Estimate [-]')
+plt.tight_layout()
+plt.show()
+
+
+# line plot wrapper
+def lag_plot(var, prefix=''):
+    var.plot.line(x='lag', **plotset)
+    ax = plt.gca()
+    ax.set_title(f'{prefix} {ax.get_title()}'.strip())
+    plt.tight_layout()
+    plt.show()
+
+
+# valid window, weighted
+lag_plot(ds.cc_w.loc[tv], 'Valid window,')
+
+# signal window, weighted
+lag_plot(ds.cc_w.loc[ts], 'Signal window,')
+
+# noise window, weighted
+lag_plot(ds.cc_w.loc[tn], 'Noise window,')
+
+
+###############################################################################
+# Signal-to-noise ratio
+# ---------------------
+ds['snr'] = xcorr.signal.snr(x=ds.cc_w, signal=signal_win, noise=noise_win)
+
+# plot of snr values
+ds.snr.plot.line(x='time', hue='pair', marker='o', markersize=8, **plotset)
+plt.tight_layout()
+plt.show()
+
+
+# lag plot cc colour coded per receiver when snr >= snr_min
+def snr_lag_plot(ds, snr_min=0., var='cc_w', snr='snr', alpha=0.3):
+    fig, ax = plt.subplots(ncols=1, nrows=1, figsize=[10, 4])
+    lines = []
+    for p, c in zip(ds.pair,  mpl.rcParams['axes.prop_cycle']()):
+        snr_pass = ds[snr].loc[{'pair': p}] >= snr_min
+        if any(snr_pass):
+            for t in ds.time[snr_pass]:
+                line, = xr.plot.line(
+                    ds[var].loc[{
+                        'time': t,
+                        'lag': ds.lag[signal_win],
+                        'pair': p,
+                    }],
+                    x='lag', alpha=alpha, ax=ax, **c
+                )
+            lines.append((line, str(p.values)))
+    plt.legend(list(zip(*lines))[0], list(zip(*lines))[1])
+    ax.set_title(f'{snr} > {snr_min}')
+    plt.tight_layout()
+    plt.show()
+
+
+# plot each cc colour coded per receiver when snr >= 5.
+snr_lag_plot(ds, 5.)
+
 
 ###############################################################################
 # Signal-to-noise ratio
 # ---------------------
 
-# calculate snr
-ds['snr'] = xcorr.signal.snr(
-    ds.cc, signal=signal_mask, noise=noise_mask, dim='lag'
+# compute spectrogram for time t and signal window only
+psd = xcorr.signal.spectrogram(
+    ds.cc_w.loc[{'lag': ds.lag[signal_win], 'time': t}],
+    duration=2.,
+    padding_factor=4,
 )
 
-# default xarray plot settings
-plotset = dict(aspect=2.5, size=4)
-
-# plot snr
-ds.plot.scatter(x='time', y='snr', hue='pair', **plotset)
+# plot first pair
+plt.figure()
+psd.loc[{'pair': psd.pair[0]}].plot.imshow(x='lag')
 plt.tight_layout()
 plt.show()
 
-# plot snr
-ds.snr.plot.line(x='time', hue='pair', marker='o', markersize=10, **plotset)
+# plot second pair
+plt.figure()
+psd.loc[{'pair': psd.pair[1]}].plot.imshow(x='lag')
 plt.tight_layout()
 plt.show()

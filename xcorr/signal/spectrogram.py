@@ -111,7 +111,7 @@ def spectrogram(
 
     # static dimensions
     nfft = int(win_len * padding_factor)
-    edge = int(np.rint(win_len/2-1))
+    edge = int(np.rint(win_len/2))
 
     # expand x with frequency coordinate
     freq = np.linspace(0., sampling_rate/2, int(nfft/2 + 1))
@@ -130,6 +130,7 @@ def spectrogram(
             scaling=scaling,
             mode='psd',
             axis=axis,
+            return_onesided=True,
             **kwargs
         )
         # get basic shape (in loop for dask!)
@@ -176,10 +177,9 @@ def spectrogram(
     y.name = 'psd'
     y.attrs = {
         **x.attrs,
-        'long_name': long_name,
-        'standard_name': standard_name,
+        'long_name': f'{x.long_name} {long_name}',
+        'standard_name': f'{x.standard_name}_{standard_name}',
         'units': units,
-        'from_variable': x.name,
         'scaling': scaling,
         'mode': 'psd',
         'duration': duration,
