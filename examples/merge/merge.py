@@ -21,7 +21,7 @@ root = '../../data/results'
 
 # get merged datasets using glob wildcards
 # returns radial and vertical components of RAR.10
-ds = xcorr.merge([f'{root}/*/*H10N1.*.RAR.10.BH?.2015.015.nc'], fast=True)
+ds = xcorr.merge([f'{root}/*/*H03S1.*.RAR.10.BH?.2015.015.nc'], fast=True)
 assert ds, 'No data found!'
 
 # select a single time and receiver pair
@@ -122,7 +122,7 @@ plt.show()
 
 
 # lag plot cc colour coded per receiver when snr >= snr_min
-def snr_lag_plot(ds, snr_min=0., var='cc_w', snr='snr', alpha=0.3):
+def snr_lag_plot(ds, snr_min=0., var='cc_w', snr='snr', alpha=0.3, xlim=[]):
     fig, ax = plt.subplots(ncols=1, nrows=1, figsize=[10, 4])
     lines = []
     for p, c in zip(ds.pair,  mpl.rcParams['axes.prop_cycle']()):
@@ -141,11 +141,23 @@ def snr_lag_plot(ds, snr_min=0., var='cc_w', snr='snr', alpha=0.3):
     plt.legend(list(zip(*lines))[0], list(zip(*lines))[1])
     ax.set_title(f'{snr} > {snr_min}')
     plt.tight_layout()
+    if xlim:
+        plt.xlim(xlim)
     plt.show()
 
 
 # plot each cc colour coded per receiver when snr >= 5.
 snr_lag_plot(ds, 5.)
+
+# snr_lag_plot(ds, 5., xlim=[4920, 4950])
+# snr_lag_plot(ds, 5., xlim=[9475, 9525])
+# snr_lag_plot(ds, 5., xlim=[9490, 9500])
+
+# snr_lag_plot(ds, 5., xlim=[4924.5, 4930.5])
+# snr_lag_plot(ds, 5., xlim=[4929.5, 4935.5])
+# snr_lag_plot(ds, 5., xlim=[4934.5, 4940.5])
+# snr_lag_plot(ds, 5., xlim=[4939.5, 4945.5])
+# snr_lag_plot(ds, 5., xlim=[4944.5, 4950.5])
 
 
 ###############################################################################
@@ -159,14 +171,11 @@ psd = xcorr.signal.spectrogram(
     padding_factor=4,
 )
 
-# plot first pair
-plt.figure()
-psd.loc[{'pair': psd.pair[0]}].plot.imshow(x='lag')
-plt.tight_layout()
-plt.show()
-
-# plot second pair
-plt.figure()
-psd.loc[{'pair': psd.pair[1]}].plot.imshow(x='lag')
-plt.tight_layout()
-plt.show()
+for pair in psd.pair:
+    plt.figure()
+    psd.loc[{'pair': psd.pair[0]}].plot.imshow(x='lag')
+    # plt.xlim([4920, 4950])
+    # plt.xlim([9475, 9525])
+    plt.ylim([2, 12])
+    plt.tight_layout()
+    plt.show()

@@ -441,6 +441,7 @@ def mfread(
         join='outer',
         parallel=parallel,
         preprocess=_validate,
+        engine='netcdf4'
     )
 
     if extract:
