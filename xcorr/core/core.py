@@ -392,7 +392,8 @@ def read(
 
 
 def mfread(
-    paths, extract: bool = False, parallel: bool = True, chunks=None, **kwargs
+    paths, extract: bool = False, parallel: bool = True, chunks=None,
+    engine:str = None, **kwargs
 ):
     """
     Open multiple xcorr N-D labelled files as a single dataset using
@@ -419,6 +420,9 @@ def mfread(
         has a major impact on performance: see :func:`xarray.open_mfdataset`
         for more details.
 
+    engine : `str`, optional
+        File engine. Defaults to 'netcdf4'.
+
     Any additional keyword arguments will be passed to the :func:`validate`.
 
     Returns
@@ -441,7 +445,8 @@ def mfread(
         join='outer',
         parallel=parallel,
         preprocess=_validate,
-        engine='netcdf4'
+        engine=engine,
+        lock=False,
     )
 
     if extract:
@@ -490,6 +495,15 @@ def validate(
         'sha256_hash' not in dataset.attrs
     ):
         return None
+
+    # encode cf
+    dataset = xr.decode_cf(
+        dataset,
+        concat_characters=True,
+        mask_and_scale=True,
+        decode_times=True,
+        decode_coords=True
+    )
 
     # extract source
     source = dataset.encoding['source']
@@ -664,7 +678,7 @@ def write(
     # write to temporary file
     if verb > 0:
         print('To temporary netcdf', end='. ')
-    data.to_netcdf(path=tmp, mode='w', format='NETCDF4')
+    data.to_netcdf(path=tmp, mode='w', format='NETCDF4', compute=True)
 
     # Replace file
     if verb:
