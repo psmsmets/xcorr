@@ -435,7 +435,8 @@ def mfread(
 
     """
 
-    validated = validate_list(paths, keep_opened=False, **kwargs)
+    # get a list of validated datasets
+    validated = validate_list(paths, keep_opened=False, paths_only=True, **kwargs)
 
     # validate wrapper to pass arguments
     def _validate(ds):
@@ -516,7 +517,7 @@ def validate(
 
     Returns
     -------
-    dataset : :class:`xarray.Dataset`
+    validated : :class:`xarray.Dataset`
         The validated `xcorr` N-D labelled set of data arrays.
 
     """
@@ -645,6 +646,129 @@ def validate(
     return dataset
 
 
+def validate_list(
+    datasets, strict: bool = False, keep_opened: bool = False,
+    paths_only: bool = False, verb: int = 0, **kwargs
+):
+    """
+    Validate a list of xcorr N-D labelled datasets.
+
+    Parameters
+    ----------
+    datasets : `str` or `list`
+        A glob string, or a list of either glob strings or a
+        :class:`xr.Dataset` containing the `xcorr` N-D labelled data arrays.
+
+    extract : `bool`, optional
+        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
+        `True`. Defaults to `False`.
+
+    strict : `bool`, optional
+        If `True`, do not merge data arrays with different `xcorr` versions.
+        Defaults to `False`.
+
+    keep_opened : `bool`, optional
+        If `True`, do not close the file after opening. Defaults to `False`.
+
+    paths_only : `bool`, optional
+        If `True`, ``datasets`` can only be glob strings. Defaults to `False`.
+
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
+
+    Any additional keyword arguments will be passed to :func:`validate`.
+
+    Returns
+    -------
+    validated : :class:`xarray.Dataset`
+        The validated list of `xcorr` N-D labelled sets of data arrays.
+        If ``datasets`` was a glob string the expanded file list is returned.
+
+    """
+
+    valErr = ('Datasets should either be a list of paths or xarray.Dataset '
+              '(when paths_only is False) but not both.')
+
+    if isinstance(datasets, str):
+        datasets = [datasets]
+
+    assert isinstance(datasets, list), (
+        'datasets should be either a string or a list.'
+    )
+
+    # expand path list with glob
+    paths = []
+
+    for path in datasets:
+
+        if isinstance(path, str):
+
+            paths += glob(path)
+
+        elif isinstance(path, xr.Dataset):
+
+            if len(paths) > 0 or paths_only:
+
+                raise ValueError(valErr)
+
+        else:
+
+            raise ValueError(valErr)
+
+    paths = sorted(paths) if paths else datasets
+    validated = []
+    validate_args = dict()
+
+    # loop over datasets (dask delayed option?!)
+    for ds in paths:
+
+        isFile = False
+
+        if isinstance(ds, str):
+
+            if not os.path.isfile(ds):
+
+                if verb > 0:
+                    warnings.warn(f'Datasets item "{ds}" does not exists.',
+                                  UserWarning)
+
+                continue
+
+            isFile = True
+            ds = xr.open_dataset(ds)
+
+        # validate dataset
+        ds = validate(ds, verb=verb, **validate_args, **kwargs)
+
+        if not isinstance(ds, xr.Dataset):
+
+            continue
+
+        # update validate arguments
+        if not validate_args:
+
+            validate_args['metadata_hash'] = ds.attrs['sha256_hash_metadata']
+            validate_args['preprocess_hash'] = (
+                ds.pair.attrs['preprocess']['sha256_hash']
+            )
+
+            if strict:
+
+                validate_args['xcorr_version'] = ds.attrs['xcorr_version']
+
+        # close file if openend
+        if isFile and not keep_opened:
+
+            ds.close()
+            validated.append(ds.encoding['source'])
+
+        else:
+
+            validated.append(ds)
+
+    return validated
+
+
 def write(
     data, path: str, close: bool = True,
     force_write: bool = False, compute: bool = True, verb: int = 1
@@ -771,122 +895,6 @@ def write(
         print('Done.')
 
     return delayed_obj if not compute else None
-
-
-def validate_list(
-    datasets, strict: bool = False, keep_opened: bool = False, verb: int = 0,
-    **kwargs
-):
-    """
-    Validate a list of xcorr N-D labelled datasets.
-
-    Parameters
-    ----------
-    datasets : `str` or `list`
-        A glob string, or a list of either glob strings or a
-        :class:`xr.Dataset` containing the `xcorr` N-D labelled data arrays.
-
-    extract : `bool`, optional
-        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
-        `True`. Defaults to `False`.
-
-    strict : `bool`, optional
-        If `True`, do not merge data arrays with different `xcorr` versions.
-        Defaults to `False`.
-
-    verb : {0, 1, 2, 3, 4}, optional
-        Level of verbosity. Defaults to 0.
-
-    Any additional keyword arguments will be passed to :func:`validate`.
-
-    Returns
-    -------
-    validated : :class:`xarray.Dataset`
-        The validated list of `xcorr` N-D labelled sets of data arrays.
-        If ``datasets`` was a glob string the expanded file list is returned.
-
-    """
-
-    valErr = 'Datasets should be either a list of paths or xarray datasets.'
-
-    if isinstance(datasets, str):
-        datasets = [datasets]
-
-    assert isinstance(datasets, list), (
-        'datasets should be either a string or a list.'
-    )
-
-    # expand path list with glob
-    paths = []
-
-    for path in datasets:
-
-        if isinstance(path, str):
-
-            paths += glob(path)
-
-        elif isinstance(path, xr.Dataset):
-
-            if len(paths) > 0:
-
-                raise ValueError(valErr)
-
-        else:
-
-            raise ValueError(valErr)
-
-    datasets = sorted(paths) if paths else datasets
-    validated = []
-    validate_args = dict()
-
-    # loop over datasets (dask delayed option?!)
-    for ds in datasets:
-
-        isFile = False
-
-        if isinstance(ds, str):
-
-            if not os.path.isfile(ds):
-
-                if verb > 0:
-                    warnings.warn(f'Datasets item "{ds}" does not exists.',
-                                  UserWarning)
-
-                continue
-
-            isFile = True
-            ds = xr.open_dataset(ds)
-
-        # validate dataset
-        ds = validate(ds, verb=verb, **validate_args, **kwargs)
-
-        if not isinstance(ds, xr.Dataset):
-
-            continue
-
-        # update validate arguments
-        if not validate_args:
-
-            validate_args['metadata_hash'] = ds.attrs['sha256_hash_metadata']
-            validate_args['preprocess_hash'] = (
-                ds.pair.attrs['preprocess']['sha256_hash']
-            )
-
-            if strict:
-
-                validate_args['xcorr_version'] = ds.attrs['xcorr_version']
-
-        # close file if openend
-        if isFile and not keep_opened:
-
-            ds.close()
-            validated.append(ds.encoding['source'])
-
-        else:
-
-            validated.append(ds)
-
-    return validated
 
 
 def merge(
