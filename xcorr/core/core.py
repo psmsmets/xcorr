@@ -974,7 +974,8 @@ def merge(
 
     """
 
-    validated = validate_list(datasets, verb=verb, keep_opened=True, **kwargs)
+    validated = validate_list(datasets, verb=verb, keep_opened=True,
+                              parallel=False, **kwargs)
 
     dsets = xr.combine_by_coords(validated, data_vars='minimal', join='outer')
 
