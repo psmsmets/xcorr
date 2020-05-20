@@ -524,6 +524,10 @@ def validate(
 
     """
 
+    # cannot be empty
+    if not isinstance(dataset, xr.Dataset):
+        return None
+
     # check existance of main attributes
     if (
         'xcorr_version' not in dataset.attrs or
@@ -650,8 +654,8 @@ def validate(
 
 def validate_list(
     datasets, strict: bool = False, parallel: bool = True,
-    keep_opened: bool = False, paths_only: bool = False, verb: int = 0,
-    compute_args: dict = {}, **kwargs
+    keep_opened: bool = False, paths_only: bool = False,
+    compute: bool = True, compute_args: dict = {}, verb: int = 0, **kwargs
 ):
     """
     Validate a list of xcorr N-D labelled datasets.
@@ -666,14 +670,21 @@ def validate_list(
         If `True`, do not merge data arrays with different `xcorr` versions.
         Defaults to `False`.
 
-    parallel : `bool`, optional
-        Enabled parallellization if `True` (defaults). Requires Dask.
-
     keep_opened : `bool`, optional
         If `True`, do not close the file after opening. Defaults to `False`.
 
     paths_only : `bool`, optional
         If `True`, ``datasets`` can only be glob strings. Defaults to `False`.
+
+    parallel : `bool`, optional
+        Enabled parallellization if `True` (default). Requires Dask.
+
+    compute : `bool`, optional
+        Execute Dask compute if `True` (default) and ``parallel`` is enabled.
+        Otherwise the delayed object is returned.
+
+    compute_args : `dict`, optional
+        Provide a dictionary with arguments for Dask compute.
 
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
@@ -724,7 +735,7 @@ def validate_list(
     sources = sorted(sources) if isFile else datasets
     validated = []
 
-    # get wrapper
+    # get dataset wrapper
     def get_dataset(source):
 
         if not isFile:
@@ -740,23 +751,21 @@ def validate_list(
 
         return xr.open_dataset(source)
 
-    # add wrapper
-    def add_dataset(ds):
+    # get output wrapper
+    def get_output(ds):
 
         if not isinstance(ds, xr.Dataset):
 
-            return False
+            return None
 
         if isFile and not keep_opened:
 
             ds.close()
-            validated.append(ds.encoding['source'])
+            return ds.encoding['source']
 
         else:
 
-            validated.append(ds)
-
-        return True
+            return ds
 
     # find first validated dataset
     for i, source in enumerate(sources):
@@ -777,7 +786,7 @@ def validate_list(
             break
 
     # append first valid ds
-    total = int(add_dataset(ds))
+    validated.append(get_output(ds))
 
     # set validate args based on first valid ds
     validate_args = {
@@ -786,37 +795,25 @@ def validate_list(
         'xcorr_version': ds.attrs['xcorr_version'] if strict else None,
     }
 
-    # add valid wrapper
-    def add_valid_dataset(source):
-
-        ds = get_dataset(source)
-
-        if not isinstance(ds, xr.Dataset):
-
-            return False
-
-        ds = validate(ds, verb=verb, **validate_args, **kwargs)
-
-        return add_dataset(ds)
-
     if parallel:
-
-        def inc(total, source):
-            return total + int(add_valid_dataset(source))
 
         for source in sources[i+1:]:
 
-            total = dask.delayed(inc)(total, source)
+            ds = dask.delayed(get_dataset)(source)
+            ds = dask.delayed(validate)(ds, **validate_args, **kwargs)
+            validated.append(dask.delayed(get_output)(ds))
 
-        total = dask.compute(total, **compute_args)[0]
+        if compute:
+
+            validated = dask.compute(validated, **compute_args)
 
     else:
 
         for source in sources[i+1:]:
 
-            total += int(add_valid_dataset(total))
-
-    assert len(validated) == total, 'Validated list does not match total.'
+            ds = get_dataset(source)
+            ds = validate(ds, **validate_args, **kwargs)
+            validated.append(get_output(ds))
 
     return validated
 
