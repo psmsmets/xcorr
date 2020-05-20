@@ -18,6 +18,10 @@ import json
 import warnings
 import os
 from glob import glob
+try:
+    import dask
+except ModuleNotFoundError:
+    dask = False
 
 
 # Relative imports
@@ -35,8 +39,8 @@ from ..preprocess import (
 )
 
 
-__all__ = ['init', 'validate', 'read', 'write', 'merge', 'mfread',
-           'process', 'bias_correct']
+__all__ = ['init', 'read', 'write', 'merge', 'mfread', 'process',
+           'bias_correct']
 
 
 def init(
@@ -383,9 +387,8 @@ def read(
             m=dataset.time.size,
         ))
 
-    # missing/unprocessed to NaN
+    # extract valid data
     if extract:
-
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
 
     return dataset
@@ -393,7 +396,7 @@ def read(
 
 def mfread(
     paths, extract: bool = False, parallel: bool = True, chunks=None,
-    engine:str = None, **kwargs
+    engine: str = None, **kwargs
 ):
     """
     Open multiple xcorr N-D labelled files as a single dataset using
@@ -432,13 +435,15 @@ def mfread(
 
     """
 
+    validated = validate_list(paths, keep_opened=False, **kwargs)
+
     # validate wrapper to pass arguments
     def _validate(ds):
-        return validate(ds, **kwargs)
+        return validate(ds, quick_and_dirty=True)
 
     # open multiple files using dask
     dataset = xr.open_mfdataset(
-        paths,
+        validated,
         combine='by_coords',
         chunks=chunks,
         data_vars='minimal',
@@ -449,15 +454,31 @@ def mfread(
         lock=False,
     )
 
+    # extract valid data
     if extract:
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
+
+    # update some global attrs
+    del dataset.attrs['sha256_hash']
+
+    strt0 = pd.to_datetime(dataset.time.values[0]).strftime('%Y.%j')
+    strt1 = pd.to_datetime(dataset.time.values[-1]).strftime('%Y.%j')
+    dataset.attrs['title'] = (
+        (dataset.attrs['title']).split(' - ')[0] +
+        ' - ' +
+        strt0 +
+        ' to {}'.format(strt1) if strt0 != strt1 else ''
+    ).strip()
+
+    dataset.attrs['history'] = 'Merged @ {}'.format(pd.to_datetime('now'))
 
     return dataset
 
 
 def validate(
     dataset: xr.Dataset, fast: bool = False, quick_and_dirty: bool = False,
-    metadata_hash: str = None, verb: int = 0
+    metadata_hash: str = None, preprocess_hash: str = None,
+    xcorr_version: str = None, verb: int = 0
 ):
     """
     Read an xcorr N-D labelled data array from a netCDF4 file.
@@ -477,6 +498,18 @@ def validate(
     metadata_hash : `str`, optional
         Provide a template metadata sha256 hash to filter data arrays.
         A mismatch in ``dataset.sha256_hash_metadata`` will return `None`.
+        Defaults to `None`.
+
+    preprocess_hash : `str`, optional
+        Provide a template pair preprocess sha256 hash to filter data arrays.
+        A mismatch in ``dataset.pair.attrs['preprocess']['sha256_hash']`` will
+        return `None`.
+        Defaults to `None`.
+
+    xcorr_version : `str`, optional
+        Provide a template xcorr version number to filter data arrays.
+        A mismatch in ``dataset.xcorr_version`` will return `None`.
+        Defaults to `None`.
 
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
@@ -494,19 +527,12 @@ def validate(
         'sha256_hash_metadata' not in dataset.attrs or
         'sha256_hash' not in dataset.attrs
     ):
+        dataset.close()
         return None
 
-    # encode cf
-    dataset = xr.decode_cf(
-        dataset,
-        concat_characters=True,
-        mask_and_scale=True,
-        decode_times=True,
-        decode_coords=True
-    )
-
     # extract source
-    source = dataset.encoding['source']
+    src = (dataset.encoding['source'] if 'source' in dataset.encoding
+           else '[memory]')
 
     # Verify metadata_hash input
     if metadata_hash:
@@ -518,6 +544,16 @@ def validate(
         if not len(metadata_hash) == 64:
 
             raise ValueError('``metadata_hash`` should be of length 64.')
+
+    # check if at least pair and time variables exist
+    if not ('pair' in dataset.coords and 'time' in dataset.coords):
+
+        if verb > 0:
+            warnings.warn('Dataset contains no pair and time coordinate.',
+                          UserWarning)
+
+        dataset.close()
+        return None
 
     # convert preprocess operations
     preprocess_operations_to_dict(dataset.pair)
@@ -531,14 +567,16 @@ def validate(
 
         if sha256_hash_metadata != dataset.sha256_hash_metadata:
 
-            warnings.warn(
-                f'Dataset metadata sha256 hash in {source} is inconsistent.',
-                UserWarning
-            )
+            if verb > 0:
+
+                warnings.warn(
+                    f'Dataset metadata sha256 hash in {src} is inconsistent.',
+                    UserWarning
+                )
 
             if verb > 1:
 
-                print('source :', source)
+                print('source :', src)
                 print(
                     'sha256 hash metadata in ncfile :',
                     dataset.sha256_hash_metadata
@@ -558,33 +596,58 @@ def validate(
 
         if sha256_hash != dataset.sha256_hash:
 
-            warnings.warn(
-                f'Dataset sha256 hash in {source} is inconsistent.',
-                UserWarning
-            )
+            if verb > 0:
+
+                warnings.warn(f'Dataset sha256 hash in {src} is inconsistent.',
+                              UserWarning)
 
             if verb > 1:
 
-                print('source :', source)
+                print('source :', src)
                 print('sha256 hash in ncfile :', dataset.sha256_hash)
                 print('sha256 hash computed  :', sha256_hash)
 
             return None
 
     # compare metadata_hash with template
-    if metadata_hash:
+    if metadata_hash and dataset.sha256_hash_metadata != metadata_hash:
 
-        if dataset.sha256_hash_metadata is not metadata_hash:
+        if verb > 0:
+            warnings.warn('Dataset metadata hash does not match.',
+                          UserWarning)
 
-            dataset.close()
-            return None
+        dataset.close()
+        return None
+
+    # compare preprocess_hash with template
+    if (
+        preprocess_hash and
+        dataset.pair.attrs['preprocess']['sha256_hash'] != preprocess_hash
+    ):
+
+        if verb > 0:
+            warnings.warn('Dataset preprocess hash does not match.',
+                          UserWarning)
+
+        dataset.close()
+        return None
+
+    # compare xcorr_version with template
+    if xcorr_version and dataset.xcorr_version != xcorr_version:
+
+        if verb > 0:
+            warnings.warn('Dataset xcorr version does not match.',
+                          UserWarning)
+
+        dataset.close()
+        return None
 
     return dataset
 
 
 def write(
     data, path: str, close: bool = True,
-    force_write: bool = False, verb: int = 1
+    force_write: bool = False, compute: bool = True, verb: int = 1
 ):
     """
     Write an xcorr N-D labelled data array to a netCDF4 file using a
@@ -607,8 +670,15 @@ def write(
     force_write : `bool`, optional
         Always write file if `True` even if its empty. Default is `False`.
 
+    compute : `bool`, optional
+        If `False`, return a dask.delayed object that can be computed later.
+        Defaults to `True`.
+
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 1.
+
+    Any additional keyword arguments will be passed to
+    :func:`xarray.to_netcdf`.
 
     """
     isdataset = isinstance(data, xr.Dataset)
@@ -618,6 +688,9 @@ def write(
 
     # metadata hash
     metadata_hash = util.hasher.hash(data, metadata_only=True)
+
+    # no verbose on delayed
+    verb = 0 if not compute else verb
 
     if 'sha256_hash_metadata' not in data.attrs:
         data.attrs['sha256_hash_metadata'] = metadata_hash
@@ -678,7 +751,8 @@ def write(
     # write to temporary file
     if verb > 0:
         print('To temporary netcdf', end='. ')
-    data.to_netcdf(path=tmp, mode='w', format='NETCDF4', compute=True)
+    delayed_obj = data.to_netcdf(path=tmp, mode='w', format='netcdf4',
+                                 compute=compute)
 
     # Replace file
     if verb:
@@ -696,19 +770,21 @@ def write(
     if verb > 0:
         print('Done.')
 
+    return delayed_obj if not compute else None
 
-def merge(
-    datasets: list, extract: bool = True, strict: bool = False,
-    verb: int = 0, **kwargs
+
+def validate_list(
+    datasets, strict: bool = False, keep_opened: bool = False, verb: int = 0,
+    **kwargs
 ):
     """
-    Merge a list of xcorr N-D labelled data arrays.
+    Validate a list of xcorr N-D labelled datasets.
 
     Parameters
     ----------
-    datasets : `list`
-        A list with either a `str` specifying the path as a glob string or a
-        :class:`xarray.Dataset` containing the `xcorr` N-D labelled data array.
+    datasets : `str` or `list`
+        A glob string, or a list of either glob strings or a
+        :class:`xr.Dataset` containing the `xcorr` N-D labelled data arrays.
 
     extract : `bool`, optional
         Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
@@ -721,17 +797,24 @@ def merge(
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
 
-    **kwargs :
-        Additional parameters provided to :func:`read`.
+    Any additional keyword arguments will be passed to :func:`validate`.
 
     Returns
     -------
-    datasets : :class:`xarray.Dataset`
-        The merged `xcorr` N-D labelled set of data array.
+    validated : :class:`xarray.Dataset`
+        The validated list of `xcorr` N-D labelled sets of data arrays.
+        If ``datasets`` was a glob string the expanded file list is returned.
 
     """
 
     valErr = 'Datasets should be either a list of paths or xarray datasets.'
+
+    if isinstance(datasets, str):
+        datasets = [datasets]
+
+    assert isinstance(datasets, list), (
+        'datasets should be either a string or a list.'
+    )
 
     # expand path list with glob
     paths = []
@@ -753,94 +836,97 @@ def merge(
             raise ValueError(valErr)
 
     datasets = sorted(paths) if paths else datasets
-    dsets = None
+    validated = []
+    validate_args = dict()
 
+    # loop over datasets (dask delayed option?!)
     for ds in datasets:
+
+        isFile = False
 
         if isinstance(ds, str):
 
             if not os.path.isfile(ds):
-                warnings.warn(
-                    'Datasets item "{}" does not exists. Item skipped.'
-                    .format(ds),
-                    UserWarning
-                )
+
+                if verb > 0:
+                    warnings.warn(f'Datasets item "{ds}" does not exists.',
+                                  UserWarning)
+
                 continue
 
-            ds = read(ds, extract=False, **kwargs)
+            isFile = True
+            ds = xr.open_dataset(ds)
 
-        else:
-
-            preprocess_operations_to_dict(ds.pair)
+        # validate dataset
+        ds = validate(ds, verb=verb, **validate_args, **kwargs)
 
         if not isinstance(ds, xr.Dataset):
 
             continue
 
-        if verb > 1:
+        # update validate arguments
+        if not validate_args:
 
-            print("\n# Open and inspect xcorr dataset:\n\n", ds, "\n")
-
-        # set base dataset
-        if not isinstance(dsets, xr.Dataset):
-
-            dsets = ds.copy()
-
-            continue
-
-        # check before merging
-        if (
-            dsets.pair.attrs['preprocess']['sha256_hash'] !=
-            ds.pair.attrs['preprocess']['sha256_hash']
-        ):
-            warnings.warn(
-                'Dataset preprocess hash does not match. Item skipped.',
-                UserWarning
-            )
-            continue
-
-        if (
-            dsets.attrs['sha256_hash_metadata'] !=
-            ds.attrs['sha256_hash_metadata']
-        ):
-            warnings.warn(
-                'Dataset metadata hash does not match. Item skipped.',
-                UserWarning
-            )
-            continue
-
-        if (
-            dsets.attrs['xcorr_version'] != ds.attrs['xcorr_version'] and
-            strict
-        ):
-            warnings.warn(
-                'Dataset xcorr_version does not match. Item skipped.',
-                UserWarning
-            )
-            continue
-
-        # try to merge
-        try:
-
-            dsets = dsets.merge(ds, join='outer')
-
-        except xr.MergeError:
-
-            warnings.warn(
-                'Dataset could not be merged. Item skipped.',
-                RuntimeWarning
+            validate_args['metadata_hash'] = ds.attrs['sha256_hash_metadata']
+            validate_args['preprocess_hash'] = (
+                ds.pair.attrs['preprocess']['sha256_hash']
             )
 
-            continue
+            if strict:
 
-    # fix status dtype change
-    dsets['status'] = dsets.status.astype(np.byte)
+                validate_args['xcorr_version'] = ds.attrs['xcorr_version']
+
+        # close file if openend
+        if isFile and not keep_opened:
+
+            ds.close()
+            validated.append(ds.encoding['source'])
+
+        else:
+
+            validated.append(ds)
+
+    return validated
+
+
+def merge(
+    datasets: list, extract: bool = True, verb: int = 0, **kwargs
+):
+    """
+    Merge a list of xcorr N-D labelled data arrays.
+
+    Parameters
+    ----------
+    datasets : `list`
+        A list with either a `str` specifying the path as a glob string or a
+        :class:`xarray.Dataset` containing the `xcorr` N-D labelled data array.
+
+    extract : `bool`, optional
+        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
+        `True`. Defaults to `False`.
+
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 0.
+
+    Any additional keyword arguments will be passed to :func:`validate_list`.
+
+    Returns
+    -------
+    datasets : :class:`xarray.Dataset`
+        The merged `xcorr` N-D labelled set of data array.
+
+    """
+
+    validated = validate_list(datasets, verb=verb, keep_opened=True, **kwargs)
+
+    dsets = xr.combine_by_coords(validated, join='outer')
 
     # extract valid data
     if extract:
         dsets['cc'] = dsets.cc.where(dsets.status == 1)
 
     # update some global attrs
+    dsets.attrs = validated[0].attrs
     del dsets.attrs['sha256_hash']
 
     strt0 = pd.to_datetime(dsets.time.values[0]).strftime('%Y.%j')
