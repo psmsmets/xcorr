@@ -414,6 +414,7 @@ def mfread(
         `True`. Defaults to `False`.
 
     parallel : `bool`, optional
+        Enabled parallellization if `True` (defaults). Requires Dask.
 
     chunks : `int` or `dict` , optional
         Dictionary with keys given by dimension names and values given by
@@ -436,7 +437,8 @@ def mfread(
     """
 
     # get a list of validated datasets
-    validated = validate_list(paths, keep_opened=False, paths_only=True, **kwargs)
+    validated = validate_list(paths, keep_opened=False, paths_only=True,
+                              **kwargs)
 
     # validate wrapper to pass arguments
     def _validate(ds):
@@ -647,8 +649,9 @@ def validate(
 
 
 def validate_list(
-    datasets, strict: bool = False, keep_opened: bool = False,
-    paths_only: bool = False, verb: int = 0, **kwargs
+    datasets, strict: bool = False, parallel: bool = True,
+    keep_opened: bool = False, paths_only: bool = False, verb: int = 0,
+    compute_args: dict = {}, **kwargs
 ):
     """
     Validate a list of xcorr N-D labelled datasets.
@@ -659,13 +662,12 @@ def validate_list(
         A glob string, or a list of either glob strings or a
         :class:`xr.Dataset` containing the `xcorr` N-D labelled data arrays.
 
-    extract : `bool`, optional
-        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
-        `True`. Defaults to `False`.
-
     strict : `bool`, optional
         If `True`, do not merge data arrays with different `xcorr` versions.
         Defaults to `False`.
+
+    parallel : `bool`, optional
+        Enabled parallellization if `True` (defaults). Requires Dask.
 
     keep_opened : `bool`, optional
         If `True`, do not close the file after opening. Defaults to `False`.
@@ -696,18 +698,21 @@ def validate_list(
         'datasets should be either a string or a list.'
     )
 
+    parallel = dask and parallel
+
     # expand path list with glob
-    paths = []
+    sources = []
 
-    for path in datasets:
+    # expand glob strings and check for unique type in list
+    for source in datasets:
 
-        if isinstance(path, str):
+        if isinstance(source, str):
 
-            paths += glob(path)
+            sources += glob(source)
 
-        elif isinstance(path, xr.Dataset):
+        elif isinstance(source, xr.Dataset):
 
-            if len(paths) > 0 or paths_only:
+            if len(sources) > 0 or paths_only:
 
                 raise ValueError(valErr)
 
@@ -715,48 +720,33 @@ def validate_list(
 
             raise ValueError(valErr)
 
-    paths = sorted(paths) if paths else datasets
+    isFile = len(sources) > 0
+    sources = sorted(sources) if isFile else datasets
     validated = []
-    validate_args = dict()
 
-    # loop over datasets (dask delayed option?!)
-    for ds in paths:
+    # get wrapper
+    def get_dataset(source):
 
-        isFile = False
+        if not isFile:
 
-        if isinstance(ds, str):
+            return source
 
-            if not os.path.isfile(ds):
+        if not os.path.isfile(source):
 
-                if verb > 0:
-                    warnings.warn(f'Datasets item "{ds}" does not exists.',
-                                  UserWarning)
+            if verb > 0:
+                warnings.warn(f'Datasets item "{source}" does not exists.',
+                              UserWarning)
+            return None
 
-                continue
+        return xr.open_dataset(source)
 
-            isFile = True
-            ds = xr.open_dataset(ds)
-
-        # validate dataset
-        ds = validate(ds, verb=verb, **validate_args, **kwargs)
+    # add wrapper
+    def add_dataset(ds):
 
         if not isinstance(ds, xr.Dataset):
 
-            continue
+            return False
 
-        # update validate arguments
-        if not validate_args:
-
-            validate_args['metadata_hash'] = ds.attrs['sha256_hash_metadata']
-            validate_args['preprocess_hash'] = (
-                ds.pair.attrs['preprocess']['sha256_hash']
-            )
-
-            if strict:
-
-                validate_args['xcorr_version'] = ds.attrs['xcorr_version']
-
-        # close file if openend
         if isFile and not keep_opened:
 
             ds.close()
@@ -765,6 +755,68 @@ def validate_list(
         else:
 
             validated.append(ds)
+
+        return True
+
+    # find first validated dataset
+    for i, source in enumerate(sources):
+
+        # get dataset
+        ds = get_dataset(source)
+
+        if ds is None:
+
+            continue
+
+        # validate dataset
+        ds = validate(ds, verb=verb, **kwargs)
+
+        # passed?
+        if ds is not None:
+
+            break
+
+    # append first valid ds
+    total = int(add_dataset(ds))
+
+    # set validate args based on first valid ds
+    validate_args = {
+        'metadata_hash': ds.attrs['sha256_hash_metadata'],
+        'preprocess_hash': ds.pair.attrs['preprocess']['sha256_hash'],
+        'xcorr_version': ds.attrs['xcorr_version'] if strict else None,
+    }
+
+    # add valid wrapper
+    def add_valid_dataset(source):
+
+        ds = get_dataset(source)
+
+        if not isinstance(ds, xr.Dataset):
+
+            return False
+
+        ds = validate(ds, verb=verb, **validate_args, **kwargs)
+
+        return add_dataset(ds)
+
+    if parallel:
+
+        def inc(total, source):
+            return total + int(add_valid_dataset(source))
+
+        for source in sources[i+1:]:
+
+            total = dask.delayed(inc)(total, source)
+
+        total = dask.compute(total, **compute_args)[0]
+
+    else:
+
+        for source in sources[i+1:]:
+
+            total += int(add_valid_dataset(total))
+
+    assert len(validated) == total, 'Validated list does not match total.'
 
     return validated
 
