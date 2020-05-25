@@ -26,7 +26,7 @@ __all__ = ['spectrogram']
 
 def spectrogram(
     x: xr.DataArray, duration: float = None, padding_factor: int = 2,
-    scaling: str = None, dim: str = 'lag', **kwargs
+    scaling: str = None, dim: str = None, **kwargs
 ):
     """
     Compute an N-D labelled spectrogram with consecutive Fourier transforms.
@@ -61,7 +61,7 @@ def spectrogram(
 
     dim : `str`, optional
         The time coordinates name of ``x`` used to compute the spectrogram.
-        Defaults to 'lag'.
+        Defaults to the last dimension.
 
     **kwargs
         Extra arguments passed on to :func:`scipy.signal.spectrogram`.
@@ -72,9 +72,9 @@ def spectrogram(
         The computed spectrogram for ``x``.
 
     """
-    assert dim in x.dims, (
-        f'x has no dimension "{dim}"!'
-    )
+    dim = dim or x.dims[-1]
+    assert dim in x.dims, f'x has no dimension "{dim}"!'
+
     assert 'sampling_rate' in x[dim].attrs, (
         'Dimension has no attribute "{sampling_rate}"!'
     )

@@ -26,7 +26,7 @@ __all__ = ['filter']
 
 def filter(
     x: xr.DataArray, frequency, btype: str, order: int = 2,
-    dim: str = 'lag', **kwargs
+    dim: str = None, **kwargs
 ):
     """
     Butterworth filter an N-D labelled array of data.
@@ -50,7 +50,8 @@ def filter(
         The order of the filter. Default is 2.
 
     dim : `str`, optional
-        The coordinates name of ``x`` to be filtered over. Default is 'lag'.
+        The coordinates name of ``x`` to be filtered over. Defaults to the
+        last dimension of ``x``.
 
     **kwargs :
         Additional parameters provided to :func:`xarray.apply_ufunc`.
@@ -61,9 +62,12 @@ def filter(
         The filtered data array.
 
     """
-    assert dim in x.dims, (
-        f'x has no dimension "{dim}"!'
-    )
+
+    # dim
+    dim = dim or x.dims[-1]
+    assert dim in x.dims, f'x has no dimension "{dim}"!'
+
+    # check
     assert 'sampling_rate' in x[dim].attrs, (
         f'Dimension "{dim}" has no attribute "sampling_rate"!'
     )

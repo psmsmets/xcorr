@@ -28,7 +28,7 @@ __all__ = ['unbias']
 
 
 def unbias(
-    x: xr.DataArray, w: xr.DataArray = None, dim: str = 'lag', name: str = None
+    x: xr.DataArray, w: xr.DataArray = None, dim: str = None, name: str = None
 ):
     """
     Bias correct the xcorr N-D labelled cc array of data.
@@ -42,7 +42,7 @@ def unbias(
         The unbiased cc weight data array.
 
     dim : `str`, optional
-        The coordinates name of ``x`` to be filtered over. Default is 'lag'.
+        The dimension to unbias. Defaults to the last dimension of ``x``.
 
     name : `str`, optional
         Unbiased cc variable name. Defaults to 'x.name'.
@@ -55,6 +55,7 @@ def unbias(
     """
 
     # check x
+    dim = dim or x.dims[-1]
     assert dim in x.dims, f'x has no dimension "{dim}"!'
     assert 'unbiased' in x.attrs, f'x has no unbiased flag attribute!'
 

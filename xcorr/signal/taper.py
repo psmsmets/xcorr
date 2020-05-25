@@ -22,7 +22,7 @@ __all__ = ['taper']
 
 def taper(
     x: xr.DataArray, wtype: str = None, max_percentage: float = None,
-    max_length: float = None, side: str = None, dim: str = 'lag',
+    max_length: float = None, side: str = None, dim: str = None,
 
 ):
     """
@@ -56,9 +56,8 @@ def taper(
         The windowed output of ``x`` if ``inplace`` is `False`.
 
     """
-    assert dim in x.dims, (
-        f'x has no dimension "{dim}"!'
-    )
+    dim = dim or x.dims[-1]
+    assert dim in x.dims, f'x has no dimension "{dim}"!'
 
     w = window(x[dim], wtype, max_percentage, max_length, side)
 

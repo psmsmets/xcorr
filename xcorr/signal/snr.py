@@ -22,7 +22,7 @@ __all__ = ['snr']
 
 def snr(
     x: xr.DataArray, signal: xr.DataArray, noise: xr.DataArray,
-    dim: str = 'lag'
+    dim: str = None
 ):
     """
     Compute the signal-to-noise ratio of an N-D labeled array of data given a
@@ -48,6 +48,9 @@ def snr(
         The snr output of ``x``.
 
     """
+    dim = dim or x.dims[-1]
+    assert dim in x.dims, f'x has no dimension "{dim}"!'
+
     s = xr.ufuncs.fabs(x.where(signal, drop=True))
     n = x.where(noise, drop=True)
 

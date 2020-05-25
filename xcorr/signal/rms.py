@@ -20,7 +20,7 @@ __all__ = ['rms']
 
 
 def rms(
-    x: xr.DataArray, dim: str = 'lag'
+    x: xr.DataArray, dim: str = None
 ):
     """
     Root-mean-square an N-D labeled array of data.
@@ -31,7 +31,8 @@ def rms(
         The array of data to be root-mean-squared.
 
     dim : `str`, optional
-        The coordinates name of ``x`` to be filtered over. Default is 'lag'.
+        The coordinates name of ``x`` to be filtered over. Default is the
+        last dimension.
 
     Returns
     -------
@@ -39,9 +40,8 @@ def rms(
         The rms of ``x``.
 
     """
-    assert dim in x.dims, (
-        f'x has no dimension "{dim}"!'
-    )
+    dim = dim or x.dims[-1]
+    assert dim in x.dims, f'x has no dimension "{dim}"!'
 
     # square
     y = xr.ufuncs.square(x)

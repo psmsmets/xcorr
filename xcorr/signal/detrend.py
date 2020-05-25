@@ -25,7 +25,7 @@ __all__ = ['detrend', 'demean']
 
 
 def detrend(
-    x: xr.DataArray, type: str = 'constant', bp=0, dim: str = 'lag',
+    x: xr.DataArray, type: str = 'constant', dim: str = None,
     **kwargs
 ):
     """
@@ -44,13 +44,9 @@ def detrend(
        mean of ``x`` is subtracted. If type == 'linear', the result of a
        linear least-squares fit to ``x`` is subtracted from ``x``.
 
-    bp : `array_like of ints`, optional
-        A sequence of break points. If given, an individual linear fit is
-        performed for each part of ``dim`` between two break points. Break
-        points are specified as indices of ``x`` into ``dim``.
-
     dim : `str`, optional
-        The coordinates name of ``x`` to be detrended over. Default is 'lag'.
+        The coordinates name of ``x`` to be detrended over. Defaults to the
+        last dimension of ``x``.
 
     **kwargs :
         Additional parameters provided to :func:`xarray.apply_ufunc`.
@@ -61,7 +57,10 @@ def detrend(
         The detrended data array.
 
     """
-    assert dim in x.dims, 'Dimension not found!'
+
+    # dim
+    dim = dim or x.dims[-1]
+    assert dim in x.dims, f'x has no dimension "{dim}"!'
 
     # get index of dim
     axis = x.dims.index(dim)
@@ -72,8 +71,7 @@ def detrend(
         return signal.detrend(
             data=obj.data,
             axis=axis,
-            type='linear',
-            bp=0
+            type=type,
         )
 
     # dask collection?
@@ -94,14 +92,13 @@ def detrend(
     historicize(y, f='detrend', a={
         'x': y.name,
         'type': type,
-        'bp': bp,
         'dim': dim,
     })
 
     return y
 
 
-def demean(x: xr.DataArray, dim: str = 'lag', **kwargs):
+def demean(x: xr.DataArray, dim: str = None, **kwargs):
     r"""Demean  an N-D labelled array of data.
 
     Wrapper function for :func:`xcorr.signal.detrend` with arguments
@@ -113,7 +110,8 @@ def demean(x: xr.DataArray, dim: str = 'lag', **kwargs):
         The array of data to be detrended.
 
     dim : `str`, optional
-        The coordinates name of ``x`` to be demeaned over. Default is 'lag'.
+        The coordinates name of ``x`` to be demeaned over. Defaults to the
+        last dimension of ``x``.
 
     **kwargs :
         Additional parameters provided to :func:`xarray.apply_ufunc`.
@@ -124,5 +122,4 @@ def demean(x: xr.DataArray, dim: str = 'lag', **kwargs):
         The demeaned array of data.
 
     """
-    assert dim in x.dims, 'Dimension not found!'
     return detrend(x, type='constant', dim=dim, **kwargs)
