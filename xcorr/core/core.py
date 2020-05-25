@@ -440,6 +440,9 @@ def mfread(
     validated = validate_list(paths, keep_opened=False, paths_only=True,
                               **kwargs)
 
+    # init chunks
+    chunks = chunks or {'pair': 1, 'time': 1}
+
     # validate wrapper to pass arguments
     def _validate(ds):
         return validate(ds, quick_and_dirty=True)
