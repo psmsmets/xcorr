@@ -262,7 +262,6 @@ class Client(object):
         util.stream.stream2SDS(
             stream,
             sds_path=self.sds_root_write,
-            force_override=True,
             verbose=verb == 4,
         )
         if verb > 0:
