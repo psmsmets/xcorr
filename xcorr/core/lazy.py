@@ -229,6 +229,10 @@ def lazy_process(
         If `True`, for a to iniate and process an xcorr data array each step.
         Defaults to `False`.
 
+    download : `bool`, optional
+        If `True` (default), download missing data on-the-fly during
+        the data availability analysis.
+
     debug : `bool`, optional
         If `True`, process single threaded with some extra verbosity. Default
         is `False`.
@@ -244,8 +248,9 @@ def lazy_process(
     print('Config')
     print('    results root :', root)
     print('    threads      :', 1 if debug else (threads or -1))
-    print('    debug        :', debug)
     print('    force_fresh  :', force_fresh)
+    print('    download     :', download)
+    print('    debug        :', debug)
 
     # -------------------------------------------------------------------------
     # various inits
@@ -281,7 +286,7 @@ def lazy_process(
     )
     lazy_availability = client.verify_data_availability(
         availability,
-        download=True,
+        download=download,
         compute=False
     )
 
@@ -296,7 +301,7 @@ def lazy_process(
     print('    times : {} ({})'.format(len(times), len(availability.time)))
     print('        start  : {}'.format(times[0]))
     print('        end    : {}'.format(times[-1]))
-    print('        extend : 1 day')
+    print('        extend : {} day(s)'.format(extend_days))
 
     # -------------------------------------------------------------------------
     # Evaluate data availability (parallel), and try to download missing data
