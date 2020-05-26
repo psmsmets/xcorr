@@ -974,9 +974,10 @@ class Client(object):
             for time in status.time:
                 if status.loc[{'receiver': receiver, 'time': time}] == 1:
                     continue
-                args = dict(
-                    receiver=rec_dict, date=time.values, verb=0, **kwargs
-                )
+                args = {
+                    'receiver': rec_dict, 'date': time.values, 'verb': 0,
+                     **kwargs
+                }
                 if parallel:
                     flag = dask.delayed(self._test_waveforms_for_date)(**args)
                     verified = dask.delayed(set_status_flag)(
