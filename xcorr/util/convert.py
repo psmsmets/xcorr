@@ -39,7 +39,7 @@ def to_trace(da: DataArray, **kwargs):
     assert isinstance(da, DataArray), 'da should be an xarray.DataArray.'
     assert len(da.dims) == 1, 'da should be a one-dimensional data array.'
 
-    dim = 'time' 
+    dim = 'time'
     assert dim in da.dims, f'da has no dimension {dim}'
 
     assert 'window_length' in da[dim].attrs, (
@@ -59,7 +59,7 @@ def to_trace(da: DataArray, **kwargs):
         'network': 'xr',
         'station': '',
         'location': '',
-        'channel': da.name, 
+        'channel': da.name,
         'starttime': to_UTCDateTime(da[dim][0].values),
         'delta': dt,
         **kwargs

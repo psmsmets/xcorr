@@ -975,7 +975,7 @@ class Client(object):
                     continue
                 args = {
                     'receiver': rec_dict, 'date': time.values, 'verb': 0,
-                     **kwargs
+                    **kwargs
                 }
                 if parallel:
                     flag = dask.delayed(self._test_waveforms_for_date)(**args)

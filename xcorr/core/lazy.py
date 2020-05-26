@@ -190,8 +190,8 @@ def lazy_processes(
 def lazy_process(
     pairs: list, times: pd.DatetimeIndex, init_args: dict, client_args: dict,
     inventory: Inventory, root: str, threads: int = None,
-    progressbar: bool = True, force_fresh: bool = False, debug: bool = False,
-    **kwargs
+    progressbar: bool = True, force_fresh: bool = False, download: bool = True,
+    debug: bool = False, **kwargs
 ):
     """
     Lazy process a lot of data with xcorr and dask.
