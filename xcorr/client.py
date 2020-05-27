@@ -318,7 +318,7 @@ class Client(object):
                 stream,
                 sds_path=self.sds_root_write,
                 method='merge',
-                extra_samples=0,
+                extra_samples=None,
                 verbose=verb == 4,
             )
 
@@ -512,8 +512,8 @@ class Client(object):
                 stream += self._get_waveforms_for_date(
                     receiver=receiver,
                     date=day,
-                    download=True,
                     scan_sds=False,
+                    download=True,
                     verb=verb-1,
                     **kwargs
                 )

@@ -149,7 +149,7 @@ def stream2SDS(
             tr.split().write(out_fn, out_format, flush=True)
 
 
-def _slice_days(stream, extra=10, sampling_precision=2):
+def _slice_days(stream, extra=None, sampling_precision=2):
     """
     Slice traces in ``stream`` into day segments starting at the first
     sample after midnight till ``extra`` samples after midnight
@@ -174,8 +174,9 @@ def _slice_days(stream, extra=10, sampling_precision=2):
     st : :class:`~obspy.core.Stream`
         A stream with the sliced traces.
     """
-    if extra < 1:
-        raise ValueError('``extra`` must be larger than 1')
+    extra = extra or 0
+    if extra < 0:
+        raise ValueError('``extra`` must be larger than 0')
     st = Stream()
     try:
         stream.merge(method=1)
