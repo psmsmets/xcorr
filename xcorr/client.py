@@ -514,6 +514,7 @@ class Client(object):
                     date=day,
                     download=True,
                     scan_sds=False,
+                    verb=verb-1,
                     **kwargs
                 )
 
