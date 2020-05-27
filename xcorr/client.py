@@ -329,7 +329,7 @@ class Client(object):
 
     def get_waveforms(
         self, receiver: str, time: pd.Timestamp, centered: bool = True,
-        duration: float = 86400., buffer: float = 60.,
+        duration: float = None, buffer: float = None,
         allow_wildcards: bool = False, download: bool = True,
         verb: int = 0
     ):
@@ -378,12 +378,28 @@ class Client(object):
             The requested waveforms.
 
         """
+
         # check if receiver SEED-id is valid
         util.receiver.check_receiver(
             receiver,
             allow_wildcards=allow_wildcards,
             raise_error=True
         )
+
+        # check duration
+        duration = duration or 86400.
+
+        if not (isinstance(duration, float) or isinstance(duration, int)):
+            raise TypeError('duration should be in float seconds.')
+
+        if duration <= 0.:
+            raise ValueError('duration cannot be zero or negative.')
+
+        # check buffer
+        buffer = buffer or 0.
+
+        if not (isinstance(buffer, float) or isinstance(buffer, int)):
+            raise TypeError('buffer should be in float seconds.')
 
         # center time of 24h window -12h
         t0 = pd.to_datetime(time)
