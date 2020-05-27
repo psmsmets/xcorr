@@ -197,7 +197,7 @@ def _slice_days(stream, extra=10, sampling_precision=2):
 
         ti = UTCDateTime(year=starttime.year, julday=starttime.julday)
         while ti < endtime:
-            tf = UTCDateTime(year=ti.year, julday=ti.julday + 1)
+            tf = ti + 86400.
             st += tr.slice(
                 starttime=ti,
                 endtime=tf + extra * delta,
