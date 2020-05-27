@@ -16,7 +16,7 @@ from obspy import UTCDateTime, Stream, Inventory
 from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
-from warnings import warn
+import warnings
 from tabulate import tabulate
 # VDMS client for IMS waveforms?
 try:
@@ -114,43 +114,67 @@ class Client(object):
         self._sds_root_read = (sds_root_read if sds_root_read else [sds_root])
 
         if sds_root_write:
+
             self._sds_root_read += [sds_root_write]
         else:
+
             self._sds_root_read += [sds_root]
 
         self._sds_root_read = list(set(self._sds_root_read))
 
         self._sds_read = []
+
         for _sds_root_read in self._sds_root_read:
+
             self._sds_read.append(sdsClient(_sds_root_read))
 
         # fdsn web-service
         if fdsn_service:
+
             if isinstance(fdsn_service, str):
+
                 self._fdsn = fdsnClient(fdsn_service)
+
             elif isinstance(fdsn_service, fdsnClient):
+
                 self._fdsn = fdsn_service
+
             else:
+
                 raise TypeError('`fdsn_service` should be of type str or '
                                 ':class:`obspy.clients.fdsn.Client`!')
         else:
+
             self._fdsn = False
 
         # vdms web-service
         if vdmsClient:
+
             if isinstance(vdms_service, bool):
+
                 self._vdms = vdmsClient() if vdms_service else False
+
             elif isinstance(vdms_service, vdmsClient):
+
                 self._vdms = vdms_service
+
             else:
+
                 raise TypeError('`vdms_service` should be of type bool or '
                                 ':class:`pyvdms.Client`!')
+
             if self._vdms:
+
                 test = self._vdms.get_channels('*H1', 'BDF')
+
                 if not isinstance(test, pd.DataFrame):
+
                     self._vdms = False
-                    warn('VDMS Client test failed. Service shall be disabled.')
+                    warnings.warn(
+                        'VDMS Client test failed. Service shall be disabled.'
+                    )
         else:
+
             self._vdms = False
 
         # other parameters
@@ -165,11 +189,17 @@ class Client(object):
         out += [['sds read', self.sds_root_read]]
         out += [['sds write', self.sds_root_write]]
         out += [['fdsn', 'Yes' if self.fdsn else 'No']]
+
         if self.fdsn:
+
             out += [['fdsn base url', self.fdsn.base_url]]
+
         out += [['vdms', 'Yes' if self.vdms else 'No']]
+
         if self.vdms:
+
             out += [['vdms client', self.vdms._request.clc]]
+
         out += [['max gap', f'{self.max_gap}s']]
 
         return tabulate(out)
@@ -237,7 +267,7 @@ class Client(object):
         return self._parallel
 
     def _sds_write_daystream(
-        self, stream: Stream, verb: int = 0
+        self, stream: Stream, force_write: bool = False, verb: int = 0
     ):
         """
         Wrapper to write a day stream of data to the local SDS archive.
@@ -246,6 +276,10 @@ class Client(object):
         ----------
         stream : :class:`obspy.Stream`
             Stream with a day of data.
+
+        force_write : `bool`, optional
+            Force to write the stream to disk if `True`, even if it contains
+            gaps. Defaults to `False`.
 
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
@@ -257,18 +291,27 @@ class Client(object):
             :meth:'check_duration', otherwise returns `True`.
 
         """
-        if not self.check_duration(stream, verb=verb):
+        passed = self.check_duration(stream, verb=verb)
+
+        if not passed and not force_write:
+
             return False
-        util.stream.stream2SDS(
-            stream,
-            sds_path=self.sds_root_write,
-            method = 'overwrite',
-            extra_samples=0,
-            verbose=verb == 4,
-        )
+
+        with warnings.catch_warnings():
+
+            util.stream.stream2SDS(
+                stream,
+                sds_path=self.sds_root_write,
+                method='merge',
+                extra_samples=0,
+                verbose=verb == 4,
+            )
+
         if verb > 0:
+
             print(_msg_added_archive)
-        return True
+
+        return passed
 
     def check_duration(
         self, stream: Stream, duration: float = None, receiver: str = None,
@@ -488,7 +531,7 @@ class Client(object):
 
     def _get_waveforms_for_date(
         self, receiver: dict, date: pd.Timestamp, scan_sds: bool = True,
-        download: bool = True, verb: int = 0
+        download: bool = True, force_write: bool = False, verb: int = 0
     ):
         """
         Get the waveforms for a receiver and date.
@@ -512,6 +555,10 @@ class Client(object):
             ``self.fdsn`` and ``self.vdms`` webservices. Data is added to
             ``self.sds_write``.
 
+        force_write : `bool`, optional
+            Force to write the stream to disk if `True`, even if it contains
+            gaps. Defaults to `False`.
+
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
@@ -523,62 +570,105 @@ class Client(object):
         """
         time = UTCDateTime(pd.to_datetime(date) +
                            pd.offsets.DateOffset(0, normalize=True))
-        args = dict(**receiver, starttime=time, endtime=time + 86400)
+        get_args = dict(**receiver, starttime=time, endtime=time + 86400)
+
+        set_args = dict(verb=verb-2, force_write=force_write)
 
         if verb > 0:
             print(
                 "Get waveforms for {network}.{station}.{location}.{channel} "
-                "from {starttime} until {endtime}".format(**args)
+                "from {starttime} until {endtime}".format(**get_args)
             )
 
+        # 1. check sds
         if scan_sds:
+
             if verb > 1:
+
                 print(_msg_load_archive.format(time))
+
             for sds in self.sds_read:
-                daystream = sds.get_waveforms(**args)
+
+                daystream = sds.get_waveforms(**get_args)
+
                 if self.check_duration(daystream, verb=verb-1):
+
                     if verb > 1:
+
                         print(_msg_loaded_archive.format(time))
+
                     return daystream
             else:
+
                 if verb > 1:
+
                     print(_msg_no_data.format(time))
 
+        # 2. check services
         if download:
+
             # attempt via fdsn
             if self.fdsn:
+
                 if verb > 1:
+
                     print('Try FDSN.')
+
                 try:
-                    daystream = self.fdsn.get_waveforms(**args)
-                    if self._sds_write_daystream(daystream, verb=verb-2):
+
+                    daystream = self.fdsn.get_waveforms(**get_args)
+
+                    if self._sds_write_daystream(daystream, **set_args):
+
                         return daystream
+
                 except (KeyboardInterrupt, SystemExit):
+
                     raise
+
                 except FDSNNoDataException:
+
                     if verb > 1:
+
                         print(_msg_no_data.format(time))
+
                 except Exception as e:
+
                     if verb > 0:
+
                         print('an error occurred:')
                         print(e)
 
             # attempt via vdms
             if self.vdms:
+
                 if verb > 1:
+
                     print('Try VDMS')
+
                 try:
-                    daystream = self.vdms.get_waveforms(**args)
-                    if self._sds_write_daystream(daystream, verb=verb-2):
+
+                    daystream = self.vdms.get_waveforms(**get_args)
+
+                    if self._sds_write_daystream(daystream, **set_args):
+
                         return daystream
+
                     if verb > 1:
+
                         print(_msg_no_data.format(time))
+
                 except (KeyboardInterrupt, SystemExit):
+
                     raise
+
                 except Exception as e:
+
                     if verb > 0:
+
                         print('an error occurred:')
                         print(e)
+
         return Stream()
 
     def _test_waveforms_for_date(self, **kwargs):
@@ -597,14 +687,19 @@ class Client(object):
 
         """
         try:
+
             stream = self._get_waveforms_for_date(**kwargs)
+
         except RuntimeError:
+
             return -2
+
         passed = self.check_duration(
             stream,
             duration=86400.,
             receiver=util.receiver.receiver_to_str(kwargs['receiver'])
         )
+
         return 1 if passed else -1
 
     def get_preprocessed_waveforms(
