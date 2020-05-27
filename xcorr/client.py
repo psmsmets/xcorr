@@ -263,6 +263,7 @@ class Client(object):
             stream,
             sds_path=self.sds_root_write,
             method = 'overwrite',
+            extra_samples=0,
             verbose=verb == 4,
         )
         if verb > 0:
