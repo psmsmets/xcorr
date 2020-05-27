@@ -56,7 +56,7 @@ class Client(object):
         self, sds_root: str = None, sds_root_write: str = None,
         sds_root_read: list = None, fdsn_service='IRIS',
         vdms_service: bool = True, max_gap: float = None,
-        parallel: bool = True,
+        force_write: bool = False, parallel: bool = True,
     ):
         """Initialize a `xcorr` waveform request client.
 
@@ -90,7 +90,11 @@ class Client(object):
             Specify the maximum time gap in seconds that is allowed in a day.
             If `None`, ``max_gap`` is 300s (default).
 
-        dask : `bool`, optional
+        force_write : `bool`, optional
+            Force to write downloaded day streams to the SDS archive even when
+            the cummulated gap is larger than max_gap. Defaults to `False`.
+
+        parallel : `bool`, optional
             Parallelize workflows using :class:`dask.delayed`. Defaults to
             `True` if `dask` is found.
 
@@ -179,6 +183,7 @@ class Client(object):
 
         # other parameters
         self._max_gap = abs(max_gap or 300.)
+        self._force_write = force_write or False
         self._parallel = dask and parallel
 
     def __str__(self):
@@ -201,6 +206,7 @@ class Client(object):
             out += [['vdms client', self.vdms._request.clc]]
 
         out += [['max gap', f'{self.max_gap}s']]
+        out += [['force write', 'Yes' if self.force_write else 'No']]
 
         return tabulate(out)
 
@@ -259,6 +265,13 @@ class Client(object):
         return self._max_gap
 
     @property
+    def force_write(self):
+        """Force writing downloaded day streams to the SDS archive even when
+        the cummulated gap is larger than max_gap.
+        """
+        return self._force_write
+
+    @property
     def parallel(self):
         """Returns `True` if :mod:`dask` is loaded and :class:`Client` is
         initiated with ``parallel``=`True`. All routines of :class:`Client`
@@ -267,7 +280,7 @@ class Client(object):
         return self._parallel
 
     def _sds_write_daystream(
-        self, stream: Stream, force_write: bool = False, verb: int = 0
+        self, stream: Stream, force_write: bool = None, verb: int = 0
     ):
         """
         Wrapper to write a day stream of data to the local SDS archive.
@@ -278,8 +291,8 @@ class Client(object):
             Stream with a day of data.
 
         force_write : `bool`, optional
-            Force to write the stream to disk if `True`, even if it contains
-            gaps. Defaults to `False`.
+            Force to write downloaded day streams to the SDS archive even when
+            the cummulated gap is larger than max_gap. Defaults to `False`.
 
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
@@ -291,6 +304,8 @@ class Client(object):
             :meth:'check_duration', otherwise returns `True`.
 
         """
+        force_write = force_write or self.force_write
+
         passed = self.check_duration(stream, verb=verb)
 
         if not passed and not force_write:
@@ -375,7 +390,7 @@ class Client(object):
         self, receiver: str, time: pd.Timestamp, centered: bool = True,
         duration: float = None, buffer: float = None,
         allow_wildcards: bool = False, download: bool = True,
-        verb: int = 0
+        verb: int = 0, **kwargs
     ):
         """
         Get waveforms from the clients given a SEED-id.
@@ -416,6 +431,8 @@ class Client(object):
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
+        Addition arguments are passed to :func:`_get_waveforms_for_date`.
+
         Returns
         -------
         stream : :class:`obspy.Stream`
@@ -434,26 +451,36 @@ class Client(object):
         duration = duration or 86400.
 
         if not (isinstance(duration, float) or isinstance(duration, int)):
+
             raise TypeError('duration should be in float seconds.')
 
         if duration <= 0.:
+
             raise ValueError('duration cannot be zero or negative.')
 
         # check buffer
         buffer = buffer or 0.
 
         if not (isinstance(buffer, float) or isinstance(buffer, int)):
+
             raise TypeError('buffer should be in float seconds.')
 
         # center time of 24h window -12h
         t0 = pd.to_datetime(time)
+
         if centered:
+
             t0 -= pd.offsets.DateOffset(seconds=duration/2)
+
         t1 = t0 + pd.offsets.DateOffset(seconds=duration)
+
         if buffer > 0.:
+
             t0 -= pd.offsets.DateOffset(seconds=buffer)
             t1 += pd.offsets.DateOffset(seconds=buffer)
+
         if verb > 0:
+
             print(
                 'Get waveforms for {} from {} until {}'
                 .format(receiver, t0, t1)
@@ -479,12 +506,15 @@ class Client(object):
 
             # get streams per day
             stream = Stream()
+
             for day in days:
+
                 stream += self._get_waveforms_for_date(
                     receiver=receiver,
                     date=day,
                     download=True,
                     scan_sds=False,
+                    **kwargs
                 )
 
             # trim to asked time range
@@ -514,19 +544,31 @@ class Client(object):
 
         """
         receiver = util.receiver.receiver_to_str(kwargs)
+
         if verb > 0:
+
             print("Get waveforms for {} from {} until {}"
                   .format(receiver, kwargs['starttime'], kwargs['endtime']))
+
         dt = kwargs['endtime'] - kwargs['starttime']
+
         for sds in self.sds_read:
+
             stream = sds.get_waveforms(**kwargs)
+
             if not stream:
+
                 continue
+
             if self.check_duration(stream, duration=dt,
                                    receiver=receiver, verb=verb-1):
+
                 if verb > 1:
+
                     print(_msg_loaded_archive.format(kwargs['starttime']))
+
                 return stream
+
         return Stream()
 
     def _get_waveforms_for_date(
