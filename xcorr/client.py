@@ -750,7 +750,7 @@ class Client(object):
         duration: float = 86400., centered: bool = True,
         inventory: Inventory = None, substitute: bool = True,
         three_components: str = '12Z', raise_error: bool = False,
-        verb: int = 0, **kwargs
+        verb: int = 0, strict: bool = False, **kwargs
     ):
         """
         Get preprocessed waveforms from the clients given a SEED-id and an
@@ -791,6 +791,12 @@ class Client(object):
             If `True` raise when an error occurs. Otherwise a warning is given.
             Defaults to `False`.
 
+        strict: `bool`, optional
+            If `True`, the samples difference between the expected and the
+            obtained number of samples is zero. If `False` (default), a
+            two-sample difference is allowed (solving to nearest_sample
+            differences).
+
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
@@ -816,8 +822,11 @@ class Client(object):
 
         # radial or transverse component? Request all channels manually.
         if substitute and ch[-1] in 'RT':
+
             st = Stream()
+
             for c in three_components:  # '12NEZ'??
+
                 st = st + self.get_waveforms(
                     receiver=receiver[:-1]+c,
                     time=time,
@@ -826,7 +835,9 @@ class Client(object):
                     verb=verb,
                     **kwargs
                 )
+
         else:
+
             st = self.get_waveforms(
                 receiver=receiver,
                 time=time,
@@ -837,14 +848,21 @@ class Client(object):
             )
 
         if verb > 2:
+
             print(st)
+
         if not isinstance(st, Stream) or len(st) == 0:
+
             return Stream()
 
         if centered:
+
             t0 = util.time.to_UTCDateTime(time) - duration/2
+
         else:
+
             t0 = util.time.to_UTCDateTime(time)
+
         t1 = t0 + duration
 
         st = xcorr_preprocess(
@@ -856,10 +874,32 @@ class Client(object):
             raise_error=raise_error,
             verb=verb-1,
         )
+
+        # expects a stream with one trace
         if not isinstance(st, Stream) or len(st) != 1:
+
+            if raise_error:
+
+                raise ValueError('No stream with single trace returned '
+                                 'after preprocessing.')
+
             return Stream()
-        if st[0].stats.npts * st[0].stats.delta < duration:
+
+        # only allow 2 sample difference (max nearest sample difference)
+        diff = duration / st[0].stats.delta - st[0].stats.npts
+
+        if diff > (0 if strict else 2):
+
+            if raise_error:
+
+                raise ValueError(
+                    'Preprocessed stream fails {}duration check.'.format(
+                        'strict ' if strict else ''
+                    )
+                )
+
             return Stream()
+
         return st
 
     def _test_preprocessed_waveforms(self, sampling_rate: float = None,
@@ -888,8 +928,11 @@ class Client(object):
         kwargs['raise_error'] = True
 
         try:
+
             stream = self.get_preprocessed_waveforms(**kwargs)
+
         except RuntimeError:
+
             return -2
 
         passed = self.check_duration(stream, duration=kwargs['duration'],
@@ -987,7 +1030,7 @@ class Client(object):
                   .format(status.size))
 
         verified = self.verify_data_availability(
-            status, count_verified=True, verb=verb, **kwargs
+            status, count_verified=True, verb=verb-1, **kwargs
         )
 
         if verb:
@@ -1095,7 +1138,7 @@ class Client(object):
     def verify_data_availability(
         self, status: xr.DataArray, count_verified: bool = False,
         parallel: bool = None, compute: bool = True, verb: int = 0,
-        **kwargs
+        debug: bool = False, **kwargs
     ):
         """Verify daily waveform availability for receivers and times.
 
@@ -1133,7 +1176,7 @@ class Client(object):
             ``count_verified`` is `True`, otherwise `None`.
 
         """
-        parallel = parallel or self.parallel
+        parallel = self.parallel if parallel is None else parallel
 
         if parallel and not dask:
 
@@ -1152,13 +1195,13 @@ class Client(object):
                     continue
 
                 args = {
-                    'receiver': rec_dict, 'date': time.values,
-                    'verb': 0 if parallel else verb,
+                    'receiver': rec_dict, 'date': time.values, 'verb': verb,
                     **kwargs
                 }
 
                 if parallel:
 
+                    # todo: chunk per item and make use of apply_ufunc!
                     flag = dask.delayed(self._test_waveforms_for_date)(**args)
                     verified = dask.delayed(set_status_flag)(
                         status, receiver, time, flag, verified
@@ -1239,7 +1282,7 @@ class Client(object):
                   .format(status.size))
 
         verified = self.verify_data_preprocessing(
-            status, inventory, count_verified=True, verb=verb, **kwargs
+            status, inventory, count_verified=True, verb=verb - 1, **kwargs
         )
 
         if verb:
@@ -1386,7 +1429,7 @@ class Client(object):
             ``count_verified`` is `True`, otherwise `None`.
 
         """
-        parallel = parallel or self.parallel
+        parallel = self.parallel if parallel is None else parallel
 
         if parallel and not dask:
 
@@ -1411,7 +1454,7 @@ class Client(object):
                 three_components=receiver.attrs['three_components'],
                 raise_error=True,
                 centered=False,
-                verb=0 if parallel else verb,
+                verb=verb,
                 **kwargs,
             )
 

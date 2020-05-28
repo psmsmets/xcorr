@@ -1093,6 +1093,7 @@ def process(
                 buffer=t.window_length/20,  # 5%
                 inventory=inventory,
                 verb=verb-1,
+                strict=True,
                 **kwargs
             )
             if not isinstance(st, obspy.Stream) or len(st) != 2:

@@ -311,7 +311,8 @@ def lazy_process(
     lazy_availability = client.verify_data_availability(
         availability,
         download=download,
-        compute=False
+        compute=False,
+        verb=verb,
     )
 
     # -------------------------------------------------------------------------
@@ -320,8 +321,11 @@ def lazy_process(
     print('-'*79)
     print('Data')
     print('    pairs : {}'.format(len(pairs)))
+
     for p in pairs:
+
         print('        {}'.format(p))
+
     print('    times : {} ({})'.format(len(times), len(availability.time)))
     print('        start  : {}'.format(times[0]))
     print('        end    : {}'.format(times[-1]))
@@ -378,6 +382,7 @@ def lazy_process(
         sampling_rate=init_args['sampling_rate'],
         download=False,
         compute=False,
+        verb=verb,
     )
 
     # evaluate availability
