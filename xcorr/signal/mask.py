@@ -30,7 +30,7 @@ def get_scalar_value(
         'Input parameter cannot be empty without a default value!'
     )
     if isinstance(x, np.ndarray) or isinstance(x, xr.DataArray):
-        y = np.asscalar(x) if x else x0
+        y = x.item() if x else x0
     else:
         y = x if x else x0
     return y

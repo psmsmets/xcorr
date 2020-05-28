@@ -345,7 +345,7 @@ def lazy_process(
         duration=init_args['window_length'],
         sampling_rate=init_args['sampling_rate'],
         download=False,
-        compute=False
+        compute=False,
     )
 
     # evaluate availability
