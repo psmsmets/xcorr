@@ -266,7 +266,7 @@ def lazy_process(
     warnings.filterwarnings("ignore")
 
     if debug:
-        verb = 1
+        verb = kwargs['verb'] if 'verb' in kwargs else 1
         compute_args = dict(scheduler='single-threaded')
     else:
         verb = 0
@@ -276,6 +276,9 @@ def lazy_process(
         if progressbar:
             pbar = ProgressBar()
             pbar.register()
+
+    if 'verb' in kwargs:
+        kwargs.pop('verb')
 
     # -------------------------------------------------------------------------
     # Init data availability
