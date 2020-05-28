@@ -50,12 +50,15 @@ def single_threaded_process(
     nc = util.ncfile(pair, time, root)
 
     if not force_fresh:
+
         # open
         data = core.read(nc, fast=True)
 
         # update
         if data and np.all(data.status.values == 1):
+
             data.close()
+
             return True
 
     # create
@@ -81,7 +84,9 @@ def single_threaded_process(
 
     # Save
     if data and np.any(data.status.values == 1):
+
         core.write(data, nc, verb=verb)
+
         return True
 
     return False
@@ -145,10 +150,12 @@ def lazy_processes(
         for time in times:
 
             if verb > 0:
+
                 print('    Check {} {}'.format(pair, time), end='. ')
 
             # preprocessing status
             if verb > 2:
+
                 print('Preprocessing', preprocessing_status)
 
             # check availability
@@ -169,19 +176,25 @@ def lazy_processes(
 
             # availability status
             if verb > 2:
+
                 print('Availability',
                       'passed' if availability_passed else 'failed', end='. ')
 
             # preprocessing and availability passed
             if preprocessing_passed and availability_passed:
+
                 if verb > 0:
+
                     print('Add lazy process.')
                 result = single_threaded_process(
                     pair, time, init_args, verb=verb, **kwargs
                 )
                 results.append(result)
+
             else:
+
                 if verb > 0:
+
                     print('Skip.')
 
     return results
@@ -266,18 +279,26 @@ def lazy_process(
     warnings.filterwarnings("ignore")
 
     if debug:
+
         verb = kwargs['verb'] if 'verb' in kwargs else 1
         compute_args = dict(scheduler='single-threaded')
+
     else:
+
         verb = 0
         compute_args = dict()
+
         if isinstance(threads, int):
+
             compute_args['num_workers'] = threads
+
         if progressbar:
+
             pbar = ProgressBar()
             pbar.register()
 
     if 'verb' in kwargs:
+
         kwargs.pop('verb')
 
     # -------------------------------------------------------------------------
@@ -318,7 +339,9 @@ def lazy_process(
     print('    Overall availability : {:.2f}%'
           .format(100 * np.sum(availability.values == 1) / availability.size))
     print('    Receiver availability')
+
     for rec in availability.receiver:
+
         pcnt = 100*np.sum(
             availability.loc[{'receiver': rec}].values == 1
         ) / availability.time.size
@@ -330,13 +353,19 @@ def lazy_process(
 
     # init waveform preprocessing status for a day with max availability
     nofrec = len(availability.receiver)
+
     for time in availability.time[extend_days:-extend_days]:
+
         if np.sum(availability.loc[{'time': time}].values == 1) == nofrec:
+
             break
+
     else:
+
         raise RuntimeError(
             'Your pairs contain a receiver without data availability...'
         )
+
     time = pd.to_datetime(time.values)
     preprocessing = client.init_data_preprocessing(
         pairs, time,
@@ -362,7 +391,9 @@ def lazy_process(
     print('    Overall preprocessing : {:.2f}% passed'
           .format(100*np.sum(preprocessing.values == 1) / preprocessing.size))
     print('    Receiver preprocessing')
+
     for rec in preprocessing.receiver:
+
         passed = np.all(preprocessing.loc[{'receiver': rec}].values == 1)
         print('        {} :'.format(rec.values),
               'passed' if passed else 'failed')
