@@ -27,12 +27,12 @@ def to_trace(da: DataArray, **kwargs):
 
     Parameters
     ----------
-    da : `xarray.DataArray`
+    da : :class:`xarray.DataArray`
         One-dimensional N-D labelled data array.
 
     Returns
     -------
-    tr : any
+    tr : :class:`obspy.Trace`
         Obspy trace object.
 
     """
@@ -81,13 +81,13 @@ def to_stream(da: DataArray):
 
     Parameters
     ----------
-    da : `xarray.DataArray`
+    da : :class:`xarray.DataArray`
         Two-dimensional N-D labelled data array.
 
     Returns
     -------
-    tr : any
-        Obspy trace object.
+    st : :class:`obspy.Stream`
+        Obspy stream object.
 
     """
     assert isinstance(da, DataArray), 'da should be an xarray.DataArray.'

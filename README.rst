@@ -53,9 +53,10 @@ Main xcorr features listed per submodule:
   - ``rms``: root-mean-square.
   - ``snr``: signal-to-noise ratio.
   - ``spectrogram``: compute the power spectrogram (density or spectrum).
-  - ``stack``: stack over a full time period, or grouped per day, month, year,
     year-day, year-month. 
   - ``taper``: apply a ``window`` to a dimension.
+  - ``trigger``: perform a coincidence trigger on a precomputed custom
+    characteristic function.
   - ``unbias``: bias correct the correlation estimate.
   - ``window``: construct a taper window for a coordinate using any window of
     `scipy.signal.windows <https://docs.scipy.org/doc/scipy/reference/signal.windows.html>`_ 
@@ -93,10 +94,9 @@ Install xcorr via ``pip``:
    pip install -e .
 
 
-Required are Python version 3.5 or higher and the modules `NumPy`_, `SciPy`_,
-`ObsPy`_, `Pandas`_, and `xarray`_.
-Old versions of `ObsPy`_ (<1.2.0) and `NumPy`_ tend to cause problems which
-kills the `remove_response`_ function of `ObsPy`_.
+Required are Python version 3.6 or higher and the modules `NumPy`, `SciPy`,
+`ObsPy`, `Pandas`, and `Xarray`.
+
 Create a working (non-conflicting) Python 3.7 environment in conda as follows:
 
 .. code-block:: console
@@ -107,7 +107,7 @@ Create a working (non-conflicting) Python 3.7 environment in conda as follows:
 Citation
 ========
 
-If you publish results for which you used empymod, please give credit by citing
+If you publish results for which you used xcorr, please give credit by citing
 `Smets (2020)  <#>`_:
 
     Smets, P. S. M., ... (2020), title: Journal (number), pages; DOI:

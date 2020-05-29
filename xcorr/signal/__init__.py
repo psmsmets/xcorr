@@ -10,11 +10,12 @@ from ..signal.mask import mask, multi_mask
 from ..signal.rms import rms
 from ..signal.snr import snr
 from ..signal.spectrogram import spectrogram
-from ..signal.stack import stack
 from ..signal.taper import taper
+from ..signal.trigger import coincidence_trigger
 from ..signal.unbias import unbias
 from ..signal.window import window
 
 
-__all__ = ['detrend', 'demean', 'filter', 'mask', 'multi_mask', 'rms', 'snr',
-           'spectrogram', 'stack', 'taper', 'unbias', 'window']
+__all__ = ['coincidence_trigger', 'detrend', 'demean', 'filter',
+           'mask', 'multi_mask', 'rms', 'snr', 'spectrogram',
+           'taper', 'unbias', 'window']

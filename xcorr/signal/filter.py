@@ -54,7 +54,8 @@ def filter(
         last dimension of ``x``.
 
     **kwargs :
-        Additional parameters provided to :func:`xarray.apply_ufunc`.
+        Any additional keyword arguments will be passed to
+        :func:`xarray.apply_ufunc`.
 
     Returns
     -------

@@ -63,8 +63,9 @@ def spectrogram(
         The time coordinates name of ``x`` used to compute the spectrogram.
         Defaults to the last dimension.
 
-    **kwargs
-        Extra arguments passed on to :func:`scipy.signal.spectrogram`.
+    **kwargs :
+        Any additional keyword arguments will be passed to
+        :func:`scipy.signal.spectrogram`.
 
     Returns
     -------

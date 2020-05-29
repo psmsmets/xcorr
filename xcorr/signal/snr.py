@@ -31,7 +31,7 @@ def snr(
     Parameters
     ----------
     x : :class:`xarray.DataArray`
-        The array of data to compute the snr for.
+        The array of data to compute the snr ratio.
 
     signal : :class:`xarray.DataArray`
         The boolean array masking the signal window of ``x``.
@@ -40,12 +40,13 @@ def snr(
         The boolean array masking the noise window of ``x``.
 
     dim : `str`, optional
-        The coordinates name of ``x`` to be filtered over. Default is 'lag'.
+        The coordinates name of ``x`` to compute the snr for. Defaults to the
+        last dimension of ``x``.
 
     Returns
     -------
     snr : :class:`xarray.DataArray`
-        The snr output of ``x``.
+        The computed snr for ``x``.
 
     """
     dim = dim or x.dims[-1]

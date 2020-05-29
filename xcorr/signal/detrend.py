@@ -49,7 +49,8 @@ def detrend(
         last dimension of ``x``.
 
     **kwargs :
-        Additional parameters provided to :func:`xarray.apply_ufunc`.
+        Any additional keyword arguments will be passed to
+        :func:`xarray.apply_ufunc`.
 
     Returns
     -------
@@ -114,7 +115,8 @@ def demean(x: xr.DataArray, dim: str = None, **kwargs):
         last dimension of ``x``.
 
     **kwargs :
-        Additional parameters provided to :func:`xarray.apply_ufunc`.
+        Any additional keyword arguments will be passed to
+        :func:`xarray.apply_ufunc`.
 
     Returns:
     --------
