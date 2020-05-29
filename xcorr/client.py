@@ -893,9 +893,9 @@ class Client(object):
             if raise_error:
 
                 raise ValueError(
-                    'Preprocessed stream fails {}duration check.'.format(
-                        'strict ' if strict else ''
-                    )
+                    ('Preprocessed stream fails {}duration check: '
+                     '{} sample difference.')
+                    .format('strict ' if strict else '', diff)
                 )
 
             return Stream()
