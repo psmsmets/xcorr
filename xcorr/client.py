@@ -459,7 +459,7 @@ class Client(object):
             raise ValueError('duration cannot be zero or negative.')
 
         # check buffer
-        buffer = buffer or 0.
+        buffer = buffer or 60.
 
         if not (isinstance(buffer, float) or isinstance(buffer, int)):
 
@@ -749,8 +749,9 @@ class Client(object):
         self, receiver: str, time: pd.Timestamp, preprocess: dict,
         duration: float = 86400., centered: bool = True,
         inventory: Inventory = None, substitute: bool = True,
-        three_components: str = '12Z', raise_error: bool = False,
-        verb: int = 0, strict: bool = False, **kwargs
+        three_components: str = '12Z',  duration_check: bool = True,
+        strict: bool = True, raise_error: bool = False, verb: int = 0,
+        **kwargs
     ):
         """
         Get preprocessed waveforms from the clients given a SEED-id and an
@@ -787,15 +788,19 @@ class Client(object):
         three_components: {'12Z', 'NEZ'}, optional
             Set the three-component orientation characters. Defaults to '12Z'.
 
+        duration_check: `bool`, optional
+            If `True` (default), verify the preprocessed stream duration using
+            the ``strict`` method if enabled.
+
+        strict: `bool`, optional
+            If `True` (default), the samples difference between the expected
+            and the obtained number of samples is zero. If `False`, a
+            two-sample difference is allowed (solving nearest sample related
+            differences).
+
         raise_error : `bool`, optional
             If `True` raise when an error occurs. Otherwise a warning is given.
             Defaults to `False`.
-
-        strict: `bool`, optional
-            If `True`, the samples difference between the expected and the
-            obtained number of samples is zero. If `False` (default), a
-            two-sample difference is allowed (solving to nearest_sample
-            differences).
 
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
@@ -885,20 +890,22 @@ class Client(object):
 
             return Stream()
 
-        # only allow 2 sample difference (max nearest sample difference)
-        diff = duration / st[0].stats.delta - st[0].stats.npts
+        # check stream duration
+        if duration_check:
 
-        if diff > (0 if strict else 2):
+            diff = duration / st[0].stats.delta - st[0].stats.npts
 
-            if raise_error:
+            if diff > (0 if strict else 2):
 
-                raise ValueError(
-                    ('Preprocessed stream fails {}duration check: '
-                     '{} sample difference.')
-                    .format('strict ' if strict else '', diff)
-                )
+                if raise_error:
 
-            return Stream()
+                    raise ValueError(
+                        ('Preprocessed stream fails {}duration check: '
+                         '{} sample difference.')
+                        .format('strict ' if strict else '', diff)
+                    )
+
+                return Stream()
 
         return st
 
@@ -926,6 +933,7 @@ class Client(object):
 
         kwargs['centered'] = False
         kwargs['raise_error'] = True
+        kwargs['duration_check'] = False
 
         try:
 
