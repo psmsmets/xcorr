@@ -30,7 +30,7 @@ def coincidence_trigger(
 ):
     """
     Compute the triggered periods of an N-D labeled array of data with
-    precomputed custom characteristic functions, for example, the
+    precomputed characteristic functions such as, for example, the
     signal-to-noise ratio.
 
     Parameters

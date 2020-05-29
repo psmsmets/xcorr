@@ -55,8 +55,8 @@ Main xcorr features listed per submodule:
   - ``spectrogram``: compute the power spectrogram (density or spectrum).
     year-day, year-month. 
   - ``taper``: apply a ``window`` to a dimension.
-  - ``trigger``: perform a coincidence trigger on a precomputed custom
-    characteristic function.
+  - ``trigger``: perform a coincidence trigger on a precomputed characteristic
+    function, for example, the signal-to-noise ratio.
   - ``unbias``: bias correct the correlation estimate.
   - ``window``: construct a taper window for a coordinate using any window of
     `scipy.signal.windows <https://docs.scipy.org/doc/scipy/reference/signal.windows.html>`_ 
