@@ -1203,8 +1203,10 @@ class Client(object):
 
             raise RuntimeError('Dask is required but cannot be found!')
 
+        # init
         verified = 0
 
+        # evaluate receiver and days
         for receiver in status.receiver:
 
             rec_dict = util.receiver.receiver_to_dict(str(receiver.values))
@@ -1222,7 +1224,7 @@ class Client(object):
 
                 if parallel:
 
-                    # todo: chunk per item and make use of apply_ufunc!
+                    # todo: chunk per item to avoid set_status_flag
                     flag = dask.delayed(self._test_waveforms_for_date)(**args)
                     verified = dask.delayed(set_status_flag)(
                         status, receiver, time, flag, verified

@@ -22,31 +22,9 @@ print(client)
 
 
 ###############################################################################
-# Get waveforms
-# -------------
-
-# Get waveforms for an entire day (default duration is 86400s)
-EDH = client.get_waveforms(
-    receiver='IM.H10N1..EDH',
-    time=pd.to_datetime('2015-01-15T00:00'),
-    centered=False,
-    verb=3,
-)
-# View the stream
-print(EDH)
-
-# Validate the duration
-client.check_duration(EDH, sampling_rate=250.)
-
-# Plot
-f = EDH.plot()
-
-
-###############################################################################
 # Inventory
 # ---------
 inv = read_inventory('../../data/Monowai.xml')
-f = inv.plot(color=0., projection='local')
 
 
 ###############################################################################
@@ -124,61 +102,51 @@ preprocess = {
 
 
 ###############################################################################
-# Preprocessed waveforms
-# ----------------------
-
-# EDH
-H10 = client.get_preprocessed_waveforms(
-    receiver='IM.H10N1..EDH',
-    time=pd.to_datetime('2015-01-15T12:00'),
-    preprocess=preprocess,
-    inventory=inv,
-    verb=0,
-)
-f = H10.plot()
-
-# BHZ
-BHZ = client.get_preprocessed_waveforms(
-    receiver='IU.RAR.10.BHZ',
-    time=pd.to_datetime('2015-01-15T12:00'),
-    preprocess=preprocess,
-    inventory=inv,
-    verb=True,
-)
-f = BHZ.plot()
-
-# BHR
-BHR = client.get_preprocessed_waveforms(
-    receiver='IU.RAR.10.BHR',
-    time=pd.to_datetime('2016-01-15T12:00'),
-    preprocess=preprocess,
-    inventory=inv,
-    verb=2,
-)
-f = BHR.plot()
-
-
-###############################################################################
-# Preprocessed pair stream
+# Verify data availability
 # ------------------------
 
-pair = client.get_pair_preprocessed_waveforms(
-    pair='IM.H10N1..EDH-IU.RAR.10.BHZ',
-    time=pd.to_datetime('2015-01-15T12:00'),
-    preprocess=preprocess,
-    inventory=inv,
-    verb=2,
+# set pairs and times
+pairs = [
+    'IM.H10N1..EDH-IU.RAR.10.BHZ',
+    'IM.H10N1..EDH-IU.RAR.10.BHR',
+    'IM.H03S1..EDH-IU.RAR.10.BHZ',
+    'IM.H03S1..EDH-IU.RAR.10.BHR',
+]
+times = pd.date_range('2015-01-01', '2015-01-10', freq='1D')
+
+# evaluate data status
+status = client.data_availability(
+    pairs, times, verb=2, download=False, substitute=True
 )
-f = pair[0].plot()
-f = pair[1].plot()
+
+# print summary per receiver
+print(status.sum(dim='time') / status.time.size)
+
+# or in separate steps to control dask delayed compute showing a progressbar
+status = client.init_data_availability(pairs, times, substitute=True)
+delayed_status = client.verify_data_availability(
+    status, download=False, compute=False
+)
+with ProgressBar():
+    verified = delayed_status.compute()
+
+# number of verified days per receiver
+print(verified)
 
 
 ###############################################################################
-# Hash
-# ----
+# Verify preprocessing
+# --------------------
 
-# hash
-xcorr.util.hasher.hash_Stream(pair)
+# on-the-fly
+status = client.data_preprocessing(pairs, times[0], preprocess, inv)
 
-# or using the wrapper
-xcorr.util.hasher.hash(pair)
+# in steps
+status = client.init_data_preprocessing(
+    pairs, times[0], preprocess=preprocess, substitute=True
+)
+delayed_status = client.verify_data_preprocessing(
+    status, inventory=inv, download=False, compute=False
+)
+with ProgressBar():
+    verified = delayed_status.compute()
