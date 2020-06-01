@@ -18,6 +18,7 @@ from dask.diagnostics import ProgressBar
 
 
 # Relative imports
+from ..version import version
 from ..core import core
 from ..client import Client
 from .. import util
@@ -264,6 +265,7 @@ def lazy_process(
     print('    force_fresh  :', force_fresh)
     print('    download     :', download)
     print('    debug        :', debug)
+    print('    version      :', version)
 
     # -------------------------------------------------------------------------
     # various inits
