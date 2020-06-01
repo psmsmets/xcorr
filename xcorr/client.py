@@ -555,7 +555,20 @@ class Client(object):
 
         for sds in self.sds_read:
 
-            stream = sds.get_waveforms(**kwargs)
+            try:
+
+                stream = sds.get_waveforms(**kwargs)
+
+            except (KeyboardInterrupt, SystemExit):
+
+                raise
+
+            except Exception as e:
+
+                if verb > 0:
+
+                    print('an error occurred:')
+                    print(e)
 
             if not stream:
 
