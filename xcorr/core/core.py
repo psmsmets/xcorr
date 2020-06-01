@@ -1049,9 +1049,12 @@ def process(
     )
     # extract and validate preprocess operations
     if isinstance(dataset.pair.preprocess, dict):
+
         o = dataset.pair.preprocess
         check_operations_hash(o, raise_error=True)
+
     else:
+
         o = operations_to_dict(dataset.pair.preprocess)
 
     # check lag indices and update if necessary
@@ -1068,23 +1071,30 @@ def process(
             # set location
             pt = {'pair': p, 'time': t}
 
-            if verb:
+            if verb > 0:
+
                 print(str(p.values), str(t.values)[:19], end=': ')
 
             # skip processed
             if dataset.status.loc[pt].values != 0:
+
                 if not (
                     retry_missing and
                     dataset.status.loc[pt].values == -1
                 ):
-                    if verb:
+
+                    if verb > 0:
+
                         print('Has status "{}". Skip.'.format(
                               dataset.status.loc[pt].values))
+
                     continue
 
             # waveforms
-            if verb:
+            if verb > 0:
+
                 print('Waveforms', end='. ')
+
             st = client.get_pair_preprocessed_waveforms(
                 pair=p.values,
                 time=t.values,
@@ -1096,11 +1106,19 @@ def process(
                 strict=True,
                 **kwargs
             )
+
             if not isinstance(st, obspy.Stream) or len(st) != 2:
-                print('Missing data. Set status "-1" and skip.')
+
+                if verb > 0:
+
+                    print('Missing data. Set status "-1" and skip.')
+
                 dataset.status.loc[pt] = -1
+
                 if test_run:
+
                     break
+
                 continue
 
             # track timing offsets
@@ -1116,13 +1134,18 @@ def process(
 
             # hash
             if hash_waveforms:
-                if verb:
+
+                if verb > 0:
+
                     print('Hash', end='. ')
+
                 dataset.hash.loc[pt] = util.hash_Stream(st)
 
             # cc
-            if verb:
+            if verb > 0:
+
                 print('CC', end='. ')
+
             dataset.cc.loc[pt] = correlate.cc(
                 x=st[0].data[:dataset.lag.attrs['npts']],
                 y=st[1].data[:dataset.lag.attrs['npts']],
@@ -1136,9 +1159,12 @@ def process(
             dataset.status.loc[pt] = 1
 
             # Finish
-            if verb:
+            if verb > 0:
+
                 print('Done.')
+
             if test_run:
+
                 break
 
     # update history
@@ -1148,6 +1174,7 @@ def process(
 
     # bias correct?
     if dataset.cc.attrs['bias_correct'] == 1:
+
         dataset = bias_correct(dataset)
 
     # update metadata hash
