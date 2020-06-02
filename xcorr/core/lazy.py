@@ -14,8 +14,9 @@ import pandas as pd
 import xarray as xr
 from obspy import Inventory
 import dask
-from dask.diagnostics import ProgressBar
-
+import dask.distributed
+from dask.diagnostics import (ProgressBar, Profiler, ResourceProfiler,
+                              CacheProfiler, visualize)
 
 # Relative imports
 from ..version import version
@@ -205,7 +206,7 @@ def lazy_process(
     pairs: list, times: pd.DatetimeIndex, init_args: dict, client_args: dict,
     inventory: Inventory, root: str, threads: int = None,
     progressbar: bool = True, force_fresh: bool = False, download: bool = True,
-    debug: bool = False, **kwargs
+    debug: bool = False, profiler: bool = False, **kwargs
 ):
     """
     Lazy process a lot of data with xcorr and dask.
@@ -255,6 +256,21 @@ def lazy_process(
         Parameters passed to :func:`lazy_processes`.
 
     """
+
+    # -------------------------------------------------------------------------
+    # Dask profiler
+    # -------------------------------------------------------------------------
+    if profiler:
+
+        prof = Profiler()
+        prof.register()
+
+        rprof = ResourceProfiler(dt=0.25)
+        rprof.register()
+
+        cprof = CacheProfiler()
+        cprof.register()
+
     # -------------------------------------------------------------------------
     # Print some config parameters
     # -------------------------------------------------------------------------
@@ -265,6 +281,7 @@ def lazy_process(
     print('    force_fresh  :', force_fresh)
     print('    download     :', download)
     print('    debug        :', debug)
+    print('    profiler     :', profiler)
     print('    version      :', version)
 
     # -------------------------------------------------------------------------
@@ -280,25 +297,31 @@ def lazy_process(
     # minimize output to stdout in dask!
     warnings.filterwarnings("ignore")
 
+    # dask compute arguments
     if debug:
 
+        # allow verbose
         verb = kwargs['verb'] if 'verb' in kwargs else 1
-        compute_args = dict(scheduler='single-threaded')
+
+        # single-threaded
+        dask.config.set(scheduler='single-threaded')
 
     else:
 
+        # disable verbose globally
         verb = 0
-        compute_args = dict()
 
+        # set workers/threads
         if isinstance(threads, int):
 
-            compute_args['num_workers'] = threads
+            dask.config.set(num_workers=threads)
 
         if progressbar:
 
             pbar = ProgressBar()
             pbar.register()
 
+    # make sure there is no verb in kwargs
     if 'verb' in kwargs:
 
         kwargs.pop('verb')
@@ -338,7 +361,7 @@ def lazy_process(
     # -------------------------------------------------------------------------
     print('-'*79)
     print('Verify availability')
-    verified = lazy_availability.compute(**compute_args)
+    verified = lazy_availability.compute()
     pcnt = 100 * verified / availability.size
     print('    Verified : {} of {} ({:.1f}%)'
           .format(verified, availability.size, pcnt))
@@ -390,7 +413,7 @@ def lazy_process(
     # evaluate availability
     print('-'*79)
     print('Verify preprocessing')
-    verified = lazy_preprocessing.compute(**compute_args)
+    verified = lazy_preprocessing.compute()
     pcnt = 100 * verified / preprocessing.size
     print('    Reference time : {}'.format(str(time)))
     print('    Verified : {} of {} ({:.1f}%)'
@@ -415,11 +438,21 @@ def lazy_process(
             pairs, times, availability, preprocessing, init_args,
             client=client, inventory=inventory, root=root,
             force_fresh=force_fresh, verb=verb, **kwargs
-        ),
-        **compute_args,
+        )
     )
     results = results[0]  # unpack tuple (only one variable returned)
     completed = sum(results)
     pcnt = 100 * completed / len(results) if len(results) > 0 else 0.
     print('    Completed : {} of {} ({:.1f}%)'
           .format(completed, len(results), pcnt))
+
+    # -------------------------------------------------------------------------
+    # Dask profiler
+    # -------------------------------------------------------------------------
+    if profiler:
+
+        visualize([prof, rprof, cprof])
+
+        prof.clear()
+        rprof.clear()
+        cprof.clear()
