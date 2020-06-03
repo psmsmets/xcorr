@@ -561,13 +561,13 @@ class Client(object):
 
             # warnings.simplefilter('error::InternalMSEEDWarning')
             obspyWarn.filterwarnings('error', 'InternalMSEEDWarning')
-            obspyWarn.filterwarnings('error', 'Incompatible traces')
 
             for sds in self.sds_read:
 
                 try:
 
                     stream = sds.get_waveforms(**kwargs)
+                    stream = stream.merge()
 
                 except (KeyboardInterrupt, SystemExit):
 
