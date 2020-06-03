@@ -16,7 +16,7 @@ from obspy import UTCDateTime, Stream, Inventory
 from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
-from obspy import warings as obspyWarn
+from obspy import warnings as obspyWarn
 import warnings
 from tabulate import tabulate
 # VDMS client for IMS waveforms?
