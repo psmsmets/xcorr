@@ -320,7 +320,7 @@ class Client(object):
             util.stream.stream2SDS(
                 stream,
                 sds_path=self.sds_root_write,
-                method='merge',
+                method='overwrite',
                 extra_samples=None,
                 verbose=verb == 4,
             )

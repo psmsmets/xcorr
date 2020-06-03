@@ -31,9 +31,6 @@ __all__ = ['stream2SDS']
 # year, network, station,  channel, julday
 sdsPattern = os.path.join('*{}', '{}', '{}', '{}.*', '*.{}')
 
-# number of seconds per day
-one_day = 86400  # 24 * 60 * 60
-
 
 def stream2SDS(
     stream: Stream, sds_path: str, datatype: str = 'D',
