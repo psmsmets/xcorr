@@ -645,7 +645,7 @@ class Client(object):
         """
         time = UTCDateTime(pd.to_datetime(date) +
                            pd.offsets.DateOffset(0, normalize=True))
-        get_args = dict(**receiver, starttime=time, endtime=time + 86399.99999)
+        get_args = dict(**receiver, starttime=time, endtime=time + 86400)
 
         set_args = dict(verb=verb-2, force_write=force_write)
 
