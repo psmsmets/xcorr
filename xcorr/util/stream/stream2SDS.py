@@ -87,13 +87,22 @@ def stream2SDS(
         Information about the process is printed to stdout if `True`.
         Set to ``False`` (default) to suppress output.
     """
+
+    # check method
+    if method not in ('merge', 'overwrite'):
+
+        raise ValueError('Method should be "merge" or "overwrite".')
+
+    # get merged (masked) stream per seedid per day
     stream = _slice_days(stream, extra_samples, sampling_precision)
 
+    # write masked day traces
     for tr in stream:
 
         starttime = tr.stats.starttime
 
         if tr.stats.endtime - starttime < min_seconds:
+
             continue
 
         id = tr.id
@@ -125,10 +134,12 @@ def stream2SDS(
 
                 # compare the existing data to the new data
                 if streams_almost_equal(tr, existing):
-                    # warnings.warn(
-                    #     f'File {out_fn} already contains the data for {id}.'
-                    #     ' Set ``method="overwrite"`` to force overwriting.'
-                    # )
+
+                    warnings.warn(
+                        f'File {out_fn} already contains the data for {id}.'
+                        ' Set ``method="overwrite"`` to force overwriting.'
+                    )
+
                     # skip merging and writing if data is the same
                     continue
 
@@ -158,7 +169,7 @@ def stream2SDS(
 
                 continue
 
-        elif method == 'overwrite':
+        else:
 
             if verbose:
 
