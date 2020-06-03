@@ -7,7 +7,6 @@ xcorr client.
 """
 import pandas as pd
 from obspy import read_inventory
-from dask.diagnostics import ProgressBar
 import xcorr
 
 ###############################################################################

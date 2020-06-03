@@ -7,18 +7,33 @@ xcorr client.
 """
 import pandas as pd
 from obspy import read_inventory
-from dask.diagnostics import ProgressBar
+from dask import distributed
+from shutil import rmtree
 import xcorr
 
+
 ###############################################################################
-# Client object
-# -------------
+# dask client
+# -----------
+
+dcluster = distributed.LocalCluster(
+    processes=False, threads_per_worker=1, n_workers=2,
+)
+dclient = distributed.Client(dcluster)
+
+print('Dask client:', dclient)
+print('Dask dashboard:', dclient.dashboard_link)
+
+###############################################################################
+# xcorr client
+# ------------
 
 # Create a client object.
-client = xcorr.Client(sds_root='../../data/WaveformArchive')
+xclient = xcorr.Client(sds_root='../../data/WaveformArchive')
 
 # Inspect the client summary
-print(client)
+print('xcorr client:')
+print(xclient)
 
 
 ###############################################################################
@@ -115,8 +130,8 @@ pairs = [
 times = pd.date_range('2015-01-01', '2015-01-10', freq='1D')
 
 # evaluate data status
-status = client.data_availability(
-    pairs, times, verb=2, download=False, substitute=True
+status = xclient.data_availability(
+    pairs, times, verb=1, download=False, substitute=True
 )
 
 
@@ -125,4 +140,15 @@ status = client.data_availability(
 # --------------------
 
 # on-the-fly evaluate data preprocessing
-# status = client.data_preprocessing(pairs, times[0], preprocess, inv)
+status = xclient.data_preprocessing(
+    pairs, times[0], preprocess, inv, verb=1, substitute=True
+)
+
+
+###############################################################################
+# Cleanup
+# -------
+
+dclient.close()
+dcluster.close()
+rmtree('dask-worker-space')

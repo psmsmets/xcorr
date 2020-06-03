@@ -8,15 +8,13 @@ Lazy processing using `xcorr`.
 """
 
 # Mandatory imports
-import warnings
 import numpy as np
 import pandas as pd
 import xarray as xr
 from obspy import Inventory
+from shutil import rmtree
 import dask
-import dask.distributed
-from dask.diagnostics import (ProgressBar, Profiler, ResourceProfiler,
-                              CacheProfiler, visualize)
+from dask import distributed
 
 # Relative imports
 from ..version import version
@@ -205,8 +203,8 @@ def lazy_processes(
 def lazy_process(
     pairs: list, times: pd.DatetimeIndex, init_args: dict, client_args: dict,
     inventory: Inventory, root: str, threads: int = None,
-    progressbar: bool = True, force_fresh: bool = False, download: bool = True,
-    debug: bool = False, profiler: bool = False, **kwargs
+    force_fresh: bool = False, download: bool = True,
+    debug: bool = False, **kwargs
 ):
     """
     Lazy process a lot of data with xcorr and dask.
@@ -258,44 +256,8 @@ def lazy_process(
     """
 
     # -------------------------------------------------------------------------
-    # Dask profiler
+    # Dask
     # -------------------------------------------------------------------------
-    if profiler:
-
-        prof = Profiler()
-        prof.register()
-
-        rprof = ResourceProfiler(dt=0.25)
-        rprof.register()
-
-        cprof = CacheProfiler()
-        cprof.register()
-
-    # -------------------------------------------------------------------------
-    # Print some config parameters
-    # -------------------------------------------------------------------------
-    print('-'*79)
-    print('Config')
-    print('    results root :', root)
-    print('    threads      :', 1 if debug else (threads or -1))
-    print('    force_fresh  :', force_fresh)
-    print('    download     :', download)
-    print('    debug        :', debug)
-    print('    profiler     :', profiler)
-    print('    version      :', version)
-
-    # -------------------------------------------------------------------------
-    # various inits
-    # -------------------------------------------------------------------------
-
-    # init the waveform client
-    client = Client(**client_args)
-
-    # Read and filter inventory
-    inventory = util.receiver.get_pair_inventory(pairs, inventory, times)
-
-    # minimize output to stdout in dask!
-    warnings.filterwarnings("ignore")
 
     # dask compute arguments
     if debug:
@@ -304,41 +266,54 @@ def lazy_process(
         verb = kwargs['verb'] if 'verb' in kwargs else 1
 
         # single-threaded
-        dask.config.set(scheduler='single-threaded')
+        dcluster = distributed.LocalCluster(
+            processes=False, scheduler='single-threaded',
+        )
 
     else:
 
         # disable verbose globally
         verb = 0
 
-        # set workers/threads
-        if isinstance(threads, int):
-
-            dask.config.set(num_workers=threads)
-
-        if progressbar:
-
-            pbar = ProgressBar()
-            pbar.register()
+        # init local cluster
+        dcluster = distributed.LocalCluster(
+            processes=False, threads_per_worker=1, n_workers=threads or -1,
+        )
 
     # make sure there is no verb in kwargs
     if 'verb' in kwargs:
 
         kwargs.pop('verb')
 
+    # dask client from cluster
+    dclient = distributed.Client(dcluster)
+
     # -------------------------------------------------------------------------
-    # Init data availability
+    # Print some config parameters
     # -------------------------------------------------------------------------
-    extend_days = 1
-    availability = client.init_data_availability(
-        pairs, times, extend_days=extend_days, substitute=True
-    )
-    lazy_availability = client.verify_data_availability(
-        availability,
-        download=download,
-        compute=False,
-        verb=verb,
-    )
+    print('-'*79)
+    print('Config')
+    print('    results root   :', root)
+    print('    threads        :', 1 if debug else (threads or -1))
+    print('    force_fresh    :', force_fresh)
+    print('    download       :', download)
+    print('    debug          :', debug)
+    print('    xcorr version  :', version)
+    print('    dask dashboard :', dclient.dashboard_link)
+
+    print(dclient)
+
+    # -------------------------------------------------------------------------
+    # various inits
+    # -------------------------------------------------------------------------
+
+    # init the waveform client
+    xclient = Client(**client_args)
+
+    print(xclient)
+
+    # Read and filter inventory
+    inventory = util.receiver.get_pair_inventory(pairs, inventory, times)
 
     # -------------------------------------------------------------------------
     # Print main data parameters
@@ -347,11 +322,13 @@ def lazy_process(
     print('Data')
     print('    pairs : {}'.format(len(pairs)))
 
+    extend_days = 1
+
     for p in pairs:
 
         print('        {}'.format(p))
 
-    print('    times : {} ({})'.format(len(times), len(availability.time)))
+    print('    times : {}'.format(len(times)))
     print('        start  : {}'.format(times[0]))
     print('        end    : {}'.format(times[-1]))
     print('        extend : {} day(s)'.format(extend_days))
@@ -361,20 +338,13 @@ def lazy_process(
     # -------------------------------------------------------------------------
     print('-'*79)
     print('Verify availability')
-    verified = lazy_availability.compute()
-    pcnt = 100 * verified / availability.size
-    print('    Verified : {} of {} ({:.1f}%)'
-          .format(verified, availability.size, pcnt))
-    print('    Overall availability : {:.2f}%'
-          .format(100 * np.sum(availability.values == 1) / availability.size))
-    print('    Receiver availability')
 
-    for rec in availability.receiver:
-
-        pcnt = 100*np.sum(
-            availability.loc[{'receiver': rec}].values == 1
-        ) / availability.time.size
-        print('        {} : {:.2f}%'.format(rec.values, pcnt))
+    availability = xclient.init_data_availability(
+        pairs, times, extend_days=extend_days,
+        substitute=True,
+        download=download,
+        verb=verb or 1,
+    )
 
     # -------------------------------------------------------------------------
     # Data preprocessing (parallel)
@@ -396,37 +366,18 @@ def lazy_process(
         )
 
     time = pd.to_datetime(time.values)
-    preprocessing = client.init_data_preprocessing(
+
+    preprocessing = xclient.data_preprocessing(
         pairs, time,
-        preprocess=init_args['preprocess'], substitute=True
-    )
-    lazy_preprocessing = client.verify_data_preprocessing(
-        preprocessing,
+        preprocess=init_args['preprocess'],
         inventory=inventory,
+        substitute=True,
         duration=init_args['window_length'],
         sampling_rate=init_args['sampling_rate'],
         download=False,
         compute=False,
-        verb=verb,
+        verb=verb or 1,
     )
-
-    # evaluate availability
-    print('-'*79)
-    print('Verify preprocessing')
-    verified = lazy_preprocessing.compute()
-    pcnt = 100 * verified / preprocessing.size
-    print('    Reference time : {}'.format(str(time)))
-    print('    Verified : {} of {} ({:.1f}%)'
-          .format(verified, preprocessing.size, pcnt))
-    print('    Overall preprocessing : {:.2f}% passed'
-          .format(100*np.sum(preprocessing.values == 1) / preprocessing.size))
-    print('    Receiver preprocessing')
-
-    for rec in preprocessing.receiver:
-
-        passed = np.all(preprocessing.loc[{'receiver': rec}].values == 1)
-        print('        {} :'.format(rec.values),
-              'passed' if passed else 'failed')
 
     # -------------------------------------------------------------------------
     # Evaluate lazy process list
@@ -436,7 +387,7 @@ def lazy_process(
     results = dask.compute(
         lazy_processes(
             pairs, times, availability, preprocessing, init_args,
-            client=client, inventory=inventory, root=root,
+            client=xclient, inventory=inventory, root=root,
             force_fresh=force_fresh, verb=verb, **kwargs
         )
     )
@@ -449,10 +400,8 @@ def lazy_process(
     # -------------------------------------------------------------------------
     # Dask profiler
     # -------------------------------------------------------------------------
-    if profiler:
+    if not debug:
 
-        visualize([prof, rprof, cprof])
-
-        prof.clear()
-        rprof.clear()
-        cprof.clear()
+        dclient.close()
+        dcluster.close()
+        rmtree('dask-worker-space')

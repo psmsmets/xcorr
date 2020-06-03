@@ -16,7 +16,11 @@ import xcorr
 # --------------
 
 # open merged list using dask
-ds = xcorr.mfread('../../data/results/*/*2015.0*.nc', fast=True, chunks={'time': 4})
+ds = xcorr.mfread(
+    '../../data/results/*/*2015.0*.nc',
+    fast=True,
+    chunks={'time': 4}
+)
 assert ds, 'No data found!'
 
 # common plot settings

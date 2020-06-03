@@ -17,6 +17,7 @@ from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
 from obspy import warnings as obspyWarn
+import traceback
 import warnings
 from tabulate import tabulate
 # VDMS client for IMS waveforms?
@@ -38,7 +39,7 @@ except ModuleNotFoundError:
 
 # Relative imports
 from .preprocess import preprocess as xcorr_preprocess
-from .preprocess import operations_to_json, operations_to_dict
+from .preprocess import operations_to_json
 from . import util
 
 
@@ -569,7 +570,7 @@ class Client(object):
         # parallel?
         parallel = self.parallel if parallel is None else parallel
 
-        # lock? 
+        # lock?
         lock = distributed and parallel
 
         # get seedid, extra arguments are ignored
@@ -600,7 +601,7 @@ class Client(object):
                         t0 = kwargs['starttime'] - sds.fileborder_seconds
                         t1 = kwargs['endtime'] + sds.fileborder_seconds
 
-                        # construct unique thread string for files to be accessed
+                        # construct unique thread id for files to be accessed
                         threadId = '{}+{}+{}+{}'.format(
                             sds.sds_root,
                             receiver,
@@ -611,9 +612,7 @@ class Client(object):
                         # lock thread file access
                         if lock:
 
-                            print('lock thread sds file access')
                             threadLock = distributed.Lock(threadId)
-                            print(threadLock)
                             threadLock.acquire()
 
                     # get waveforms
@@ -622,7 +621,6 @@ class Client(object):
                     # release
                     if lock:
 
-                        print('release thread sds file access')
                         threadLock.release()
 
                     # test for sample rate issues
@@ -631,6 +629,20 @@ class Client(object):
                 except (KeyboardInterrupt, SystemExit):
 
                     raise
+
+                except Exception as e:
+
+                    if verb > 0:
+
+                        print('An error occurred:')
+                        print(e)
+
+                    if verb > 1:
+
+                        print('-'*79)
+                        track = traceback.format_exc()
+                        print(track)
+                        print('-'*79)
 
                 except Warning as w:
 
@@ -717,8 +729,6 @@ class Client(object):
         if scan_sds:
 
             daystream = self._get_sds_waveforms(verb=verb-1, **get_args)
-
-            print(daystream)
 
             if daystream:
 
@@ -1082,7 +1092,8 @@ class Client(object):
     def data_availability(
         self, pairs_or_receivers: list, times: pd.DatetimeIndex,
         extend_days: int = None, substitute: bool = False,
-        three_components: str = None, verb: int = 0, **kwargs
+        three_components: str = None, parallel: bool = None,
+        verb: int = 0, **kwargs
     ):
         """
         Verify the waveform data availability for receivers and times.
@@ -1109,75 +1120,20 @@ class Client(object):
             Set the three-component orientation characters for ``substitute``.
             Defaults to '12Z'.
 
+        parallel : `bool`, optional
+            Enable parallel processing using :method:`dask`. If `None`
+            (default) ``self.parallel`` is used.
+
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
         **kwargs :
-            Parameters passed to :meth:`_verify_data_availability`.
+            Parameters passed to :meth:`_get_waveforms_for_date`
 
         Returns
         -------
         status : :class:`xarray.DataArray`
-            Data availability status N-D labelled array with dimensions
-            ``time`` and ``receiver``.
-
-        """
-        status = self._init_data_availability(
-            pairs_or_receivers, times, extend_days,
-            substitute, three_components
-        )
-
-        if verb:
-
-            print('Verify {} (receiver, time) combinations.'
-                  .format(status.size))
-
-        verified = self._verify_data_availability(
-            status, count_verified=True, verb=verb-1, **kwargs
-        )
-
-        if verb:
-
-            print('Verified {} out of {}.'
-                  .format(verified, status.size))
-
-        return status
-
-    def _init_data_availability(
-        self, pairs_or_receivers: list, times: pd.DatetimeIndex,
-        extend_days: int = None, substitute: bool = False,
-        three_components: str = None
-    ):
-        """
-        Create a new N-D labelled array to verify the waveform data
-        availability for receivers and times.
-
-        Parameters
-        ----------
-        pairs_or_receivers : `list`
-            List of receivers or pairs (receiver couple separated by a '-').
-            Each receiver should be specified by a SEED-id string of format
-            '{network}.{station}.{location}.{channel}'.
-
-        times : `pd.DatetimeIndex`
-            Sequence of dates with `freq`="D".
-
-        extend_days : `int`, optional
-            Extend ``times`` with n-days at both left and right edges.
-
-        substitute : `bool`, optional
-            If `True`, convert radial 'R' and transverse 'T' rotated
-            orientation codes automatically to ``three_components``.
-            Defaults to `False`.
-
-        three_components: {'12Z', 'NEZ'}, optional
-            Set the three-component orientation characters for ``substitute``.
-            Defaults to '12Z'.
-
-        Returns
-        -------
-        status : :class:`xarray.DataArray`
-            Data availability status N-D labelled array with dimensions
+            Data availability flags as an N-D labelled array with dimensions
             ``times`` and ``receivers``.
 
         """
@@ -1189,6 +1145,12 @@ class Client(object):
         assert isinstance(extend_days, int), (
             '``extend_days`` should be of type `int`!'
         )
+
+        parallel = self.parallel if parallel is None else parallel
+
+        if parallel and not dask:
+
+            raise RuntimeError('Dask is required but cannot be found!')
 
         # get all receivers from pairs
         receivers = []
@@ -1236,57 +1198,14 @@ class Client(object):
             'three_components': three_components,
         }
 
-        return status
+        if verb:
 
-    def _verify_data_availability(
-        self, status: xr.DataArray, count_verified: bool = False,
-        parallel: bool = None, compute: bool = True, verb: int = 0,
-        debug: bool = False, **kwargs
-    ):
-        """Verify daily waveform availability for receivers and times.
+            print('Verify {} (receiver, time) combinations.'
+                  .format(status.size))
 
-        Parameters
-        ----------
-        status : :class:`xarray.DataArray`
-            Data availability status N-D labelled array with dimensions
-            ``status.time`` and ``status.receiver``. ``status`` is updated in
-            place.
+        if parallel:
 
-        count_verified : `bool`, optional
-            If `True`, count the number of verified (receiver, time) couples.
-            Defaults to `False`.
-
-        parallel : `bool`, optional
-            Enable parallel processing using :method:`dask`. If `None`
-            (default) ``self.parallel`` is used.
-
-        compute : `bool`, optional
-            Compute the lazy :class:`dask.delayed` result in parallel, if
-            `True` (default) and ``dask`` is enabled. Set to `False` to add
-            more delayed tasks, or to visualize the process with
-            ``stream.visualize()``.
-
-        verb : {0, 1, 2, 3, 4}, optional
-            Level of verbosity. Defaults to 0.
-
-        **kwargs :
-            Parameters passed to :meth:`_get_waveforms_for_date`
-
-        Returns
-        -------
-        verified : `int`, optional
-            The number of verified (receiver, time) couples. If
-            ``count_verified`` is `True`, otherwise `None`.
-
-        """
-        parallel = self.parallel if parallel is None else parallel
-
-        if parallel and not dask:
-
-            raise RuntimeError('Dask is required but cannot be found!')
-
-        # init
-        verified = 0
+            lazy_flags = []
 
         # evaluate receiver and days
         for receiver in status.receiver:
@@ -1299,38 +1218,57 @@ class Client(object):
 
                     continue
 
-                args = {
-                    'receiver': rec_dict, 'date': time.values, 'verb': verb,
+                args = dict(
+                    receiver=rec_dict,
+                    date=time.values,
+                    verb=verb-1,
                     **kwargs
-                }
+                )
 
                 if parallel:
 
-                    # todo: chunk per item to avoid set_status_flag
-                    flag = dask.delayed(self._test_waveforms_for_date)(**args)
-                    verified = dask.delayed(set_status_flag)(
-                        status, receiver, time, flag, verified
+                    lazy_flags.append(
+                        dask.delayed(self._test_waveforms_for_date)(**args)
                     )
 
                 else:
 
-                    flag = self._test_waveforms_for_date(**args)
-                    verified = set_status_flag(
-                        status, receiver, time, flag, verified
+                    status.loc[{'receiver': receiver, 'time': time}] = (
+                        self._test_waveforms_for_date(**args)
                     )
 
         if parallel:
 
-            verified = verified.compute() if compute else verified
+            status.values = np.array(
+                dask.compute(lazy_flags)[0]
+            ).reshape(status.shape)
 
-        if count_verified or (parallel and not compute):
+        if verb:
 
-            return verified
+            verified = np.sum(status.values != 0)
+
+            pcnt = 100 * verified / status.size
+
+            print('Verified : {} of {} ({:.1f}%)'
+                  .format(verified, status.size, pcnt))
+            print('Overall availability : {:.2f}%'
+                  .format(100 * np.sum(status.values == 1) / status.size))
+            print('Receiver availability')
+
+            for rec in status.receiver:
+
+                pcnt = 100*np.sum(
+                    status.loc[{'receiver': rec}].values == 1
+                ) / status.time.size
+                print('    {} : {:.2f}%'.format(rec.values, pcnt))
+
+        return status
 
     def data_preprocessing(
         self, pairs_or_receivers: list, time: pd.Timedelta,
         preprocess: dict, inventory: Inventory, substitute: bool = False,
-        three_components: str = None, verb: int = 0, **kwargs
+        three_components: str = None, parallel: bool = None,
+        verb: int = 0, **kwargs
     ):
         """
         Verify the waveform data preprocessing for receivers and time.
@@ -1364,11 +1302,15 @@ class Client(object):
             Set the three-component orientation characters for ``substitute``.
             Defaults to '12Z'.
 
+        parallel : `bool`, optional
+            Enable parallel processing using :method:`dask`. If `None`
+            (default) ``self.parallel`` is used.
+
         verb : {0, 1, 2, 3, 4}, optional
-            Level of verbosity. Defaults to 0.
+            Level of verbosity. Defaults to 1.
 
         **kwargs :
-            Parameters passed to :meth:`_verify_data_availability`.
+            Parameters passed to :meth:`_get_waveforms_for_date`
 
         Returns
         -------
@@ -1377,72 +1319,17 @@ class Client(object):
             ``time`` and ``receiver``.
 
         """
-        status = self._init_data_preprocessing(
-            pairs_or_receivers, time, preprocess, substitute, three_components
-        )
 
-        if verb:
-
-            print('Verify {} receivers.'
-                  .format(status.size))
-
-        verified = self._verify_data_preprocessing(
-            status, inventory, count_verified=True, verb=verb - 1, **kwargs
-        )
-
-        if verb:
-
-            print('Verified {} out of {}.'
-                  .format(verified, status.size))
-
-        return status
-
-    def _init_data_preprocessing(
-        self, pairs_or_receivers: list, time: pd.Timestamp,
-        preprocess: dict, substitute: bool = False,
-        three_components: str = None
-    ):
-        """
-        Create a new N-D labelled array to verify the waveform data
-        preprocessing for receivers and and time.
-
-        Parameters
-        ----------
-        pairs_or_receivers : `list`
-            List of receivers or pairs (receiver couple separated by a '-').
-            Each receiver should be specified by a SEED-id string of format
-            '{network}.{station}.{location}.{channel}'.
-
-        time : `pd.Timestamp`
-            Date of the waveform to test the ``preprocess`` operations.
-
-        preprocess : `dict`
-            Preprocessing operations dictionary, containing a list of
-            operations per SEED channel as key. Each list item should be a
-            tuple ('operation', {parameters}).
-            Use :func:`xcorr.preprocess.help` to list all valid operations and
-            their documentation.
-
-        substitute : `bool`, optional
-            If `True`, convert radial 'R' and transverse 'T' rotated
-            orientation codes automatically to ``three_components``.
-            Defaults to `False`.
-
-        three_components: {'12Z', 'NEZ'}, optional
-            Set the three-component orientation characters for ``substitute``.
-            Defaults to '12Z'.
-
-        Returns
-        -------
-        status : :class:`xarray.DataArray`
-            Data preprocessing status N-D labelled array with dimensions
-            ``time`` and ``receiver``.
-
-        """
         assert isinstance(preprocess, dict), (
             '``preprocess`` should be of type `dict`.'
         )
         time = pd.to_datetime(time)
+
+        parallel = self.parallel if parallel is None else parallel
+
+        if parallel and not dask:
+
+            raise RuntimeError('Dask is required but cannot be found!')
 
         # get all receivers from pairs
         receivers = []
@@ -1486,137 +1373,72 @@ class Client(object):
             'preprocess': operations_to_json(preprocess),
         }
 
-        return status
+        if verb:
 
-    def _verify_data_preprocessing(
-        self, status: xr.DataArray, inventory: Inventory,
-        count_verified: bool = False, parallel: bool = None,
-        compute: bool = True, verb: int = 0,
-        **kwargs
-    ):
-        """
-        Verify daily waveform availability for receivers and times.
-
-        Parameters
-        ----------
-        status : :class:`xarray.DataArray`
-            Data preprocessing status N-D labelled array with dimensions
-            ``status.time`` and ``status.receiver``. ``status`` is updated in
-            place.
-
-        inventory : :class:`obspy.Inventory`, optional
-            Inventory object, including the instrument response.
-
-        count_verified : `bool`, optional
-            If `True`, count the number of verified (receiver, time) couples.
-            Defaults to `False`.
-
-        parallel : `bool`, optional
-            Enable parallel processing using :method:`dask`. If `None`
-            (default) ``self.parallel`` is used.
-
-        compute : `bool`, optional
-            Compute the lazy :class:`dask.delayed` result in parallel, if
-            `True` (default) and ``dask`` is enabled. Set to `False` to add
-            more delayed tasks, or to visualize the process with
-            ``stream.visualize()``.
-
-        verb : {0, 1, 2, 3, 4}, optional
-            Level of verbosity. Defaults to 0.
-
-        **kwargs :
-            Parameters passed to :meth:`_get_waveforms_for_date`
-
-        Returns
-        -------
-        verified : `int`, optional
-            The number of verified (receiver, time) couples. If
-            ``count_verified`` is `True`, otherwise `None`.
-
-        """
-        parallel = self.parallel if parallel is None else parallel
-
-        if parallel and not dask:
-
-            raise RuntimeError('Dask is required but cannot be found!')
-
-        verified = 0
-        time = status.time[0]
-        preprocess = operations_to_dict(status.receiver.attrs['preprocess'])
-
-        for receiver in status.receiver:
-
-            if status.loc[{'receiver': receiver, 'time': time}] == 1:
-
-                continue
-
-            args = dict(
-                receiver=str(receiver.values),
-                time=time.values,
-                preprocess=preprocess,
-                inventory=inventory,
-                substitute=receiver.attrs['substitute'] == 1,
-                three_components=receiver.attrs['three_components'],
-                raise_error=True,
-                centered=False,
-                verb=verb,
-                **kwargs,
-            )
-
-            if parallel:
-
-                flag = dask.delayed(self._test_preprocessed_waveforms)(**args)
-                verified = dask.delayed(set_status_flag)(
-                    status, receiver, time, flag, verified
-                )
-
-            else:
-
-                flag = self._test_preprocessed_waveforms(**args)
-                verified = set_status_flag(
-                    status, receiver, time, flag, verified
-                )
+            print('Verify {} receivers.'.format(status.size))
 
         if parallel:
 
-            verified = verified.compute() if compute else verified
+            lazy_flags = []
 
-        if count_verified or (parallel and not compute):
+        # evaluate receiver and days
+        for receiver in status.receiver:
 
-            return verified
+            for time in status.time:
 
+                if status.loc[{'receiver': receiver, 'time': time}] == 1:
 
-def set_status_flag(
-    status: xr.DataArray, receiver: xr.DataArray, time: xr.DataArray,
-    flag: int, inc: int = None
-):
-    """
-    Set status flag for receiver and time.
+                    continue
 
-    Parameters
-    ----------
-    status : :class:`xarray.DataArray`
-        Data availability status N-D labelled array with dimensions
-        ``status.time`` and ``status.receiver``, updated in place.
+                args = dict(
+                    receiver=str(receiver.values),
+                    time=time.values,
+                    preprocess=preprocess,
+                    inventory=inventory,
+                    substitute=receiver.attrs['substitute'] == 1,
+                    three_components=receiver.attrs['three_components'],
+                    raise_error=True,
+                    centered=False,
+                    verb=verb-1,
+                    **kwargs,
+                )
 
-    receiver : :class:`xarray.DataArray`
-        ``status`` receiver coordinate to set the status.
+                if parallel:
 
-    time : :class:`xarray.DataArray`
-        ``status`` time coordinate to set the status.
+                    lazy_flags.append(
+                        dask.delayed(self._test_preprocessed_waveforms)(**args)
+                    )
 
-    flag : `int`
-        ``Status`` flag value.
+                else:
 
-    inc : `int`, optional
-        Counter to be increased by one.
+                    status.loc[{'receiver': receiver, 'time': time}] = (
+                        self._test_preprocessed_waveforms(**args)
+                    )
 
-    Returns
-    -------
-    inc_one : `int`
-        Counter ``inc`` increased by one.
+        if parallel:
 
-    """
-    status.loc[{'receiver': receiver, 'time': time}] = flag
-    if isinstance(inc, int):
-        return inc + 1
+            status.values = np.array(
+                dask.compute(lazy_flags)[0]
+            ).reshape(status.shape)
+
+        if verb:
+
+            verified = np.sum(status.values != 0)
+
+            pcnt = 100 * verified / status.size
+
+            print('Reference time : {}'.format(str(time.values)))
+            print('Verified : {} of {} ({:.1f}%)'
+                  .format(verified, status.size, pcnt))
+            print('Overall preprocessing : {:.2f}% passed'
+                  .format(100 * np.sum(status.values == 1) / status.size))
+            print('Receiver preprocessing')
+
+            for rec in status.receiver:
+
+                passed = np.all(status.loc[{'receiver': rec}].values == 1)
+
+                print('    {} :'.format(rec.values),
+                      'passed' if passed else 'failed')
+
+        return status
