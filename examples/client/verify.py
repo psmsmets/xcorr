@@ -119,34 +119,10 @@ status = client.data_availability(
     pairs, times, verb=2, download=False, substitute=True
 )
 
-# print summary per receiver
-print(status.sum(dim='time') / status.time.size)
-
-# or in separate steps to control dask delayed compute showing a progressbar
-status = client.init_data_availability(pairs, times, substitute=True)
-delayed_status = client.verify_data_availability(
-    status, download=False, compute=False
-)
-with ProgressBar():
-    verified = delayed_status.compute()
-
-# number of verified days per receiver
-print(verified)
-
 
 ###############################################################################
 # Verify preprocessing
 # --------------------
 
-# on-the-fly
-status = client.data_preprocessing(pairs, times[0], preprocess, inv)
-
-# in steps
-status = client.init_data_preprocessing(
-    pairs, times[0], preprocess=preprocess, substitute=True
-)
-delayed_status = client.verify_data_preprocessing(
-    status, inventory=inv, download=False, compute=False
-)
-with ProgressBar():
-    verified = delayed_status.compute()
+# on-the-fly evaluate data preprocessing
+# status = client.data_preprocessing(pairs, times[0], preprocess, inv)

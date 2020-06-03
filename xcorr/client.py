@@ -29,6 +29,11 @@ try:
     import dask
 except ModuleNotFoundError:
     dask = False
+# Dask distributed?
+try:
+    from dask import distributed
+except ModuleNotFoundError:
+    distributed = False
 
 
 # Relative imports
@@ -215,6 +220,7 @@ class Client(object):
 
         out += [['max gap', f'{self.max_gap}s']]
         out += [['force write', 'Yes' if self.force_write else 'No']]
+        out += [['parallel', 'Yes' if self.parallel else 'No']]
 
         return tabulate(out)
 
@@ -533,7 +539,9 @@ class Client(object):
 
         return stream
 
-    def _get_sds_waveforms(self, verb: int = 0, **kwargs):
+    def _get_sds_waveforms(
+        self, verb: int = 0, parallel: bool = None, **kwargs
+    ):
         """
         Get the local waveforms from any of the local sds_read archives.
 
@@ -541,6 +549,10 @@ class Client(object):
         ----------
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
+
+        parallel : `bool`, optional
+            Enable parallel processing using :method:`dask`. If `None`
+            (default) ``self.parallel`` is used.
 
         **kwargs :
             Parameters passed to
@@ -554,8 +566,16 @@ class Client(object):
             The requested waveforms.
 
         """
+        # parallel?
+        parallel = self.parallel if parallel is None else parallel
+
+        # lock? 
+        lock = distributed and parallel
+
+        # get seedid, extra arguments are ignored
         receiver = util.receiver.receiver_to_str(kwargs)
 
+        # feedback
         if verb > 0:
 
             print("Get waveforms for {} from {} until {}"
@@ -569,12 +589,41 @@ class Client(object):
             obspyWarn.filterwarnings('error', 'InternalMSEEDWarning')
             obspyWarn.filterwarnings('error', 'Incompatible traces')
 
+            # Examine multiple sds repositories
             for sds in self.sds_read:
 
                 try:
 
+                    if parallel:
+
+                        # get buffered start and endtime
+                        t0 = kwargs['starttime'] - sds.fileborder_seconds
+                        t1 = kwargs['endtime'] + sds.fileborder_seconds
+
+                        # construct unique thread string for files to be accessed
+                        threadId = '{}+{}+{}+{}'.format(
+                            sds.sds_root,
+                            receiver,
+                            t0.strftime('%Y.%j'),
+                            t1.strftime('%Y.%j'),
+                        )
+
+                        # lock thread file access
+                        if lock:
+
+                            print('lock thread sds file access')
+                            threadLock = distributed.Lock(threadId)
+                            print(threadLock)
+                            threadLock.acquire()
+
                     # get waveforms
                     stream = sds.get_waveforms(**kwargs)
+
+                    # release
+                    if lock:
+
+                        print('release thread sds file access')
+                        threadLock.release()
 
                     # test for sample rate issues
                     stream = stream.merge().split()
@@ -589,15 +638,6 @@ class Client(object):
 
                         print('A warning occurred:')
                         print(w)
-
-                    continue
-
-                except Exception as e:
-
-                    if verb > 0:
-
-                        print('An error occurred:')
-                        print(e)
 
                     continue
 
@@ -677,6 +717,8 @@ class Client(object):
         if scan_sds:
 
             daystream = self._get_sds_waveforms(verb=verb-1, **get_args)
+
+            print(daystream)
 
             if daystream:
 
@@ -1071,7 +1113,7 @@ class Client(object):
             Level of verbosity. Defaults to 0.
 
         **kwargs :
-            Parameters passed to :meth:`verify_data_availability`.
+            Parameters passed to :meth:`_verify_data_availability`.
 
         Returns
         -------
@@ -1080,7 +1122,7 @@ class Client(object):
             ``time`` and ``receiver``.
 
         """
-        status = self.init_data_availability(
+        status = self._init_data_availability(
             pairs_or_receivers, times, extend_days,
             substitute, three_components
         )
@@ -1090,7 +1132,7 @@ class Client(object):
             print('Verify {} (receiver, time) combinations.'
                   .format(status.size))
 
-        verified = self.verify_data_availability(
+        verified = self._verify_data_availability(
             status, count_verified=True, verb=verb-1, **kwargs
         )
 
@@ -1101,7 +1143,7 @@ class Client(object):
 
         return status
 
-    def init_data_availability(
+    def _init_data_availability(
         self, pairs_or_receivers: list, times: pd.DatetimeIndex,
         extend_days: int = None, substitute: bool = False,
         three_components: str = None
@@ -1196,7 +1238,7 @@ class Client(object):
 
         return status
 
-    def verify_data_availability(
+    def _verify_data_availability(
         self, status: xr.DataArray, count_verified: bool = False,
         parallel: bool = None, compute: bool = True, verb: int = 0,
         debug: bool = False, **kwargs
@@ -1326,7 +1368,7 @@ class Client(object):
             Level of verbosity. Defaults to 0.
 
         **kwargs :
-            Parameters passed to :meth:`verify_data_availability`.
+            Parameters passed to :meth:`_verify_data_availability`.
 
         Returns
         -------
@@ -1335,7 +1377,7 @@ class Client(object):
             ``time`` and ``receiver``.
 
         """
-        status = self.init_data_preprocessing(
+        status = self._init_data_preprocessing(
             pairs_or_receivers, time, preprocess, substitute, three_components
         )
 
@@ -1344,7 +1386,7 @@ class Client(object):
             print('Verify {} receivers.'
                   .format(status.size))
 
-        verified = self.verify_data_preprocessing(
+        verified = self._verify_data_preprocessing(
             status, inventory, count_verified=True, verb=verb - 1, **kwargs
         )
 
@@ -1355,7 +1397,7 @@ class Client(object):
 
         return status
 
-    def init_data_preprocessing(
+    def _init_data_preprocessing(
         self, pairs_or_receivers: list, time: pd.Timestamp,
         preprocess: dict, substitute: bool = False,
         three_components: str = None
@@ -1446,7 +1488,7 @@ class Client(object):
 
         return status
 
-    def verify_data_preprocessing(
+    def _verify_data_preprocessing(
         self, status: xr.DataArray, inventory: Inventory,
         count_verified: bool = False, parallel: bool = None,
         compute: bool = True, verb: int = 0,
