@@ -121,6 +121,7 @@ class Client(object):
         if sds_root_write:
 
             self._sds_root_read += [sds_root_write]
+
         else:
 
             self._sds_root_read += [sds_root]
@@ -131,7 +132,13 @@ class Client(object):
 
         for _sds_root_read in self._sds_root_read:
 
-            self._sds_read.append(sdsClient(_sds_root_read))
+            self._sds_read.append(
+                sdsClient(
+                    sds_root=_sds_root_read,
+                    fileborder_seconds=0.,
+                    fileborder_samples=0,
+                )
+            )
 
         # fdsn web-service
         if fdsn_service:
@@ -771,6 +778,10 @@ class Client(object):
 
             stream = self._get_waveforms_for_date(**kwargs)
 
+        except (KeyboardInterrupt, SystemExit):
+
+            raise
+
         except RuntimeError:
 
             return -2
@@ -976,6 +987,10 @@ class Client(object):
         try:
 
             stream = self.get_preprocessed_waveforms(**kwargs)
+
+        except (KeyboardInterrupt, SystemExit):
+
+            raise
 
         except RuntimeError:
 
