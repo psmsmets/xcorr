@@ -561,6 +561,7 @@ class Client(object):
 
             # warnings.simplefilter('error::InternalMSEEDWarning')
             obspyWarn.filterwarnings('error', 'InternalMSEEDWarning')
+            obspyWarn.filterwarnings('error', 'Incompatible traces')
 
             for sds in self.sds_read:
 
