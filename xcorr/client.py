@@ -574,7 +574,7 @@ class Client(object):
 
                     if verb > 0:
 
-                        print('a catched warning occurred:')
+                        print('A warning occurred:')
                         print(w)
 
                     continue
@@ -583,7 +583,7 @@ class Client(object):
 
                     if verb > 0:
 
-                        print('an error occurred:')
+                        print('An error occurred:')
                         print(e)
 
                     continue
@@ -645,7 +645,7 @@ class Client(object):
         """
         time = UTCDateTime(pd.to_datetime(date) +
                            pd.offsets.DateOffset(0, normalize=True))
-        get_args = dict(**receiver, starttime=time, endtime=time + 86400)
+        get_args = dict(**receiver, starttime=time, endtime=time + 86399.99999)
 
         set_args = dict(verb=verb-2, force_write=force_write)
 
