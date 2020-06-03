@@ -782,7 +782,7 @@ class Client(object):
 
             raise
 
-        except RuntimeError:
+        except Exception as e:
 
             return -2
 
