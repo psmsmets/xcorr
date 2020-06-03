@@ -559,7 +559,6 @@ class Client(object):
         # Catch massive spill of InternalMSEEDWarning
         with obspyWarn.catch_warnings():
 
-            # warnings.simplefilter('error::InternalMSEEDWarning')
             obspyWarn.filterwarnings('error', 'InternalMSEEDWarning')
             obspyWarn.filterwarnings('error', 'Incompatible traces')
 
@@ -567,8 +566,11 @@ class Client(object):
 
                 try:
 
+                    # get waveforms
                     stream = sds.get_waveforms(**kwargs)
-                    stream = stream.merge()
+
+                    # test for sample rate issues
+                    stream = stream.merge().split()
 
                 except (KeyboardInterrupt, SystemExit):
 
@@ -576,7 +578,6 @@ class Client(object):
 
                 except Warning as w:
 
-                    print(w)
                     if verb > 0:
 
                         print('A warning occurred:')
@@ -586,7 +587,6 @@ class Client(object):
 
                 except Exception as e:
 
-                    print(e)
                     if verb > 0:
 
                         print('An error occurred:')
