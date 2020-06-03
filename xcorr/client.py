@@ -16,6 +16,7 @@ from obspy import UTCDateTime, Stream, Inventory
 from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
+from obspy import warings as obspyWarn
 import warnings
 from tabulate import tabulate
 # VDMS client for IMS waveforms?
@@ -556,10 +557,11 @@ class Client(object):
         dt = kwargs['endtime'] - kwargs['starttime']
 
         # Catch massive spill of InternalMSEEDWarning
-        with warnings.catch_warnings():
+        with obspyWarn.catch_warnings():
 
             # warnings.simplefilter('error::InternalMSEEDWarning')
-            warnings.simplefilter('error')
+            obspyWarn.filterwarnings('error', 'InternalMSEEDWarning')
+            obspyWarn.filterwarnings('error', 'Incompatible traces')
 
             for sds in self.sds_read:
 
@@ -583,6 +585,7 @@ class Client(object):
 
                 except Exception as e:
 
+                    print(e)
                     if verb > 0:
 
                         print('An error occurred:')
