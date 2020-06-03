@@ -558,7 +558,8 @@ class Client(object):
         # Catch massive spill of InternalMSEEDWarning
         with warnings.catch_warnings():
 
-            warnings.simplefilter('error::InternalMSEEDWarning')
+            # warnings.simplefilter('error::InternalMSEEDWarning')
+            warnings.simplefilter('error')
 
             for sds in self.sds_read:
 
@@ -572,6 +573,7 @@ class Client(object):
 
                 except Warning as w:
 
+                    print(w)
                     if verb > 0:
 
                         print('A warning occurred:')
