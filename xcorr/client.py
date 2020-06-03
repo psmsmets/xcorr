@@ -314,7 +314,7 @@ class Client(object):
 
         with warnings.catch_warnings():
 
-            warnings.filterwarnings('ignore')
+            warnings.simplefilter('ignore')
 
             util.stream.stream2SDS(
                 stream,
@@ -558,7 +558,7 @@ class Client(object):
         # Catch massive spill of InternalMSEEDWarning
         with warnings.catch_warnings():
 
-            warnings.filterwarnings('error')
+            warnings.simplefilter('error::InternalMSEEDWarning')
 
             for sds in self.sds_read:
 
