@@ -314,6 +314,8 @@ class Client(object):
 
         with warnings.catch_warnings():
 
+            warnings.filterwarnings('ignore')
+
             util.stream.stream2SDS(
                 stream,
                 sds_path=self.sds_root_write,
@@ -553,35 +555,52 @@ class Client(object):
 
         dt = kwargs['endtime'] - kwargs['starttime']
 
-        for sds in self.sds_read:
+        # Catch massive spill of InternalMSEEDWarning
+        with warnings.catch_warnings():
 
-            try:
+            warnings.filterwarnings('error')
 
-                stream = sds.get_waveforms(**kwargs)
+            for sds in self.sds_read:
 
-            except (KeyboardInterrupt, SystemExit):
+                try:
 
-                raise
+                    stream = sds.get_waveforms(**kwargs)
 
-            except Exception as e:
+                except (KeyboardInterrupt, SystemExit):
 
-                if verb > 0:
+                    raise
 
-                    print('an error occurred:')
-                    print(e)
+                except Warning as w:
 
-            if not stream:
+                    if verb > 0:
 
-                continue
+                        print('a catched warning occurred:')
+                        print(w)
 
-            if self.check_duration(stream, duration=dt,
-                                   receiver=receiver, verb=verb-1):
+                    continue
 
-                if verb > 1:
+                except Exception as e:
 
-                    print(_msg_loaded_archive.format(kwargs['starttime']))
+                    if verb > 0:
 
-                return stream
+                        print('an error occurred:')
+                        print(e)
+
+                    continue
+
+                if not stream:
+
+                    continue
+
+                if self.check_duration(
+                    stream, duration=dt, receiver=receiver, verb=verb-1
+                ):
+
+                    if verb > 1:
+
+                        print(_msg_loaded_archive.format(kwargs['starttime']))
+
+                    return stream
 
         return Stream()
 

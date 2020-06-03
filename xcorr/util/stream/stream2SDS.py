@@ -116,14 +116,15 @@ def stream2SDS(
                 existing = read(out_fn, out_format)
 
                 # compare the existing data to the new data
-                # if streams_almost_equal(tr, existing):
-                #     warnings.warn(
-                #         f'File {out_fn} already contains the data for {id}.'
-                #         ' Set ``method="overwrite"`` to force overwriting.'
-                #     )
-                #     # skip merging and writing if data is the same
-                #     continue
-                # else:
+                if streams_almost_equal(tr, existing):
+                    # warnings.warn(
+                    #     f'File {out_fn} already contains the data for {id}.'
+                    #     ' Set ``method="overwrite"`` to force overwriting.'
+                    # )
+                    # skip merging and writing if data is the same
+                    continue
+
+                # add two streams
                 tr += existing
 
                 # merge both streams, potentially filling in gaps
