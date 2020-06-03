@@ -656,10 +656,15 @@ class Client(object):
             The waveforms for ``receiver`` on ``date``.
 
         """
+
+        # start time
         time = UTCDateTime(pd.to_datetime(date) +
                            pd.offsets.DateOffset(0, normalize=True))
+
+        # get waveform args
         get_args = dict(**receiver, starttime=time, endtime=time + 86400)
 
+        # store new waveform args
         set_args = dict(verb=verb-2, force_write=force_write)
 
         if verb > 0:
@@ -671,21 +676,16 @@ class Client(object):
         # 1. check sds
         if scan_sds:
 
-            if verb > 1:
+            daystream = self._get_sds_waveforms(verb=verb-1, **get_args)
 
-                print(_msg_load_archive.format(time))
+            if daystream:
 
-            for sds in self.sds_read:
+                if verb > 1:
 
-                daystream = sds.get_waveforms(**get_args)
+                    print(_msg_loaded_archive.format(time))
 
-                if self.check_duration(daystream, verb=verb-1):
+                return daystream
 
-                    if verb > 1:
-
-                        print(_msg_loaded_archive.format(time))
-
-                    return daystream
             else:
 
                 if verb > 1:
@@ -782,7 +782,7 @@ class Client(object):
 
             raise
 
-        except Exception as e:
+        except Exception:
 
             return -2
 
