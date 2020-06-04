@@ -1125,6 +1125,10 @@ class Client(object):
 
             raise RuntimeError('Dask is required but cannot be found!')
 
+        # verbose
+        if verb > 0:
+            print('Verify availability')
+
         # get all receivers from pairs
         receivers = []
 
@@ -1172,11 +1176,11 @@ class Client(object):
         }
 
         if verb:
-            print('Receivers :')
+            print('    Receivers :')
             for rec in status.receiver:
-                print(f'    {rec.values}')
-            print(f'Times : {times[0]} to {times[-1]}')
-            print(f'Verify {status.size} receiver time combinations.')
+                print(f'        {rec.values}')
+            print(f'    Times : {times[0]} to {times[-1]}')
+            print(f'    Verify {status.size} receiver time combinations.')
 
         if parallel:
             lazy_flags = []
@@ -1202,9 +1206,7 @@ class Client(object):
                     lazy_flags.append(
                         dask.delayed(self._test_waveforms_for_date)(**args)
                     )
-
                 else:
-
                     status.loc[{'receiver': receiver, 'time': time}] = (
                         self._test_waveforms_for_date(**args)
                     )
@@ -1217,17 +1219,16 @@ class Client(object):
         if verb > 0:
             verified = np.sum(status.values != 0)
             pcnt = 100 * verified / status.size
-            print('Verified : {} of {} ({:.1f}%)'
+            print('    Verified : {} of {} ({:.1f}%)'
                   .format(verified, status.size, pcnt))
-            print('Overall availability : {:.2f}%'
+            print('    Overall availability : {:.2f}%'
                   .format(100 * np.sum(status.values == 1) / status.size))
-            print('Receiver availability')
-
+            print('    Receiver availability')
             for rec in status.receiver:
                 pcnt = 100*np.sum(
                     status.loc[{'receiver': rec}].values == 1
                 ) / status.time.size
-                print('    {} : {:.2f}%'.format(rec.values, pcnt))
+                print('        {} : {:.2f}%'.format(rec.values, pcnt))
 
         return status
 
@@ -1297,6 +1298,10 @@ class Client(object):
         if parallel and not dask:
             raise RuntimeError('Dask is required but cannot be found!')
 
+        # verbose
+        if verb > 0:
+            print('Verify preprocessing')
+
         # get all receivers from pairs
         receivers = []
 
@@ -1339,11 +1344,11 @@ class Client(object):
         }
 
         if verb:
-            print('Receivers :')
+            print('    Receivers :')
             for rec in status.receiver:
-                print(f'    {rec.values}')
-            print(f'Reference time : {time}')
-            print(f'Verify {status.size} receivers.')
+                print(f'        {rec.values}')
+            print(f'    Reference time : {time}')
+            print(f'    Verify {status.size} receivers.')
 
         if parallel:
             lazy_flags = []
@@ -1370,13 +1375,10 @@ class Client(object):
                 )
 
                 if parallel:
-
                     lazy_flags.append(
                         dask.delayed(self._test_preprocessed_waveforms)(**args)
                     )
-
                 else:
-
                     status.loc[{'receiver': receiver, 'time': time}] = (
                         self._test_preprocessed_waveforms(**args)
                     )
@@ -1387,18 +1389,16 @@ class Client(object):
             ).reshape(status.shape)
 
         if verb:
-
             verified = np.sum(status.values != 0)
             pcnt = 100 * verified / status.size
-            print('Verified : {} of {} ({:.1f}%)'
+            print('    Verified : {} of {} ({:.1f}%)'
                   .format(verified, status.size, pcnt))
-            print('Overall preprocessing : {:.2f}% passed'
+            print('    Overall preprocessing : {:.2f}% passed'
                   .format(100 * np.sum(status.values == 1) / status.size))
-            print('Receiver preprocessing')
-
+            print('    Receiver preprocessing')
             for rec in status.receiver:
                 passed = np.all(status.loc[{'receiver': rec}].values == 1)
-                print('    {} :'.format(rec.values),
+                print('        {} :'.format(rec.values),
                       'passed' if passed else 'failed')
 
         return status
