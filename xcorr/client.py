@@ -18,6 +18,7 @@ from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
 from obspy import warnings as obspyWarn
 import warnings
+import traceback
 from tabulate import tabulate
 # VDMS client for IMS waveforms?
 try:
@@ -122,7 +123,7 @@ class Client(object):
         # other parameters
         self._max_gap = abs(max_gap or 300.)
         self._force_write = force_write or False
-        self._parallel = dask and parallel
+        self._parallel = dask and distributed and parallel
 
         # set sds roots for reading and writing
         self._sds_root_write = sds_root_write if sds_root_write else sds_root
@@ -137,10 +138,15 @@ class Client(object):
         # keep unique sds roots
         self._sds_root_read = list(set(self._sds_root_read))
         self._sds_read = []
+        self._sds_locks = dict()
 
         # init sds accessors per root
-        for _sds_root_read in self._sds_root_read:
-            self._sds_read.append(sdsClient(sds_root=_sds_root_read))
+        for root in self._sds_root_read:
+            self._sds_read.append(sdsClient(sds_root=root))
+            if self.parallel:
+                self._sds_locks[root] = dict(
+                    default=distributed.Lock(root)
+                )
 
         # fdsn web-service
         if fdsn_service:
@@ -181,17 +187,11 @@ class Client(object):
         out += [['sds read', self.sds_root_read]]
         out += [['sds write', self.sds_root_write]]
         out += [['fdsn', 'Yes' if self.fdsn else 'No']]
-
         if self.fdsn:
-
             out += [['fdsn base url', self.fdsn.base_url]]
-
         out += [['vdms', 'Yes' if self.vdms else 'No']]
-
         if self.vdms:
-
             out += [['vdms client', self.vdms._request.clc]]
-
         out += [['max gap', f'{self.max_gap}s']]
         out += [['force write', 'Yes' if self.force_write else 'No']]
         out += [['parallel', 'Yes' if self.parallel else 'No']]
@@ -267,8 +267,30 @@ class Client(object):
         """
         return self._parallel
 
+    def _get_sds_lock(self, sds_root, receiver: str = None):
+        """Return the Lock for an sds root
+        """
+        if not self._sds_locks:
+            return None
+        if sds_root not in self._sds_locks:
+            raise RuntimeError(f'No lock for sds root "{sds_root}"')
+        if receiver in self._sds_locks[sds_root]:
+            lock = self._sds_locks[sds_root][receiver]
+        else:
+            lock = self._sds_locks[sds_root]['default']
+        return lock
+
+    def _set_sds_lock(self, receiver: str = None):
+        """Return the Lock for an sds root
+        """
+        for root in self._sds_root_read:
+            self._sds_locks[root][receiver] = distributed.Lock(
+                f'{root}+{receiver}'
+            )
+
     def _sds_write_daystream(
-        self, stream: Stream, force_write: bool = None, verb: int = 0
+        self, stream: Stream, force_write: bool = None,
+        parallel: bool = None, verb: int = 0
     ):
         """
         Wrapper to write a day stream of data to the local SDS archive.
@@ -282,6 +304,10 @@ class Client(object):
             Force to write downloaded day streams to the SDS archive even when
             the cummulated gap is larger than max_gap. Defaults to `False`.
 
+        parallel : `bool`, optional
+            Enable parallel processing using :method:`dask`. If `None`
+            (default) ``self.parallel`` is used.
+
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
 
@@ -292,18 +318,38 @@ class Client(object):
             :meth:'check_duration', otherwise returns `True`.
 
         """
+        # parallel?
+        parallel = self.parallel if parallel is None else parallel
+
+        # lock?
+        locked = distributed and parallel
+
+        # always write?
         force_write = force_write or self.force_write
 
+        # check
         passed = self.check_duration(stream, verb=verb)
 
+        # passed?
         if not passed and not force_write:
-
             return False
 
+        # get sds write lock
+        if locked:
+            lock = self._get_sds_lock(
+               sds_root=self.sds_root_write,
+               receiver=stream[0].id,
+            )
+
+        # add to archive
         with warnings.catch_warnings():
 
             warnings.simplefilter('ignore')
 
+            if locked:
+                lock.acquire(timeout=.8)
+
+            # write to sds archive
             util.stream.stream2SDS(
                 stream,
                 sds_path=self.sds_root_write,
@@ -312,8 +358,11 @@ class Client(object):
                 verbose=verb == 4,
             )
 
-        if verb > 0:
+            # release sds write access
+            if locked:
+                lock.release()
 
+        if verb > 0:
             print(_msg_added_archive)
 
         return passed
@@ -544,7 +593,7 @@ class Client(object):
         parallel = self.parallel if parallel is None else parallel
 
         # lock?
-        lock = distributed and parallel
+        locked = distributed and parallel
 
         # get seedid, extra arguments are ignored
         receiver = util.receiver.receiver_to_str(kwargs)
@@ -568,37 +617,20 @@ class Client(object):
 
                 try:
 
-                    # lock sds file access
-                    if lock:
-
-                        # get buffered start and endtime
-                        # t0 = kwargs['starttime'] - sds.fileborder_seconds
-                        # t1 = kwargs['endtime'] + sds.fileborder_seconds
-
-                        # construct unique thread id for files to be accessed
-                        threadId = '{}+{}'.format(
-                            sds.sds_root,
-                            receiver,
-                            # t0.strftime('%Y.%j'),
-                            # t1.strftime('%Y.%j'),
+                    # get sds lock
+                    if locked:
+                        lock = self._get_sds_lock(
+                            sds_root=sds.sds_root,
+                            receiver=receiver,
                         )
+                        lock.acquire(timeout=.8)
 
-                        # lock thread file access
-                        threadLock = distributed.Lock(threadId)
+                    # get waveforms
+                    stream = sds.get_waveforms(**kwargs)
 
-                        # get status
-                        threadLock.acquire()
-
-                        # get waveforms
-                        stream = sds.get_waveforms(**kwargs)
-
-                        # release
-                        threadLock.release()
-
-                    else:
-
-                        # get waveforms
-                        stream = sds.get_waveforms(**kwargs)
+                    # release
+                    if locked:
+                        lock.release()
 
                     # test for sample rate issues
                     stream = stream.merge().split()
@@ -610,9 +642,7 @@ class Client(object):
                 except Warning as w:
 
                     if verb > 0:
-
-                        print('A raised warning occurred:')
-                        print(w)
+                        print(f'Intercepted warning @ sds request: {w}')
 
                     continue
 
@@ -738,9 +768,13 @@ class Client(object):
                 except Exception as e:
 
                     if verb > 0:
+                        print(f'Intercepted error @ fdsn request: {e}')
 
-                        print('an error occurred:')
-                        print(e)
+                    if verb > 1:
+                        print('-'*79)
+                        track = traceback.format_exc()
+                        print(track)
+                        print('-'*79)
 
             # attempt via vdms
             if self.vdms:
@@ -768,9 +802,13 @@ class Client(object):
                 except Exception as e:
 
                     if verb > 0:
+                        print(f'Intercepted error @ pyvdms request: {e}')
 
-                        print('an error occurred:')
-                        print(e)
+                    if verb > 1:
+                        print('-'*79)
+                        track = traceback.format_exc()
+                        print(track)
+                        print('-'*79)
 
         return Stream()
 
@@ -797,7 +835,18 @@ class Client(object):
 
             raise
 
-        except Exception:
+        except Exception as e:
+
+            if 'verb' in kwargs:
+
+                if kwargs['verb'] > 0:
+                    print(f'Intercepted error @ get_waveforms_for_date: {e}')
+
+                if kwargs['verb'] > 1:
+                    print('-'*79)
+                    track = traceback.format_exc()
+                    print(track)
+                    print('-'*79)
 
             return -2
 
@@ -1162,7 +1211,6 @@ class Client(object):
         }
 
         if verb:
-
             print('Receivers :')
             for rec in status.receiver:
                 print(f'    {rec.values}')
@@ -1170,8 +1218,9 @@ class Client(object):
             print(f'Verify {status.size} receiver time combinations.')
 
         if parallel:
-
             lazy_flags = []
+            for rec in status.receiver:
+                self._set_sds_lock(str(rec.values))
 
         # evaluate receiver and days
         for receiver in status.receiver:
@@ -1204,7 +1253,6 @@ class Client(object):
                     )
 
         if parallel:
-
             status.values = np.array(
                 dask.compute(lazy_flags)[0]
             ).reshape(status.shape)
@@ -1294,14 +1342,12 @@ class Client(object):
         parallel = self.parallel if parallel is None else parallel
 
         if parallel and not dask:
-
             raise RuntimeError('Dask is required but cannot be found!')
 
         # get all receivers from pairs
         receivers = []
 
         for p in pairs_or_receivers:
-
             receivers += util.receiver.split_pair(
                 p, to_dict=False, substitute=False
             )
@@ -1340,7 +1386,6 @@ class Client(object):
         }
 
         if verb:
-
             print('Receivers :')
             for rec in status.receiver:
                 print(f'    {rec.values}')
@@ -1348,8 +1393,9 @@ class Client(object):
             print(f'Verify {status.size} receivers.')
 
         if parallel:
-
             lazy_flags = []
+            for rec in status.receiver:
+                self._set_sds_lock(str(rec.values))
 
         # evaluate receiver and days
         for receiver in status.receiver:
