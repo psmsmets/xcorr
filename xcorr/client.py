@@ -143,10 +143,6 @@ class Client(object):
         # init sds accessors per root
         for root in self._sds_root_read:
             self._sds_read.append(sdsClient(sds_root=root))
-            if self.parallel:
-                self._sds_locks[root] = dict(
-                    default=distributed.Lock(root)
-                )
 
         # fdsn web-service
         if fdsn_service:
@@ -267,27 +263,6 @@ class Client(object):
         """
         return self._parallel
 
-    def _get_sds_lock(self, sds_root, receiver: str = None):
-        """Return the Lock for an sds root
-        """
-        if not self._sds_locks:
-            return None
-        if sds_root not in self._sds_locks:
-            raise RuntimeError(f'No lock for sds root "{sds_root}"')
-        if receiver in self._sds_locks[sds_root]:
-            lock = self._sds_locks[sds_root][receiver]
-        else:
-            lock = self._sds_locks[sds_root]['default']
-        return lock
-
-    def _set_sds_lock(self, receiver: str = None):
-        """Return the Lock for an sds root
-        """
-        for root in self._sds_root_read:
-            self._sds_locks[root][receiver] = distributed.Lock(
-                f'{root}+{receiver}'
-            )
-
     def _sds_write_daystream(
         self, stream: Stream, force_write: bool = None,
         parallel: bool = None, verb: int = 0
@@ -336,18 +311,13 @@ class Client(object):
 
         # get sds write lock
         if locked:
-            lock = self._get_sds_lock(
-               sds_root=self.sds_root_write,
-               receiver=stream[0].id,
-            )
+            lock = distributed.Lock(stream[0].id)
+            lock.acquire()
 
         # add to archive
         with warnings.catch_warnings():
 
             warnings.simplefilter('ignore')
-
-            if locked:
-                lock.acquire(timeout=.8)
 
             # write to sds archive
             util.stream.stream2SDS(
@@ -358,9 +328,9 @@ class Client(object):
                 verbose=verb == 4,
             )
 
-            # release sds write access
-            if locked:
-                lock.release()
+        # release sds write access
+        if locked:
+            lock.release()
 
         if verb > 0:
             print(_msg_added_archive)
@@ -598,6 +568,11 @@ class Client(object):
         # get seedid, extra arguments are ignored
         receiver = util.receiver.receiver_to_str(kwargs)
 
+        # get sds write lock
+        if locked:
+            lock = distributed.Lock(receiver)
+            lock.acquire()
+
         # feedback
         if verb > 0:
 
@@ -605,6 +580,7 @@ class Client(object):
                   .format(receiver, kwargs['starttime'], kwargs['endtime']))
 
         dt = kwargs['endtime'] - kwargs['starttime']
+        st = Stream()
 
         # Catch massive spill of InternalMSEEDWarning
         with obspyWarn.catch_warnings():
@@ -615,29 +591,10 @@ class Client(object):
             # Examine multiple sds repositories
             for sds in self.sds_read:
 
+                # get waveforms
                 try:
 
-                    # get sds lock
-                    if locked:
-                        lock = self._get_sds_lock(
-                            sds_root=sds.sds_root,
-                            receiver=receiver,
-                        )
-                        lock.acquire(timeout=.8)
-
-                    # get waveforms
-                    stream = sds.get_waveforms(**kwargs)
-
-                    # release
-                    if locked:
-                        lock.release()
-
-                    # test for sample rate issues
-                    stream = stream.merge().split()
-
-                except (KeyboardInterrupt, SystemExit):
-
-                    raise
+                    st = sds.get_waveforms(**kwargs)
 
                 except Warning as w:
 
@@ -646,21 +603,25 @@ class Client(object):
 
                     continue
 
-                if not stream:
+                if not st:
 
                     continue
 
-                if self.check_duration(
-                    stream, duration=dt, receiver=receiver, verb=verb-1
-                ):
+                passed = self.check_duration(st, duration=dt,
+                                             receiver=receiver, verb=verb-1)
+
+                if passed:
 
                     if verb > 1:
-
                         print(_msg_loaded_archive.format(kwargs['starttime']))
 
-                    return stream
+                    break
 
-        return Stream()
+        # release
+        if locked:
+            lock.release()
+
+        return st
 
     def _get_waveforms_for_date(
         self, receiver: dict, date: pd.Timestamp, scan_sds: bool = True,
@@ -1218,9 +1179,9 @@ class Client(object):
             print(f'Verify {status.size} receiver time combinations.')
 
         if parallel:
-            lazy_flags = []
+            lazy_flags = sds_locks = []
             for rec in status.receiver:
-                self._set_sds_lock(str(rec.values))
+                sds_locks.append(distributed.Lock(str(rec.values)))
 
         # evaluate receiver and days
         for receiver in status.receiver:
@@ -1393,9 +1354,9 @@ class Client(object):
             print(f'Verify {status.size} receivers.')
 
         if parallel:
-            lazy_flags = []
+            lazy_flags = sds_locks = []
             for rec in status.receiver:
-                self._set_sds_lock(str(rec.values))
+                sds_locks.append(distributed.Lock(str(rec.values)))
 
         # evaluate receiver and days
         for receiver in status.receiver:
@@ -1432,7 +1393,6 @@ class Client(object):
                     )
 
         if parallel:
-
             status.values = np.array(
                 dask.compute(lazy_flags)[0]
             ).reshape(status.shape)
