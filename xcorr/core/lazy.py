@@ -337,7 +337,6 @@ def lazy_process(
     # Evaluate data availability (parallel), and try to download missing data
     # -------------------------------------------------------------------------
     print('-'*79)
-    print('Verify availability')
 
     availability = xclient.init_data_availability(
         pairs, times, extend_days=extend_days,
@@ -349,6 +348,7 @@ def lazy_process(
     # -------------------------------------------------------------------------
     # Data preprocessing (parallel)
     # -------------------------------------------------------------------------
+    print('-'*79)
 
     # init waveform preprocessing status for a day with max availability
     nofrec = len(availability.receiver)
