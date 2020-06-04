@@ -138,13 +138,7 @@ class Client(object):
 
         for _sds_root_read in self._sds_root_read:
 
-            self._sds_read.append(
-                sdsClient(
-                    sds_root=_sds_root_read,
-                    fileborder_seconds=0.,
-                    fileborder_samples=0,
-                )
-            )
+            self._sds_read.append(sdsClient(sds_root=_sds_root_read))
 
         # fdsn web-service
         if fdsn_service:
@@ -595,7 +589,8 @@ class Client(object):
 
                 try:
 
-                    if parallel:
+                    # lock sds file access
+                    if lock:
 
                         # get buffered start and endtime
                         t0 = kwargs['starttime'] - sds.fileborder_seconds
@@ -610,15 +605,13 @@ class Client(object):
                         )
 
                         # lock thread file access
-                        if lock:
-
-                            threadLock = distributed.Lock(threadId)
-                            threadLock.acquire()
+                        threadLock = distributed.Lock(threadId)
+                        threadLock.acquire()
 
                     # get waveforms
                     stream = sds.get_waveforms(**kwargs)
 
-                    # release
+                    # release sds file access
                     if lock:
 
                         threadLock.release()
