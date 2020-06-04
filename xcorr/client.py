@@ -17,7 +17,6 @@ from obspy.clients.fdsn import Client as fdsnClient
 from obspy.clients.fdsn.header import FDSNNoDataException
 from obspy.clients.filesystem.sds import Client as sdsClient
 from obspy import warnings as obspyWarn
-import traceback
 import warnings
 from tabulate import tabulate
 # VDMS client for IMS waveforms?
@@ -120,79 +119,59 @@ class Client(object):
                 '`sds_root_write` are required.'
             )
 
+        # other parameters
+        self._max_gap = abs(max_gap or 300.)
+        self._force_write = force_write or False
+        self._parallel = dask and parallel
+
         # set sds roots for reading and writing
         self._sds_root_write = sds_root_write if sds_root_write else sds_root
         self._sds_root_read = (sds_root_read if sds_root_read else [sds_root])
 
+        # append sds write root to read
         if sds_root_write:
-
             self._sds_root_read += [sds_root_write]
-
         else:
-
             self._sds_root_read += [sds_root]
 
+        # keep unique sds roots
         self._sds_root_read = list(set(self._sds_root_read))
-
         self._sds_read = []
 
+        # init sds accessors per root
         for _sds_root_read in self._sds_root_read:
-
             self._sds_read.append(sdsClient(sds_root=_sds_root_read))
 
         # fdsn web-service
         if fdsn_service:
-
             if isinstance(fdsn_service, str):
-
                 self._fdsn = fdsnClient(fdsn_service)
-
             elif isinstance(fdsn_service, fdsnClient):
-
                 self._fdsn = fdsn_service
-
             else:
-
                 raise TypeError('`fdsn_service` should be of type str or '
                                 ':class:`obspy.clients.fdsn.Client`!')
         else:
-
             self._fdsn = False
 
         # vdms web-service
         if vdmsClient:
-
             if isinstance(vdms_service, bool):
-
                 self._vdms = vdmsClient() if vdms_service else False
-
             elif isinstance(vdms_service, vdmsClient):
-
                 self._vdms = vdms_service
-
             else:
-
                 raise TypeError('`vdms_service` should be of type bool or '
                                 ':class:`pyvdms.Client`!')
-
             if self._vdms:
-
                 test = self._vdms.get_channels('*H1', 'BDF')
-
                 if not isinstance(test, pd.DataFrame):
-
                     self._vdms = False
                     warnings.warn(
                         'VDMS Client test failed. Service shall be disabled.'
                     )
         else:
-
             self._vdms = False
-
-        # other parameters
-        self._max_gap = abs(max_gap or 300.)
-        self._force_write = force_write or False
-        self._parallel = dask and parallel
 
     def __str__(self):
         """Get the formatted xcorr client overview.
@@ -593,28 +572,33 @@ class Client(object):
                     if lock:
 
                         # get buffered start and endtime
-                        t0 = kwargs['starttime'] - sds.fileborder_seconds
-                        t1 = kwargs['endtime'] + sds.fileborder_seconds
+                        # t0 = kwargs['starttime'] - sds.fileborder_seconds
+                        # t1 = kwargs['endtime'] + sds.fileborder_seconds
 
                         # construct unique thread id for files to be accessed
-                        threadId = '{}+{}+{}+{}'.format(
+                        threadId = '{}+{}'.format(
                             sds.sds_root,
                             receiver,
-                            t0.strftime('%Y.%j'),
-                            t1.strftime('%Y.%j'),
+                            # t0.strftime('%Y.%j'),
+                            # t1.strftime('%Y.%j'),
                         )
 
                         # lock thread file access
                         threadLock = distributed.Lock(threadId)
+
+                        # get status
                         threadLock.acquire()
 
-                    # get waveforms
-                    stream = sds.get_waveforms(**kwargs)
+                        # get waveforms
+                        stream = sds.get_waveforms(**kwargs)
 
-                    # release sds file access
-                    if lock:
-
+                        # release
                         threadLock.release()
+
+                    else:
+
+                        # get waveforms
+                        stream = sds.get_waveforms(**kwargs)
 
                     # test for sample rate issues
                     stream = stream.merge().split()
@@ -623,25 +607,11 @@ class Client(object):
 
                     raise
 
-                except Exception as e:
-
-                    if verb > 0:
-
-                        print('An error occurred:')
-                        print(e)
-
-                    if verb > 1:
-
-                        print('-'*79)
-                        track = traceback.format_exc()
-                        print(track)
-                        print('-'*79)
-
                 except Warning as w:
 
                     if verb > 0:
 
-                        print('A warning occurred:')
+                        print('A raised warning occurred:')
                         print(w)
 
                     continue
@@ -1193,8 +1163,11 @@ class Client(object):
 
         if verb:
 
-            print('Verify {} (receiver, time) combinations.'
-                  .format(status.size))
+            print('Receivers :')
+            for rec in status.receiver:
+                print(f'    {rec.values}')
+            print(f'Times : {times[0]} to {times[-1]}')
+            print(f'Verify {status.size} receiver time combinations.')
 
         if parallel:
 
@@ -1368,7 +1341,11 @@ class Client(object):
 
         if verb:
 
-            print('Verify {} receivers.'.format(status.size))
+            print('Receivers :')
+            for rec in status.receiver:
+                print(f'    {rec.values}')
+            print(f'Reference time : {time}')
+            print(f'Verify {status.size} receivers.')
 
         if parallel:
 
@@ -1420,7 +1397,6 @@ class Client(object):
 
             pcnt = 100 * verified / status.size
 
-            print('Reference time : {}'.format(str(time.values)))
             print('Verified : {} of {} ({:.1f}%)'
                   .format(verified, status.size, pcnt))
             print('Overall preprocessing : {:.2f}% passed'
