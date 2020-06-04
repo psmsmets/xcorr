@@ -1150,16 +1150,16 @@ class Client(object):
 
         # construct status xarray object
         status = xr.DataArray(
-            data=np.zeros((len(receivers), len(times)), dtype=np.byte),
-            coords=[np.array(receivers, dtype=object), times],
-            dims=['receiver', 'time'],
+            data=np.zeros((len(receivers), len(times)), dtype=np.int8),
+            coords=(np.array(receivers, dtype=object), times),
+            dims=('receiver', 'time'),
             name='status',
             attrs={
                 'long_name': 'Data availability status',
                 'standard_name': 'data_availability_status',
                 'units': '-',
-                'valid_range': np.byte([-1, 1]),
-                'flag_values': np.byte([-1, 0, 1]),
+                'valid_range': np.int8([-1, 1]),
+                'flag_values': np.int8([-1, 0, 1]),
                 'flag_meanings': 'missing not_validated available',
             }
         )
@@ -1179,7 +1179,8 @@ class Client(object):
             print(f'Verify {status.size} receiver time combinations.')
 
         if parallel:
-            lazy_flags = sds_locks = []
+            lazy_flags = []
+            sds_locks = []
             for rec in status.receiver:
                 sds_locks.append(distributed.Lock(str(rec.values)))
 
@@ -1190,10 +1191,6 @@ class Client(object):
 
             for time in status.time:
 
-                if status.loc[{'receiver': receiver, 'time': time}] == 1:
-
-                    continue
-
                 args = dict(
                     receiver=rec_dict,
                     date=time.values,
@@ -1202,7 +1199,6 @@ class Client(object):
                 )
 
                 if parallel:
-
                     lazy_flags.append(
                         dask.delayed(self._test_waveforms_for_date)(**args)
                     )
@@ -1218,12 +1214,9 @@ class Client(object):
                 dask.compute(lazy_flags)[0]
             ).reshape(status.shape)
 
-        if verb:
-
+        if verb > 0:
             verified = np.sum(status.values != 0)
-
             pcnt = 100 * verified / status.size
-
             print('Verified : {} of {} ({:.1f}%)'
                   .format(verified, status.size, pcnt))
             print('Overall availability : {:.2f}%'
@@ -1231,7 +1224,6 @@ class Client(object):
             print('Receiver availability')
 
             for rec in status.receiver:
-
                 pcnt = 100*np.sum(
                     status.loc[{'receiver': rec}].values == 1
                 ) / status.time.size
@@ -1324,16 +1316,16 @@ class Client(object):
 
         # construct status xarray object
         status = xr.DataArray(
-            data=np.zeros((len(receivers), len(times)), dtype=np.byte),
-            coords=[np.array(receivers, dtype=object), times],
-            dims=['receiver', 'time'],
+            data=np.zeros((len(receivers), len(times)), dtype=np.int8),
+            coords=(np.array(receivers, dtype=object), times),
+            dims=('receiver', 'time'),
             name='status',
             attrs={
                 'long_name': 'Data preprocessing status',
                 'standard_name': 'data_preprocessing_status',
                 'units': '-',
-                'valid_range': np.byte([-2, 1]),
-                'flag_values': np.byte([-2, -1, 0, 1]),
+                'valid_range': np.int8([-2, 1]),
+                'flag_values': np.int8([-2, -1, 0, 1]),
                 'flag_meanings': 'missing failed not_validated passed',
             }
         )
@@ -1354,7 +1346,8 @@ class Client(object):
             print(f'Verify {status.size} receivers.')
 
         if parallel:
-            lazy_flags = sds_locks = []
+            lazy_flags = []
+            sds_locks = []
             for rec in status.receiver:
                 sds_locks.append(distributed.Lock(str(rec.values)))
 
@@ -1362,10 +1355,6 @@ class Client(object):
         for receiver in status.receiver:
 
             for time in status.time:
-
-                if status.loc[{'receiver': receiver, 'time': time}] == 1:
-
-                    continue
 
                 args = dict(
                     receiver=str(receiver.values),
@@ -1400,9 +1389,7 @@ class Client(object):
         if verb:
 
             verified = np.sum(status.values != 0)
-
             pcnt = 100 * verified / status.size
-
             print('Verified : {} of {} ({:.1f}%)'
                   .format(verified, status.size, pcnt))
             print('Overall preprocessing : {:.2f}% passed'
@@ -1410,9 +1397,7 @@ class Client(object):
             print('Receiver preprocessing')
 
             for rec in status.receiver:
-
                 passed = np.all(status.loc[{'receiver': rec}].values == 1)
-
                 print('    {} :'.format(rec.values),
                       'passed' if passed else 'failed')
 
