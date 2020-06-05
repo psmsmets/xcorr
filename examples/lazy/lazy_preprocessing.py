@@ -141,4 +141,4 @@ status = xclient.data_preprocessing(
 
 dclient.close()
 dcluster.close()
-rmtree('dask-worker-space')
+rmtree('dask-worker-space', ignore_errors=True)

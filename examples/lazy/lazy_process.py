@@ -168,30 +168,10 @@ root = '../../data/results'
 #
 # Lazy process with dask
 #
+# An internal dask.distributed.LocalCluster and dask.distributed.Client
+# are initiated and cleaned.
+#
 ##############################################################################
 
-# -----------------------------------------------------------------------------
-# dask client
-# -----------------------------------------------------------------------------
-
-dcluster = distributed.LocalCluster(
-    processes=False, n_workers=1, threads_per_worker=1,
-)
-dclient = distributed.Client(dcluster)
-
-print('Dask client:', dclient)
-print('Dask dashboard:', dclient.dashboard_link)
-
-
-# -----------------------------------------------------------------------------
-# process
-# -----------------------------------------------------------------------------
-lazy_process(pairs, times, xcorr_init_args, xcorr_client_args, inventory, root)
-
-# -----------------------------------------------------------------------------
-# Cleanup
-# -----------------------------------------------------------------------------
-
-dclient.close()
-dcluster.close()
-rmtree('dask-worker-space')
+lazy_process(pairs, times, xcorr_init_args, xcorr_client_args, inventory, root,
+             threads=1)

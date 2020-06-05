@@ -11,6 +11,7 @@ Lazy processing using `xcorr`.
 import numpy as np
 import pandas as pd
 import xarray as xr
+import re
 from obspy import Inventory
 from shutil import rmtree
 import dask
@@ -204,7 +205,7 @@ def lazy_process(
     pairs: list, times: pd.DatetimeIndex, init_args: dict, client_args: dict,
     inventory: Inventory, root: str, threads: int = None,
     force_fresh: bool = False, download: bool = True,
-    debug: bool = False, **kwargs
+    debug: bool = False, cluster_args: dict = None, **kwargs
 ):
     """
     Lazy process a lot of data with xcorr and dask.
@@ -256,39 +257,7 @@ def lazy_process(
     """
 
     # -------------------------------------------------------------------------
-    # Dask
-    # -------------------------------------------------------------------------
-
-    # dask compute arguments
-    if debug:
-
-        # allow verbose
-        verb = kwargs['verb'] if 'verb' in kwargs else 1
-
-        # single-threaded
-        dcluster = distributed.LocalCluster(
-            processes=False, scheduler='single-threaded',
-        )
-
-    else:
-
-        # disable verbose globally
-        verb = 0
-
-        # init local cluster
-        dcluster = distributed.LocalCluster(
-            processes=False, threads_per_worker=1, n_workers=threads or -1,
-        )
-
-    # make sure there is no verb in kwargs
-    if 'verb' in kwargs:
-        kwargs.pop('verb')
-
-    # dask client from cluster
-    dclient = distributed.Client(dcluster)
-
-    # -------------------------------------------------------------------------
-    # Print some config parameters
+    # Print main config parameters
     # -------------------------------------------------------------------------
     print('-'*79)
     print('Config')
@@ -298,9 +267,59 @@ def lazy_process(
     print('    download       :', download)
     print('    debug          :', debug)
     print('    xcorr version  :', version)
-    print('    dask dashboard :', dclient.dashboard_link)
 
-    print(dclient)
+
+    # -------------------------------------------------------------------------
+    # Dask
+    # -------------------------------------------------------------------------
+
+    cluster_args = cluster_args or dict()
+
+    if not isinstance(cluster_args, dict):
+        raise TypeError('cluster_args should be of type dict!')
+
+    
+    # dask compute arguments
+    if debug:
+
+        # allow verbose
+        verb = kwargs['verb'] if 'verb' in kwargs else 1
+
+        # single-threaded
+        cluster_args = dict(processes=False, scheduler='single-threaded')
+
+    else:
+
+        # disable verbose globally
+        verb = 0
+
+        # local cluster expects no processes
+        cluster_args['processes'] = False
+
+        if threads:
+            cluster_args['n_workers'] = threads
+            cluster_args['threads_per_worker'] = 1
+
+    # make sure there is no verb in kwargs
+    if 'verb' in kwargs:
+        kwargs.pop('verb')
+
+    # dask client from cluster
+    dcluster = distributed.LocalCluster(**cluster_args)
+    dclient = distributed.Client(dcluster)
+
+    protocol, workers, threads, memory = re.search(
+        '\((.*)\)', repr(dcluster)
+    )[1].replace("'", '').split(', ')
+
+    print('-'*79)
+    print('Dask')
+    print('    protocol  :', protocol)
+    print('    workers   :', workers.split('=')[1])
+    print('    threads   :', threads.split('=')[1])
+    print('    memory    :', memory.split('=')[1])
+    print('    dashboard : http://localhost{}'.format(
+          dcluster.scheduler_spec['options']['dashboard_address']))
 
     # -------------------------------------------------------------------------
     # various inits
@@ -401,4 +420,4 @@ def lazy_process(
 
         dclient.close()
         dcluster.close()
-        rmtree('dask-worker-space')
+        rmtree('dask-worker-space', ignore_errors=True)

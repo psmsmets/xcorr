@@ -60,4 +60,4 @@ status = xclient.data_availability(
 
 dclient.close()
 dcluster.close()
-rmtree('dask-worker-space')
+rmtree('dask-worker-space', ignore_errors=True)
