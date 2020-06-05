@@ -268,7 +268,6 @@ def lazy_process(
     print('    debug          :', debug)
     print('    xcorr version  :', version)
 
-
     # -------------------------------------------------------------------------
     # Dask
     # -------------------------------------------------------------------------
@@ -278,7 +277,6 @@ def lazy_process(
     if not isinstance(cluster_args, dict):
         raise TypeError('cluster_args should be of type dict!')
 
-    
     # dask compute arguments
     if debug:
 
@@ -309,7 +307,7 @@ def lazy_process(
     dclient = distributed.Client(dcluster)
 
     protocol, workers, threads, memory = re.search(
-        '\((.*)\)', repr(dcluster)
+        r'\((.*)\)', repr(dcluster)
     )[1].replace("'", '').split(', ')
 
     print('-'*79)
