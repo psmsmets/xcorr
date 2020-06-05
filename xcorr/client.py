@@ -192,7 +192,7 @@ class Client(object):
         out += [['force write', 'Yes' if self.force_write else 'No']]
         out += [['parallel', 'Yes' if self.parallel else 'No']]
 
-        return tabulate(out)
+        return tabulate(out, tablefmt="plain"))
 
     def _repr_pretty_(self, p, cycle):
         p.text(self.__str__())

@@ -328,6 +328,8 @@ def lazy_process(
     # init the waveform client
     xclient = Client(**client_args)
 
+    print('-'*79)
+    print('Client')
     print(xclient)
 
     # Read and filter inventory
