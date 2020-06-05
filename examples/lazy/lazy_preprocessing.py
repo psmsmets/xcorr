@@ -29,7 +29,7 @@ print('Dask dashboard:', dclient.dashboard_link)
 # ------------
 
 # Create a client object.
-xclient = xcorr.Client(sds_root='../../data/WaveformArchive')
+xclient = xcorr.Client(sds_root='../../data/WaveformArchive', parallel=True)
 
 # Inspect the client summary
 print('xcorr client:')
@@ -52,8 +52,8 @@ preprocess = {
             'fill_value': 'interpolate',
             'interpolation_samples': 0,
         }),
-        ('filter', {'type': 'highpass', 'freq': .05}),
         ('detrend', {'type': 'demean'}),
+        ('filter', {'type': 'highpass', 'freq': .05}),
         ('remove_response', {'output': 'VEL'}),
         ('interpolate', {
             'sampling_rate': 50,
@@ -75,8 +75,8 @@ preprocess = {
             'fill_value': 'interpolate',
             'interpolation_samples': 0,
         }),
-        ('filter', {'type': 'highpass', 'freq': .05}),
         ('detrend', {'type': 'demean'}),
+        ('filter', {'type': 'highpass', 'freq': .05}),
         ('remove_response', {'output': 'VEL'}),
         ('rotate', {'method': '->ZNE'}),
         ('rotate', {'method': 'NE->RT', 'back_azimuth': 250.39}),
@@ -101,8 +101,8 @@ preprocess = {
             'fill_value': 'interpolate',
             'interpolation_samples': 0,
         }),
-        ('filter', {'type': 'highpass', 'freq': .05}),
         ('detrend', {'type': 'demean'}),
+        ('filter', {'type': 'highpass', 'freq': .05}),
         ('remove_response', {}),
         ('decimate', {'factor': 5}),
         ('trim', {}),

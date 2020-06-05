@@ -53,8 +53,8 @@ xcorr_init_args = {
                 'fill_value': 'interpolate',
                 'interpolation_samples': 0,
             }),
-            ('filter', {'type': 'highpass', 'freq': .05}),
             ('detrend', {'type': 'demean'}),
+            ('filter', {'type': 'highpass', 'freq': .05}),
             ('remove_response', {'output': 'VEL'}),
             ('interpolate', {
                 'sampling_rate': 50,
@@ -76,8 +76,8 @@ xcorr_init_args = {
                 'fill_value': 'interpolate',
                 'interpolation_samples': 0,
             }),
-            ('filter', {'type': 'highpass', 'freq': .05}),
             ('detrend', {'type': 'demean'}),
+            ('filter', {'type': 'highpass', 'freq': .05}),
             ('remove_response', {'output': 'VEL'}),
             ('rotate', {'method': '->ZNE'}),
             ('rotate', {'method': 'NE->RT', 'back_azimuth': 250.39}),
@@ -102,10 +102,10 @@ xcorr_init_args = {
                 'fill_value': 'interpolate',
                 'interpolation_samples': 0,
             }),
-            ('filter', {'type': 'highpass', 'freq': .05}),
             ('detrend', {'type': 'demean'}),
-            ('remove_response', {}),
+            ('filter', {'type': 'highpass', 'freq': .05}),
             ('decimate', {'factor': 5}),
+            ('remove_response', {}),
             ('trim', {}),
             ('detrend', {'type': 'demean'}),
             ('taper', {
@@ -134,13 +134,13 @@ pairs = [
     'IM.H10N1..EDH-IU.RAR.10.BHZ',
     'IM.H10N2..EDH-IU.RAR.10.BHZ',
     'IM.H10N3..EDH-IU.RAR.10.BHZ',
-    # 'IM.H03S1..EDH-IU.RAR.10.BHZ',
-    # 'IM.H03S2..EDH-IU.RAR.10.BHZ',
-    # 'IM.H03S3..EDH-IU.RAR.10.BHZ',
+    'IM.H03S1..EDH-IU.RAR.10.BHZ',
+    'IM.H03S2..EDH-IU.RAR.10.BHZ',
+    'IM.H03S3..EDH-IU.RAR.10.BHZ',
     'IM.H10N1..EDH-IU.RAR.10.BHR',
     # 'IM.H10N2..EDH-IU.RAR.10.BHR',
     # 'IM.H10N3..EDH-IU.RAR.10.BHR',
-    # 'IM.H03S1..EDH-IU.RAR.10.BHR',
+    'IM.H03S1..EDH-IU.RAR.10.BHR',
     # 'IM.H03S2..EDH-IU.RAR.10.BHR',
     # 'IM.H03S3..EDH-IU.RAR.10.BHR',
 ]
@@ -149,7 +149,7 @@ pairs = [
 # times : `pandas.data_range`
 #     Date range from start to end with ``freq``='D'.
 # -----------------------------------------------------------------------------
-times = date_range(start='2015-06-15', end='2015-06-20', freq='1D')
+times = date_range(start='2015-01-15', end='2015-01-20', freq='1D')
 
 # -----------------------------------------------------------------------------
 # inventory : :class:`obspy.Inventory`, optional

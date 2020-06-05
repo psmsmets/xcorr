@@ -63,7 +63,7 @@ class Client(object):
         self, sds_root: str = None, sds_root_write: str = None,
         sds_root_read: list = None, fdsn_service='IRIS',
         vdms_service: bool = True, max_gap: float = None,
-        force_write: bool = False, parallel: bool = True,
+        force_write: bool = False, parallel: bool = False,
     ):
         """Initialize a `xcorr` waveform request client.
 
@@ -102,8 +102,11 @@ class Client(object):
             the cummulated gap is larger than max_gap. Defaults to `False`.
 
         parallel : `bool`, optional
-            Parallelize workflows using :class:`dask.delayed`. Defaults to
-            `True` if `dask` is found.
+            Lock local sds access in parallel read/write to prevent
+            segmentation faults and corresponding archived file becoming
+            corrupt. Requires an active dask distributed client and local
+            cluster to generate locks per seed-id.
+            Defaults to `False`.
 
         Examples
         --------
@@ -280,8 +283,11 @@ class Client(object):
             the cummulated gap is larger than max_gap. Defaults to `False`.
 
         parallel : `bool`, optional
-            Enable parallel processing using :method:`dask`. If `None`
-            (default) ``self.parallel`` is used.
+            Enable local sds access locking in parallel read/write to prevent
+            segmentation faults and corresponding archived file becoming
+            corrupt. Requires an active dask distributed client and local
+            cluster to generate locks per seed-id.
+            If `None` (default) ``self.parallel`` is used.
 
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
@@ -544,8 +550,11 @@ class Client(object):
             Level of verbosity. Defaults to 0.
 
         parallel : `bool`, optional
-            Enable parallel processing using :method:`dask`. If `None`
-            (default) ``self.parallel`` is used.
+            Enable local sds access locking in parallel read/write to prevent
+            segmentation faults and corresponding archived file becoming
+            corrupt. Requires an active dask distributed client and local
+            cluster to generate locks per seed-id.
+            If `None` (default) ``self.parallel`` is used.
 
         **kwargs :
             Parameters passed to
@@ -1094,8 +1103,11 @@ class Client(object):
             Defaults to '12Z'.
 
         parallel : `bool`, optional
-            Enable parallel processing using :method:`dask`. If `None`
-            (default) ``self.parallel`` is used.
+            Enable local sds access locking in parallel read/write to prevent
+            segmentation faults and corresponding archived file becoming
+            corrupt. Requires an active dask distributed client and local
+            cluster to generate locks per seed-id.
+            If `None` (default) ``self.parallel`` is used.
 
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 0.
@@ -1271,8 +1283,11 @@ class Client(object):
             Defaults to '12Z'.
 
         parallel : `bool`, optional
-            Enable parallel processing using :method:`dask`. If `None`
-            (default) ``self.parallel`` is used.
+            Enable local sds access locking in parallel read/write to prevent
+            segmentation faults and corresponding archived file becoming
+            corrupt. Requires an active dask distributed client and local
+            cluster to generate locks per seed-id.
+            If `None` (default) ``self.parallel`` is used.
 
         verb : {0, 1, 2, 3, 4}, optional
             Level of verbosity. Defaults to 1.

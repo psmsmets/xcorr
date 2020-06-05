@@ -323,6 +323,9 @@ def lazy_process(
     # various inits
     # -------------------------------------------------------------------------
 
+    # activate client parallel locking
+    client_args['parallel'] = True
+
     # init the waveform client
     xclient = Client(**client_args)
 

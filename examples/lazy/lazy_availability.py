@@ -28,7 +28,7 @@ print('Dask dashboard:', dclient.dashboard_link)
 # ------------
 
 # Create a client object.
-xclient = xcorr.Client(sds_root='../../data/WaveformArchive')
+xclient = xcorr.Client(sds_root='../../data/WaveformArchive', parallel=True)
 
 # Inspect the client summary
 print('xcorr client:')
