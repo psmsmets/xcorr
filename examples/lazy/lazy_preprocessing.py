@@ -1,11 +1,11 @@
 """
-Client
-======
+Lazy preprocessing
+==================
 
-xcorr client.
+xcorr lazy client preprocessing evaluation.
 
 """
-import pandas as pd
+from pandas import to_datetime
 from obspy import read_inventory
 from dask import distributed
 from shutil import rmtree
@@ -127,21 +127,11 @@ pairs = [
     'IM.H03S1..EDH-IU.RAR.10.BHZ',
     'IM.H03S1..EDH-IU.RAR.10.BHR',
 ]
-times = pd.date_range('2015-01-01', '2015-01-10', freq='1D')
+time = to_datetime('2015-01-01')
 
-# evaluate data status
-status = xclient.data_availability(
-    pairs, times, verb=1, download=False, substitute=True
-)
-
-
-###############################################################################
-# Verify preprocessing
-# --------------------
-
-# on-the-fly evaluate data preprocessing
+# evaluate preprocessing
 status = xclient.data_preprocessing(
-    pairs, times[0], preprocess, inv, verb=1, substitute=True
+    pairs, time, preprocess, inv, verb=1, substitute=True
 )
 
 

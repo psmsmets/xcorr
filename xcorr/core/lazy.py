@@ -282,7 +282,6 @@ def lazy_process(
 
     # make sure there is no verb in kwargs
     if 'verb' in kwargs:
-
         kwargs.pop('verb')
 
     # dask client from cluster
@@ -325,7 +324,6 @@ def lazy_process(
     extend_days = 1
 
     for p in pairs:
-
         print('        {}'.format(p))
 
     print('    times : {}'.format(len(times)))
@@ -338,7 +336,7 @@ def lazy_process(
     # -------------------------------------------------------------------------
     print('-'*79)
 
-    availability = xclient.init_data_availability(
+    availability = xclient.data_availability(
         pairs, times, extend_days=extend_days,
         substitute=True,
         download=download,
@@ -356,7 +354,6 @@ def lazy_process(
     for time in availability.time[extend_days:-extend_days]:
 
         if np.sum(availability.loc[{'time': time}].values == 1) == nofrec:
-
             break
 
     else:

@@ -1,8 +1,16 @@
-#!/usr/bin/python
+"""
+Lazy process
+============
+
+xcorr lazy client data availability and preprocessing evaluation.
+
+"""
 
 # Mandatory imports
 from pandas import date_range
 from obspy import read_inventory
+from dask import distributed
+from shutil import rmtree
 from xcorr import lazy_process
 
 
@@ -114,7 +122,7 @@ xcorr_init_args = {
 #     Dictionary with input arguments passed to :class:`xcorr.Client`
 # -----------------------------------------------------------------------------
 xcorr_client_args = {
-    'sds_root': '../data/WaveformArchive',
+    'sds_root': '../../data/WaveformArchive',
 }
 
 # -----------------------------------------------------------------------------
@@ -147,13 +155,13 @@ times = date_range(start='2015-06-15', end='2015-06-20', freq='1D')
 # inventory : :class:`obspy.Inventory`, optional
 #     Inventory object, including the instrument response.
 # -----------------------------------------------------------------------------
-inventory = read_inventory('../data/Monowai.xml')
+inventory = read_inventory('../../data/Monowai.xml')
 
 # -----------------------------------------------------------------------------
 # root : `str`
 #     Path to output base directory. A folder will be created for each pair.
 # -----------------------------------------------------------------------------
-root = '../data/results'
+root = '../../data/results'
 
 
 ##############################################################################
@@ -162,5 +170,28 @@ root = '../data/results'
 #
 ##############################################################################
 
-lazy_process(pairs, times, xcorr_init_args, xcorr_client_args, inventory, root,
-             threads=4, progressbar=True, profiler=True)
+# -----------------------------------------------------------------------------
+# dask client
+# -----------------------------------------------------------------------------
+
+dcluster = distributed.LocalCluster(
+    processes=False, n_workers=1, threads_per_worker=1,
+)
+dclient = distributed.Client(dcluster)
+
+print('Dask client:', dclient)
+print('Dask dashboard:', dclient.dashboard_link)
+
+
+# -----------------------------------------------------------------------------
+# process
+# -----------------------------------------------------------------------------
+lazy_process(pairs, times, xcorr_init_args, xcorr_client_args, inventory, root)
+
+# -----------------------------------------------------------------------------
+# Cleanup
+# -----------------------------------------------------------------------------
+
+dclient.close()
+dcluster.close()
+rmtree('dask-worker-space')
