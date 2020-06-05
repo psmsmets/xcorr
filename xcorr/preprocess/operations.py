@@ -236,7 +236,7 @@ def apply_operation(
 
     Returns
     -------
-    operated_waveforms : :class:`obspy.Stream` or :class:`obspy.Trace`
+    waveforms : :class:`obspy.Stream` or :class:`obspy.Trace`
         Waveforms after applying the operation.
 
     """
@@ -275,10 +275,12 @@ def apply_operation(
         print(f'{stdout_prefix}{operation} :', params)
 
     try:
-        operated_waveforms = (
+        waveforms = (
             eval(f'waveforms.{operation}(**params)') if method == _self
             else method(waveforms, **params)
         )
+    except (KeyboardInterrupt, SystemExit):
+        raise
     except ObsPyException as error:
         msg = ('Failed to execute operation "{}". Returned error: {}'
                .format(operation, error))
@@ -289,9 +291,9 @@ def apply_operation(
             return False
 
     if verb > 3:
-        print(operated_waveforms)
+        print(waveforms)
 
-    return operated_waveforms
+    return waveforms
 
 
 def preprocess(
@@ -350,14 +352,12 @@ def preprocess(
         msg = '``raise_error`` is not of type `bool`'
         raise TypeError(msg)
 
-    # make sure not to apply the operations in place
-    operated_waveforms = waveforms.copy()
-
     # bag dynamic parameters
     dyn_params = {'inventory': inventory,
                   'starttime': starttime,
                   'endtime': endtime}
 
+    # feedback
     if verb > 1:
         print('Dynamic parameters to be injected:', dyn_params)
 
@@ -385,8 +385,8 @@ def preprocess(
                 warnings.warn(msg, UserWarning)
                 continue
         try:
-            operated_waveforms = apply_operation(
-                waveforms=operated_waveforms,
+            waveforms = apply_operation(
+                waveforms=waveforms,
                 operation=operation,
                 parameters=parameters,
                 dynamic_parameters=dyn_params,
@@ -401,16 +401,14 @@ def preprocess(
                 raise RuntimeError(msg)
             else:
                 warnings.warn(msg, UserWarning)
-                operated_waveforms = False
+                return None
         except (KeyboardInterrupt, SystemExit):
-            raise InterruptedError
-        if not operated_waveforms:
-            return Stream() if isinstance(waveforms, Stream) else Trace()
+            raise
 
     if verb > 2:
-        print(operated_waveforms)
+        print(waveforms)
 
-    return operated_waveforms
+    return waveforms
 
 
 def example_preprocess_dict(to_json: bool = False):
