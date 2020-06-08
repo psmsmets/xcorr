@@ -37,11 +37,13 @@ setup(
         'Programming Language :: Python :: 3.7',
     ],
     install_requires=[
-        'numpy>=1.15',
+        'numpy>=1.16',
         'scipy>=1.0.0',
-        'obspy>=1.1.0',
-        'xarray>=0.14.0',
-        'pandas>=0.24.0',
+        'obspy>=1.2.0',
+        'xarray>=0.15.0',
+        'pandas>=1.0.0',
+        'pyproj>=2.0.0',
+        'tabulate>=0.8',
     ],
     use_scm_version={
         'root': '.',
