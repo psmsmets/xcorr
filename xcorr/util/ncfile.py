@@ -70,7 +70,8 @@ def ncfile(pair, time: pd.Timestamp, root: str = None):
 
     # join
     pair = '-'.join(pair)
-    root = os.path.join(root, pair) if root else pair
+    year = f'{time.year:04d}'
+    root = os.path.join(root, year, pair) if root else os.path.join(year, pair)
 
     # path and filename
     ncfile = os.path.join(root, '{p}.{y:04d}.{d:03d}.nc'.format(
