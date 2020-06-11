@@ -1140,6 +1140,7 @@ class Client(object):
         # verbose
         if verb > 0:
             print('Verify availability')
+            print(f'    Parallel : {parallel}')
 
         # get all receivers from pairs
         receivers = []
@@ -1316,6 +1317,7 @@ class Client(object):
         # verbose
         if verb > 0:
             print('Verify preprocessing')
+            print(f'    Parallel : {parallel}')
 
         # get all receivers from pairs
         receivers = []
