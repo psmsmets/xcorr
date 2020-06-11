@@ -310,6 +310,7 @@ class Client(object):
 
         # check
         passed = self.check_duration(stream, verb=verb)
+        success = False
 
         # passed?
         if not passed and not force_write:
@@ -321,27 +322,41 @@ class Client(object):
             lock.acquire()
 
         # add to archive
-        with warnings.catch_warnings():
+        try:
+            with warnings.catch_warnings():
 
-            warnings.simplefilter('ignore')
+                warnings.simplefilter('ignore')
 
-            # write to sds archive
-            util.stream.stream2SDS(
-                stream,
-                sds_path=self.sds_root_write,
-                method='overwrite',
-                extra_samples=None,
-                verbose=verb == 4,
-            )
+                # write to sds archive
+                util.stream.stream2SDS(
+                    stream,
+                    sds_path=self.sds_root_write,
+                    method='overwrite',
+                    extra_samples=None,
+                    verbose=verb == 4,
+                )
+
+            success = True
+
+        except Exception as e:
+
+            if verb > 0:
+                print(f'Intercepted error @ sds write daystream: {e}')
+
+            if verb > 1:
+                print('-'*79)
+                track = traceback.format_exc()
+                print(track)
+                print('-'*79)
 
         # release sds write access
         if locked:
             lock.release()
 
-        if verb > 0:
+        if success and verb > 0:
             print(_msg_added_archive)
 
-        return passed
+        return passed and success
 
     def check_duration(
         self, stream: Stream, duration: float = None, receiver: str = None,

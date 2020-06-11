@@ -361,6 +361,7 @@ def lazy_process(
     availability = xclient.data_availability(
         pairs, times, extend_days=extend_days,
         substitute=True,
+        parallel=True,
         download=download,
         verb=verb or 1,
     )
@@ -394,7 +395,7 @@ def lazy_process(
         duration=init_args['window_length'],
         sampling_rate=init_args['sampling_rate'],
         download=False,
-        compute=False,
+        parallel=True,
         verb=verb or 1,
     )
 
