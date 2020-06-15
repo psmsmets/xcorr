@@ -96,6 +96,7 @@ def single_threaded_process(
 def lazy_processes(
     pairs: list, times: pd.DatetimeIndex, availability: xr.DataArray,
     preprocessing: xr.DataArray, init_args: dict, verb: int = 0,
+    override_availability = bool: False,
     **kwargs
 ):
     """
@@ -118,6 +119,10 @@ def lazy_processes(
 
     init_args : `dict`
         Dictionary with input arguments passed to :class:`xcorr.init`.
+
+    override_availability : `bool`
+        If `True`, force processing even when the data availability failed.
+        Defautls to `False`. Note: preprocessing should always be passed.
 
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
@@ -173,7 +178,7 @@ def lazy_processes(
 
             availability_passed = np.any(
                 pair_availability.sum(dim='receiver') == len(receivers)
-            )
+            ) or override_availability
 
             # availability status
             if verb > 2:
