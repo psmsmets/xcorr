@@ -39,8 +39,8 @@ seism = {
 
 # signal parameters
 vel = dict(min=1.46, max=1.50)
-filter_params = dict(frequency=3., btype='highpass', order=2, inplace=True)
-taper_params = dict(max_length=2/3., inplace=True)
+filter_params = dict(frequency=3., btype='highpass', order=2)
+taper_params = dict(max_length=2/3.)
 
 
 ###############################################################################
@@ -54,13 +54,13 @@ ds = [
 ]
 
 # open merged list
-ds = xcorr.merge(ds, fast=True)
+ds = xcorr.merge(ds)
 assert ds, 'No data found!'
 
 # apply signal processing
-xcorr.signal.filter(ds.cc, **filter_params)
-xcorr.signal.taper(ds.cc, **taper_params)
-xcorr.bias_correct(ds, unbiased_var='cc_w')
+ds['cc'] = xcorr.signal.filter(ds.cc, **filter_params)
+ds['cc'] = xcorr.signal.taper(ds.cc, **taper_params)
+ds['cc_w'] = xcorr.signal.unbias(ds.cc)
 
 
 ###############################################################################
@@ -180,7 +180,7 @@ snr_lag_plot(ds, 5.)
 # ---------------------
 
 # compute spectrogram
-psd = xcorr.signal.psd(
+psd = xcorr.signal.spectrogram(
     ds.cc_w.loc[{'lag': ds.lag[signal_win]}],
     duration=2.,
     padding_factor=4,

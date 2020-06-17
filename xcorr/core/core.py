@@ -19,6 +19,10 @@ import warnings
 import os
 from glob import glob
 try:
+    import h5netcdf
+except ModuleNotFoundError:
+    h5netcdf = False
+try:
     import dask
 except ModuleNotFoundError:
     dask = False
@@ -345,7 +349,8 @@ def init(
 
 
 def read(
-    path: str, extract: bool = False, verb: int = 0, **kwargs
+    path: str, extract: bool = False, engine: str = None, verb: int = 0,
+    **kwargs
 ):
     """
     Open an xcorr N-D labelled set of data arrays from a netCDF4 file.
@@ -358,6 +363,10 @@ def read(
     extract : `bool`, optional
         Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
+
+    engine : `str`
+        Set the xarray engine to read the file. Defaults to h5netcdf if the
+        module is found instead of netcdf4.
 
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
@@ -372,11 +381,14 @@ def read(
     """
     # open if exists
     if not os.path.isfile(path):
-
         return None
 
-    # validate
-    dataset = validate(xr.open_dataset(path), verb=verb, **kwargs)
+    # set the engine
+    engine = engine or ('h5netcdf' if h5netcdf else None)
+
+    # open and validate
+    dataset = validate(xr.open_dataset(path, engine=engine),
+                       verb=verb, **kwargs)
 
     # verbose status
     if verb > 0:
@@ -395,8 +407,8 @@ def read(
 
 
 def mfread(
-    paths, extract: bool = False, parallel: bool = True, chunks=None,
-    engine: str = None, **kwargs
+    paths, extract: bool = False, engine: str = None, parallel: bool = True,
+    chunks=None, **kwargs
 ):
     """
     Open multiple xcorr N-D labelled files as a single dataset using
@@ -412,6 +424,10 @@ def mfread(
     extract : `bool`, optional
         Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
+
+    engine : `str`
+        Set the xarray engine to read the file. Defaults to h5netcdf if the
+        module is found instead of netcdf4.
 
     parallel : `bool`, optional
         Enabled parallellization if `True` (defaults). Requires Dask.
@@ -435,10 +451,12 @@ def mfread(
         The `xcorr` N-D labelled set of data arrays read from netCDF4.
 
     """
+    # set the engine
+    engine = engine or ('h5netcdf' if h5netcdf else None)
 
     # get a list of validated datasets
     validated = validate_list(paths, keep_opened=False, paths_only=True,
-                              **kwargs)
+                              engine=engine, **kwargs)
 
     # init chunks
     chunks = chunks or {'pair': 1, 'time': 1}
@@ -482,7 +500,7 @@ def mfread(
 
 
 def validate(
-    dataset: xr.Dataset, fast: bool = False, quick_and_dirty: bool = False,
+    dataset: xr.Dataset, fast: bool = True, quick_and_dirty: bool = False,
     metadata_hash: str = None, preprocess_hash: str = None,
     xcorr_version: str = None, verb: int = 0
 ):
@@ -540,6 +558,15 @@ def validate(
         dataset.close()
         return None
 
+    # fix single-element float/integers represented as np.arrays (h5netcdf)
+    for var in dataset.variables:
+        for attr in dataset[var].attrs.keys():
+            if (
+                isinstance(dataset[var].attrs[attr], np.ndarray) and
+                len(dataset[var].attrs[attr]) == 1
+            ):
+                dataset[var].attrs[attr] = dataset[var].attrs[attr].item()
+
     # extract source
     src = (dataset.encoding['source'] if 'source' in dataset.encoding
            else '[memory]')
@@ -549,10 +576,12 @@ def validate(
 
         if not isinstance(metadata_hash, str):
 
+            dataset.close()
             raise TypeError('``metadata_hash`` should be a string.')
 
         if not len(metadata_hash) == 64:
 
+            dataset.close()
             raise ValueError('``metadata_hash`` should be of length 64.')
 
     # check if at least pair and time variables exist
@@ -596,6 +625,7 @@ def validate(
                     sha256_hash_metadata
                 )
 
+            dataset.close()
             return None
 
     if not (quick_and_dirty or fast):
@@ -617,6 +647,7 @@ def validate(
                 print('sha256 hash in ncfile :', dataset.sha256_hash)
                 print('sha256 hash computed  :', sha256_hash)
 
+            dataset.close()
             return None
 
     # compare metadata_hash with template
@@ -658,7 +689,8 @@ def validate(
 def validate_list(
     datasets, strict: bool = False, parallel: bool = True,
     keep_opened: bool = False, paths_only: bool = False,
-    compute: bool = True, compute_args: dict = {}, verb: int = 0, **kwargs
+    engine: str = None, compute: bool = True, compute_args: dict = {},
+    verb: int = 0, **kwargs
 ):
     """
     Validate a list of xcorr N-D labelled datasets.
@@ -714,6 +746,9 @@ def validate_list(
 
     parallel = dask and parallel
 
+    # set the engine
+    engine = engine or ('h5netcdf' if h5netcdf else None)
+
     # expand path list with glob
     sources = []
 
@@ -752,7 +787,7 @@ def validate_list(
                               UserWarning)
             return None
 
-        return xr.open_dataset(source)
+        return xr.open_dataset(source, engine=engine)
 
     # get output wrapper
     def get_output(ds):
@@ -777,7 +812,6 @@ def validate_list(
         ds = get_dataset(source)
 
         if ds is None:
-
             continue
 
         # validate dataset
@@ -785,8 +819,10 @@ def validate_list(
 
         # passed?
         if ds is not None:
-
             break
+
+    if ds is None:
+        raise RuntimeError('No valid dataset found.')
 
     # append first valid ds
     validated.append(get_output(ds))
@@ -823,7 +859,8 @@ def validate_list(
 
 def write(
     data, path: str, close: bool = True,
-    force_write: bool = False, compute: bool = True, verb: int = 1
+    force_write: bool = False, compute: bool = True, verb: int = 1,
+    **kwargs
 ):
     """
     Write an xcorr N-D labelled data array to a netCDF4 file using a
@@ -831,6 +868,8 @@ def write(
 
     Before writing the data, metadata and data hash hashes are verified and
     updated if necessary. This changes the data attributes in place.
+
+    The preferred engine is set to h5netcdf if the module can be found.
 
     Parameters
     ----------
@@ -927,8 +966,10 @@ def write(
     # write to temporary file
     if verb > 0:
         print('To temporary netcdf', end='. ')
-    delayed_obj = data.to_netcdf(path=tmp, mode='w', format='netcdf4',
-                                 compute=compute)
+    delayed_obj = data.to_netcdf(
+        path=tmp, mode='w', format='netcdf4', compute=compute,
+        **{'engine': 'h5netcdf' if h5netcdf else None, **kwargs}
+    )
 
     # Replace file
     if verb:

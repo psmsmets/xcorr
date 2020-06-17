@@ -9,8 +9,6 @@ xcorr lazy client data availability and preprocessing evaluation.
 # Mandatory imports
 from pandas import date_range
 from obspy import read_inventory
-from dask import distributed
-from shutil import rmtree
 from xcorr import lazy_process
 
 

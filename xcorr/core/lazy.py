@@ -96,7 +96,7 @@ def single_threaded_process(
 def lazy_processes(
     pairs: list, times: pd.DatetimeIndex, availability: xr.DataArray,
     preprocessing: xr.DataArray, init_args: dict, verb: int = 0,
-    override_availability = bool: False,
+    override_availability: bool = False,
     **kwargs
 ):
     """

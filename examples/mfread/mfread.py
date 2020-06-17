@@ -8,6 +8,7 @@ xcorr multi-file read dataset using dask.
 
 import matplotlib.pyplot as plt
 import dask
+import dask.diagnostics
 import xcorr
 
 
@@ -17,8 +18,7 @@ import xcorr
 
 # open merged list using dask
 ds = xcorr.mfread(
-    '../../data/results/*/*2015.0*.nc',
-    fast=True,
+    '../../data/results/2015/*/*2015.0*.nc',
     chunks={'time': 4}
 )
 assert ds, 'No data found!'
@@ -83,6 +83,8 @@ snr.plot.line(x='time', hue='pair', marker='o', markersize=8, **plotset)
 plt.tight_layout()
 plt.show()
 
+
+raise SystemExit()
 
 ###############################################################################
 # Spectrogram
