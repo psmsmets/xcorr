@@ -26,9 +26,12 @@ dependencies:
   - distributed
   - python-graphviz
   - bokeh=2.0
+  - seaborn
+  - flake8
   - notebook
   - ipython
   - jupyter
+  - python-slugify
   - pip
   - pip:
     - python-crontab

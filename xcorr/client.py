@@ -141,7 +141,6 @@ class Client(object):
         # keep unique sds roots
         self._sds_root_read = list(set(self._sds_root_read))
         self._sds_read = []
-        self._sds_locks = dict()
 
         # init sds accessors per root
         for root in self._sds_root_read:
