@@ -61,7 +61,7 @@ def window(
         '``x`` should be a coordinate or variable with a single dimension!'
     )
     assert 'sampling_rate' in x.attrs, (
-        f'``x`` has no attribute "sampling_rate"!'
+        '``x`` has no attribute "sampling_rate"!'
     )
 
     wtype = wtype or 'hann'

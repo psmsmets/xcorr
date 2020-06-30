@@ -57,7 +57,7 @@ def unbias(
     # check x
     dim = dim or x.dims[-1]
     assert dim in x.dims, f'x has no dimension "{dim}"!'
-    assert 'unbiased' in x.attrs, f'x has no unbiased flag attribute!'
+    assert 'unbiased' in x.attrs, 'x has no unbiased flag attribute!'
 
     if x.unbiased != 0:
         warn('No need to bias correct again.')

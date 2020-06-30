@@ -152,7 +152,7 @@ def init(
     dataset.attrs = {
         'title': (
             (attrs['title'] if 'title' in attrs else '') +
-            ' Crosscorrelations - {}'
+            ' Crosscorrelations - {}{}'
             .format(
                 starttime.strftime('%Y.%j'),
                 ' to {}'.format(endtime.strftime('%Y.%j'))
@@ -570,14 +570,10 @@ def validate(
 
     # Verify metadata_hash input
     if metadata_hash:
-
         if not isinstance(metadata_hash, str):
-
             dataset.close()
             raise TypeError('``metadata_hash`` should be a string.')
-
         if not len(metadata_hash) == 64:
-
             dataset.close()
             raise ValueError('``metadata_hash`` should be of length 64.')
 
@@ -587,7 +583,6 @@ def validate(
         if verb > 0:
             warnings.warn('Dataset contains no pair and time coordinate.',
                           UserWarning)
-
         dataset.close()
         return None
 
@@ -602,16 +597,12 @@ def validate(
         )
 
         if sha256_hash_metadata != dataset.sha256_hash_metadata:
-
             if verb > 0:
-
                 warnings.warn(
                     f'Dataset metadata sha256 hash in {src} is inconsistent.',
                     UserWarning
                 )
-
             if verb > 1:
-
                 print('source :', src)
                 print(
                     'sha256 hash metadata in ncfile :',
@@ -621,39 +612,29 @@ def validate(
                     'sha256 hash metadata computed  :',
                     sha256_hash_metadata
                 )
-
             dataset.close()
             return None
 
     if not (quick_and_dirty or fast):
-
         sha256_hash = util.hasher.hash_Dataset(
             dataset, metadata_only=False, debug=False
         )
-
         if sha256_hash != dataset.sha256_hash:
-
             if verb > 0:
-
                 warnings.warn(f'Dataset sha256 hash in {src} is inconsistent.',
                               UserWarning)
-
             if verb > 1:
-
                 print('source :', src)
                 print('sha256 hash in ncfile :', dataset.sha256_hash)
                 print('sha256 hash computed  :', sha256_hash)
-
             dataset.close()
             return None
 
     # compare metadata_hash with template
     if metadata_hash and dataset.sha256_hash_metadata != metadata_hash:
-
         if verb > 0:
             warnings.warn('Dataset metadata hash does not match.',
                           UserWarning)
-
         dataset.close()
         return None
 
@@ -662,21 +643,17 @@ def validate(
         preprocess_hash and
         dataset.pair.attrs['preprocess']['sha256_hash'] != preprocess_hash
     ):
-
         if verb > 0:
             warnings.warn('Dataset preprocess hash does not match.',
                           UserWarning)
-
         dataset.close()
         return None
 
     # compare xcorr_version with template
     if xcorr_version and dataset.xcorr_version != xcorr_version:
-
         if verb > 0:
             warnings.warn('Dataset xcorr version does not match.',
                           UserWarning)
-
         dataset.close()
         return None
 
@@ -684,7 +661,7 @@ def validate(
 
 
 def validate_list(
-    datasets, strict: bool = False, paths_only: bool = False, 
+    datasets, strict: bool = False, paths_only: bool = False,
     keep_opened: bool = False, engine: str = None,
     parallel: bool = True, compute: bool = True, compute_args: dict = {},
     verb: int = 0, **kwargs
@@ -755,19 +732,12 @@ def validate_list(
 
     # expand glob strings and check for unique type in list
     for source in datasets:
-
         if isinstance(source, str):
-
             sources += glob(source)
-
         elif isinstance(source, xr.Dataset):
-
             if len(sources) > 0 or paths_only:
-
                 raise ValueError(valErr)
-
         else:
-
             raise ValueError(valErr)
 
     isFile = len(sources) > 0
@@ -776,52 +746,35 @@ def validate_list(
 
     # get dataset wrapper
     def get_dataset(source):
-
         if not isFile:
-
             return source
-
         if not os.path.isfile(source):
-
             if verb > 0:
                 warnings.warn(f'Datasets item "{source}" does not exists.',
                               UserWarning)
             return None
-
         return xr.open_dataset(source, engine=engine)
 
     # get output wrapper
     def get_output(ds):
-
         if not isinstance(ds, xr.Dataset):
-
             return None
-
         if isFile and not keep_opened:
-
             ds.close()
             return ds.encoding['source']
-
         else:
-
             return ds
 
     # find first validated dataset
     for i, source in enumerate(sources):
-
-        # get dataset
         ds = get_dataset(source)
-
         if ds is None:
             continue
-
-        # validate dataset
         ds = validate(ds, verb=verb, **kwargs)
-
-        # passed?
         if ds is not None:
             break
 
+    # any valid dataset?
     if ds is None:
         raise RuntimeError('No valid dataset found.')
 
@@ -836,21 +789,14 @@ def validate_list(
     }
 
     if parallel:
-
         for source in sources[i+1:]:
-
             ds = dask.delayed(get_dataset)(source)
             ds = dask.delayed(validate)(ds, **validate_args, **kwargs)
             validated.append(dask.delayed(get_output)(ds))
-
         if compute:
-
             validated = dask.compute(validated, **compute_args)
-
     else:
-
         for source in sources[i+1:]:
-
             ds = get_dataset(source)
             ds = validate(ds, **validate_args, **kwargs)
             validated.append(get_output(ds))
