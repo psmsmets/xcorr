@@ -425,7 +425,7 @@ def mfread(
         Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
 
-    engine : `str`
+    engine : `str`, optional
         Set the xarray engine to read the file. Defaults to h5netcdf if the
         module is found instead of netcdf4.
 
@@ -439,9 +439,6 @@ def mfread(
         will be chosen to load entire input files into memory at once. This
         has a major impact on performance: see :func:`xarray.open_mfdataset`
         for more details.
-
-    engine : `str`, optional
-        File engine. Defaults to 'netcdf4'.
 
     Any additional keyword arguments will be passed to the :func:`validate`.
 
@@ -687,9 +684,9 @@ def validate(
 
 
 def validate_list(
-    datasets, strict: bool = False, parallel: bool = True,
-    keep_opened: bool = False, paths_only: bool = False,
-    engine: str = None, compute: bool = True, compute_args: dict = {},
+    datasets, strict: bool = False, paths_only: bool = False, 
+    keep_opened: bool = False, engine: str = None,
+    parallel: bool = True, compute: bool = True, compute_args: dict = {},
     verb: int = 0, **kwargs
 ):
     """
@@ -705,11 +702,15 @@ def validate_list(
         If `True`, do not merge data arrays with different `xcorr` versions.
         Defaults to `False`.
 
+    paths_only : `bool`, optional
+        If `True`, ``datasets`` can only be glob strings. Defaults to `False`.
+
     keep_opened : `bool`, optional
         If `True`, do not close the file after opening. Defaults to `False`.
 
-    paths_only : `bool`, optional
-        If `True`, ``datasets`` can only be glob strings. Defaults to `False`.
+    engine : `str`, optional
+        Set the xarray engine to read the file. Defaults to h5netcdf if the
+        module is found instead of netcdf4.
 
     parallel : `bool`, optional
         Enabled parallellization if `True` (default). Requires Dask.
