@@ -407,7 +407,7 @@ def read(
 
 def mfread(
     paths, extract: bool = False, engine: str = None, parallel: bool = True,
-    chunks=None, **kwargs
+    chunks=None, naive: bool = False, **kwargs
 ):
     """
     Open multiple xcorr N-D labelled files as a single dataset using
@@ -439,6 +439,11 @@ def mfread(
         has a major impact on performance: see :func:`xarray.open_mfdataset`
         for more details.
 
+    naive : `bool`, optional
+        If `True`, ``paths`` is directly passed on to
+        :func:`xarray.open_mfdataset` disabling :func:`validate_list`.
+        Defaults to `False`.
+
     Any additional keyword arguments will be passed to the :func:`validate`.
 
     Returns
@@ -451,8 +456,11 @@ def mfread(
     engine = engine or ('h5netcdf' if h5netcdf else None)
 
     # get a list of validated datasets
-    validated = validate_list(paths, keep_opened=False, paths_only=True,
-                              engine=engine, **kwargs)
+    if naive:
+        validates = paths
+    else:
+        validated = validate_list(paths, keep_opened=False, paths_only=True,
+                                  engine=engine, **kwargs)
 
     # init chunks
     chunks = chunks or {'pair': 1, 'time': 1}
