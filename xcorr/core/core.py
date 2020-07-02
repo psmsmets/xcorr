@@ -457,7 +457,7 @@ def mfread(
 
     # get a list of validated datasets
     if naive:
-        validates = paths
+        validated = paths
     else:
         validated = validate_list(paths, keep_opened=False, paths_only=True,
                                   engine=engine, **kwargs)
