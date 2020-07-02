@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Signal
 ======
@@ -26,7 +27,7 @@ time = pd.to_datetime('2015-01-15')
 # receiver parameters
 hydro = {
     'network': 'IM',
-    'station': 'H10N1',
+    'station': 'H03S1',
     'location': '',
     'channel': 'EDH',
 }

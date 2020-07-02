@@ -806,7 +806,7 @@ def validate_list(
 
 def write(
     data, path: str, close: bool = True,
-    force_write: bool = False, compute: bool = True, verb: int = 1,
+    force_write: bool = False, verb: int = 1,
     **kwargs
 ):
     """
@@ -832,10 +832,6 @@ def write(
     force_write : `bool`, optional
         Always write file if `True` even if its empty. Default is `False`.
 
-    compute : `bool`, optional
-        If `False`, return a dask.delayed object that can be computed later.
-        Defaults to `True`.
-
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 1.
 
@@ -851,9 +847,6 @@ def write(
     # metadata hash
     metadata_hash = util.hasher.hash(data, metadata_only=True)
 
-    # no verbose on delayed
-    verb = 0 if not compute else verb
-
     if 'sha256_hash_metadata' not in data.attrs:
         data.attrs['sha256_hash_metadata'] = metadata_hash
 
@@ -865,7 +858,6 @@ def write(
 
     # check status?
     if isdataset and 'status' in data.variables:
-
         if (
             np.sum(data.status.data == 1) == 0 or
             (np.sum(data.status.values == -1) == 0 and force_write)
@@ -884,7 +876,6 @@ def write(
     abspath, file = os.path.split(os.path.abspath(path))
 
     if not os.path.exists(abspath):
-
         os.makedirs(abspath)
 
     tmp = os.path.join(
@@ -913,8 +904,8 @@ def write(
     # write to temporary file
     if verb > 0:
         print('To temporary netcdf', end='. ')
-    delayed_obj = data.to_netcdf(
-        path=tmp, mode='w', format='netcdf4', compute=compute,
+    data.to_netcdf(
+        path=tmp, mode='w', format='netcdf4',
         **{'engine': 'h5netcdf' if h5netcdf else None, **kwargs}
     )
 
@@ -934,7 +925,7 @@ def write(
     if verb > 0:
         print('Done.')
 
-    return delayed_obj if not compute else None
+    return
 
 
 def merge(
