@@ -387,7 +387,7 @@ def read(
     engine = engine or ('h5netcdf' if h5netcdf else None)
 
     # open and validate
-    dataset = validate(xr.open_dataset(path, engine=engine),
+    dataset = validate(xr.open_dataset(path, engine=engine, autoclose=True),
                        verb=verb, **kwargs)
 
     # verbose status
@@ -463,15 +463,16 @@ def mfread(
 
     # open multiple files using dask
     dataset = xr.open_mfdataset(
-        validated,
-        combine='by_coords',
+        paths=validated,
         chunks=chunks,
-        data_vars='minimal',
-        join='outer',
-        parallel=parallel,
+        combine='by_coords',
         preprocess=_validate,
         engine=engine,
         lock=False,
+        data_vars='minimal',
+        parallel=parallel,
+        join='outer',
+        autoclose=True,
     )
 
     # extract valid data
@@ -752,7 +753,7 @@ def validate_list(
                 warnings.warn(f'Datasets item "{source}" does not exists.',
                               UserWarning)
             return None
-        return xr.open_dataset(source, engine=engine)
+        return xr.open_dataset(source, engine=engine, autoclose=True)
 
     # get output wrapper
     def get_output(ds):
