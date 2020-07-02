@@ -392,7 +392,6 @@ def read(
 
     # verbose status
     if verb > 0:
-
         print('{s} #(status==1): {n} of {m}'.format(
             s=dataset.encoding['source'],
             n=np.sum(dataset.status.data == 1),
@@ -910,7 +909,7 @@ def write(
     )
 
     # Replace file
-    if verb:
+    if verb > 0:
         print('Replace', end='. ')
     os.replace(tmp, os.path.join(abspath, file))
 
@@ -1051,7 +1050,6 @@ def process(
             pt = {'pair': p, 'time': t}
 
             if verb > 0:
-
                 print(str(p.values), str(t.values)[:19], end=': ')
 
             # skip processed
@@ -1063,7 +1061,6 @@ def process(
                 ):
 
                     if verb > 0:
-
                         print('Has status "{}". Skip.'.format(
                               dataset.status.loc[pt].values))
 
@@ -1071,7 +1068,6 @@ def process(
 
             # waveforms
             if verb > 0:
-
                 print('Waveforms', end='. ')
 
             st = client.get_pair_preprocessed_waveforms(
@@ -1089,13 +1085,11 @@ def process(
             if not isinstance(st, obspy.Stream) or len(st) != 2:
 
                 if verb > 0:
-
                     print('Missing data. Set status "-1" and skip.')
 
                 dataset.status.loc[pt] = -1
 
                 if test_run:
-
                     break
 
                 continue
@@ -1115,14 +1109,12 @@ def process(
             if hash_waveforms:
 
                 if verb > 0:
-
                     print('Hash', end='. ')
 
                 dataset.hash.loc[pt] = util.hash_Stream(st)
 
             # cc
             if verb > 0:
-
                 print('CC', end='. ')
 
             dataset.cc.loc[pt] = correlate.cc(
@@ -1139,11 +1131,9 @@ def process(
 
             # Finish
             if verb > 0:
-
                 print('Done.')
 
             if test_run:
-
                 break
 
     # update history
@@ -1153,7 +1143,6 @@ def process(
 
     # bias correct?
     if dataset.cc.attrs['bias_correct'] == 1:
-
         dataset = bias_correct(dataset)
 
     # update metadata hash
