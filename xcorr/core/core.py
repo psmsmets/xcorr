@@ -480,7 +480,6 @@ def mfread(
         data_vars='minimal',
         parallel=parallel,
         join='outer',
-        autoclose=True,
     )
 
     # extract valid data
