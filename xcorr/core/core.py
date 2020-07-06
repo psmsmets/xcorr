@@ -811,7 +811,7 @@ def validate_list(
             ds = dask.delayed(validate)(ds, **validate_args, **kwargs)
             validated.append(dask.delayed(get_output)(ds))
         if compute:
-            validated = dask.compute(validated, **compute_args)
+            validated = dask.compute(validated, **compute_args)[0]
     else:
         for source in sources[i+1:]:
             ds = get_dataset(source)
