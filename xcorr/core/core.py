@@ -805,6 +805,7 @@ def validate_list(
         'xcorr_version': ds.attrs['xcorr_version'] if strict else None,
     }
 
+    # evaluate
     if parallel:
         for source in sources[i+1:]:
             ds = dask.delayed(get_dataset)(source)
@@ -817,6 +818,9 @@ def validate_list(
             ds = get_dataset(source)
             ds = validate(ds, **validate_args, **kwargs)
             validated.append(get_output(ds))
+
+    # filter
+    validated = filter(None, validated)
 
     return validated
 
