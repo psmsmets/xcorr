@@ -125,19 +125,19 @@ def _snr(cc, signal, noise):
 # ---------------------
 
 def lazy_snr_list(filenames: list):
-    """Compute snr for a list of filenames
+    """Evaluate snr for a list of filenames
     """
     snr_list = []
     for filename in filenames:
         ds = _open(filename)
-        mv = _mask_valid(ds)
-        ms = _mask_valid(ds)
-        mn = _mask_noise(ds)
-        cc = _select_and_trim(ds, mv)
+        valid = _mask_valid(ds)
+        signal = _mask_signal(ds)
+        noise = _mask_noise(ds)
+        cc = _select_and_trim(ds, valid)
         cc = _filter(cc)
         cc = _detrend(cc)
         cc = _taper(cc)
-        snr = _snr(cc, ms, mn)
+        snr = _snr(cc, signal, noise)
         ds = _close(ds)
         snr_list.append(snr)
     return snr_list
