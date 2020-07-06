@@ -44,7 +44,7 @@ from ..preprocess import (
 
 
 __all__ = ['init', 'read', 'write', 'merge', 'mfread', 'process',
-           'bias_correct']
+           'validate', 'validate_list', 'bias_correct']
 
 
 def init(
@@ -406,8 +406,9 @@ def read(
 
 
 def mfread(
-    paths, extract: bool = False, engine: str = None, parallel: bool = True,
-    chunks=None, naive: bool = False, **kwargs
+    paths, extract: bool = False, preprocess: callable = None,
+    engine: str = None, parallel: bool = True, chunks=None,
+    naive: bool = False, verb: int = 0, **kwargs
 ):
     """
     Open multiple xcorr N-D labelled files as a single dataset using
@@ -423,6 +424,13 @@ def mfread(
     extract : `bool`, optional
         Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
+
+    preprocess : `callable`, optional
+        If provided, call this function on each dataset prior to concatenation.
+        You can find the file-name from which each dataset was loaded in
+        ``ds.encoding['source']``.
+        If `None` (default) the :func:`validate` is used
+        ``quick_and_dirty=True``.
 
     engine : `str`, optional
         Set the xarray engine to read the file. Defaults to h5netcdf if the
@@ -461,9 +469,11 @@ def mfread(
     else:
         validated = validate_list(paths, keep_opened=False, paths_only=True,
                                   engine=engine, **kwargs)
+        if verb > 3:
+            print('validated :', validated)
 
     # init chunks
-    chunks = chunks or {'pair': 1, 'time': 1}
+    #chunks = chunks or {'pair': 1, 'time': 1}
 
     # validate wrapper to pass arguments
     def _validate(ds):
@@ -474,7 +484,7 @@ def mfread(
         paths=validated,
         chunks=chunks,
         combine='by_coords',
-        preprocess=_validate,
+        preprocess=preprocess or _validate,
         engine=engine,
         lock=False,
         data_vars='minimal',

@@ -82,34 +82,3 @@ with dask.diagnostics.ProgressBar():
 snr.plot.line(x='time', hue='pair', marker='o', markersize=8, **plotset)
 plt.tight_layout()
 plt.show()
-
-
-raise SystemExit()
-
-###############################################################################
-# Spectrogram
-# -----------
-
-# should be done per pair to avoid timeshifts due to NaN in the data
-pair = ds.pair[1]
-
-# extract and preprocess cc signal
-sig = ds.cc.sel(pair=pair).where(valid_mask, drop=True)
-sig = xcorr.signal.filter(sig, frequency=3., btype='highpass', order=2)
-sig = sig.where(signal_mask.sel(pair=pair), drop=True)
-sig = xcorr.signal.unbias(sig)
-
-# spectral density
-psd = xcorr.signal.spectrogram(
-    sig,
-    duration=2., padding_factor=4, scaling='density'
-)
-
-# compute
-with dask.diagnostics.ProgressBar():
-    dask.compute(psd, num_workers=2)
-
-# plot
-psd.sel(time=psd.time[0]).plot.imshow(x='lag')
-plt.tight_layout()
-plt.show()
