@@ -11,16 +11,19 @@ Estimate the signal-to-noise ratio of an N-D labeled array of data.
 # Mandatory imports
 import numpy as np
 import xarray as xr
+import pandas as pd
+import matplotlib.pyplot as plt
 from obspy.signal import trigger
 
 
 # Relative imports
-from ..util.time import to_datetime
+from ..util.time import to_datetime, to_seconds
 from ..util.convert import to_stream
 from ..util.history import historicize
 
 
-__all__ = ['coincidence_trigger']
+__all__ = ['coincidence_trigger', 'trigger_periods', 'trigger_values',
+           'plot_trigs']
 
 
 def coincidence_trigger(
@@ -97,11 +100,9 @@ def coincidence_trigger(
     thr_off = thr_off or thr_on
 
     if not isinstance(thr_on, float):
-
         raise TypeError('On threshold should be of type float.')
 
     if not isinstance(thr_off, float):
-
         raise TypeError('Off threshold should be of type float.')
 
     # similarity_threshold
@@ -112,7 +113,6 @@ def coincidence_trigger(
         similarity_threshold < 0 or
         similarity_threshold > 1
     ):
-
         raise TypeError('Similarity threshold should be of type float '
                         'within (0.0-1.0).')
 
@@ -120,7 +120,6 @@ def coincidence_trigger(
     extend = extend or 0
 
     if not isinstance(extend, int) or extend < 0:
-
         raise TypeError('extend should be a postive integer.')
 
     # convert dataarray to stream
@@ -128,7 +127,6 @@ def coincidence_trigger(
 
     # replace gaps with -1
     for tr in st:
-
         tr.data = tr.data.filled()
 
     # thr coincidence sum
@@ -165,7 +163,6 @@ def coincidence_trigger(
     for trig in trigs:
 
         if trig['duration'] < min_step:
-
             continue
 
         # get period start and end
@@ -178,7 +175,6 @@ def coincidence_trigger(
         period = (ct[dim] >= start) & (ct[dim] <= end)
 
         if np.all(ct[period] == -1):
-
             ct_index += 1
 
         ct[period] = ct_index
@@ -200,3 +196,97 @@ def coincidence_trigger(
     })
 
     return ct
+
+
+def trigger_periods(trigs: xr.DataArray):
+    """
+    Extract the triggered periods into a :class:`pandas.DataFrame`.
+
+    Parameters
+    ----------
+    trigs : :class:`array.DataArray`
+        The triggers of ``x``.
+
+    Returns
+    -------
+    periods : :class:`pandas.DataFrame`
+        The start and end times for each trigger.
+
+    """
+
+    per = []
+
+    for i in range(trigs.nperiods):
+        trig = trigs.time.where(trigs == i, drop=True)
+        per.append(
+            pd.DataFrame(
+                data={
+                    'start': [trig[0].values],
+                    'end': [trig[-1].values],
+                    'days': [to_seconds(trig[-1] - trig[0]).values/86400.],
+                },
+                index=[i]
+            )
+        )
+
+    return pd.concat(per)
+
+
+def trigger_values(x: xr.DataArray, trigs: xr.DataArray):
+    """
+    Extract the triggered values into a :class:`pandas.DataFrame`.
+
+    Parameters
+    ----------
+    x : :class:`xarray.DataArray`
+        The array of data with the precomputed characteristic functions to
+        compute the coincidence trigger for.
+
+    trigs : :class:`array.DataArray`
+        The triggers of ``x``.
+
+    Returns
+    -------
+    values : :class:`pandas.DataFrame`
+        Triggered values for each coordinate in ``x``.
+
+    """
+
+    val = []
+
+    for i in range(trigs.nperiods):
+        trig = trigs.time.where(trigs == i, drop=True)
+        tmp = x.sel(time=trig).to_dataframe()
+        tmp['period'] = i
+        val.append(tmp)
+
+    return pd.concat(val).reset_index()
+
+
+def plot_trigs(x: xr.DataArray, trigs: xr.DataArray, ax: plt.Axes = None):
+    """
+    Plot the triggered periods and values.
+
+    Parameters
+    ----------
+    x : :class:`xarray.DataArray`
+        The array of data with the precomputed characteristic functions to
+        compute the coincidence trigger for.
+
+    trigs : :class:`array.DataArray`
+        The triggers of ``x``.
+
+    ax : :class:`matplotlib.axes.Axes`
+        Specify the axes to plot into. If `None` (default) the current active
+        axes is used.
+
+    """
+
+    ax = ax or plt.gca()
+
+    ymin, ymax = x.min().values, x.max().values
+    for i in range(trigs.nperiods):
+        ax.fill_between(
+            trigs.time.where(trigs == i), ymin, ymax,
+            alpha=0.2, color='black'
+        )

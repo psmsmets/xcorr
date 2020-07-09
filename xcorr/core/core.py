@@ -473,7 +473,7 @@ def mfread(
             print('validated :', validated)
 
     # init chunks
-    #chunks = chunks or {'pair': 1, 'time': 1}
+    # chunks = chunks or {'pair': 1, 'time': 1}
 
     # validate wrapper to pass arguments
     def _validate(ds):
@@ -813,14 +813,13 @@ def validate_list(
             validated.append(dask.delayed(get_output)(ds))
         if compute:
             validated = dask.compute(validated, **compute_args)[0]
+            validated = [ds for ds in validated if ds is not None]
     else:
         for source in sources[i+1:]:
             ds = get_dataset(source)
             ds = validate(ds, **validate_args, **kwargs)
-            validated.append(get_output(ds))
-
-    # filter
-    validated = filter(None, validated)
+            if ds is not None:
+                validated.append(get_output(ds))
 
     return validated
 
@@ -950,7 +949,7 @@ def write(
 
 
 def merge(
-    datasets: list, extract: bool = True, verb: int = 0, **kwargs
+    datasets: list, extract: bool = False, verb: int = 0, **kwargs
 ):
     """
     Merge a list of xcorr N-D labelled data arrays.
@@ -977,31 +976,36 @@ def merge(
 
     """
 
-    validated = validate_list(datasets, verb=verb, keep_opened=True,
-                              parallel=False, **kwargs)
+    # check
+    dsets = validate_list(datasets, verb=verb, keep_opened=True,
+                          parallel=False, **kwargs)
 
-    dsets = xr.combine_by_coords(validated, data_vars='minimal', join='outer')
+    # merge
+    ds = xr.combine_by_coords(dsets, data_vars='minimal', join='outer')
 
-    # extract valid data
-    if extract:
-        dsets['cc'] = dsets.cc.where(dsets.status == 1)
+    # close
+    for dset in dsets:
+        dset.close()
 
-    # update some global attrs
-    dsets.attrs = validated[0].attrs
-    del dsets.attrs['sha256_hash']
+    # update global attrs
+    ds.attrs = dsets[0].attrs
+    del ds.attrs['sha256_hash'], dsets
 
-    strt0 = pd.to_datetime(dsets.time.values[0]).strftime('%Y.%j')
-    strt1 = pd.to_datetime(dsets.time.values[-1]).strftime('%Y.%j')
-    dsets.attrs['title'] = (
-        (dsets.attrs['title']).split(' - ')[0] +
+    strt0 = pd.to_datetime(ds.time.values[0]).strftime('%Y.%j')
+    strt1 = pd.to_datetime(ds.time.values[-1]).strftime('%Y.%j')
+    ds.attrs['title'] = (
+        (ds.attrs['title']).split(' - ')[0] +
         ' - ' +
         strt0 +
         ' to {}'.format(strt1) if strt0 != strt1 else ''
     ).strip()
+    ds.attrs['history'] = 'Merged @ {}'.format(pd.to_datetime('now'))
 
-    dsets.attrs['history'] = 'Merged @ {}'.format(pd.to_datetime('now'))
+    # extract valid data
+    if extract:
+        ds['cc'] = ds.cc.where(ds.status == 1)
 
-    return dsets
+    return ds
 
 
 def process(
