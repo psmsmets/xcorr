@@ -170,7 +170,7 @@ ds1 = xcorr.read('test.nc', verb=1)
 # Whole period
 # ------------
 
-root = '../../data/results'
+root = '../../data/cc'
 
 for pair in pairs:
 

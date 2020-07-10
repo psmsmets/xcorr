@@ -18,8 +18,8 @@ import xcorr
 # Signal parameters
 # -----------------
 
-# results data root
-root = '../../data/results'
+# cc data root
+root = '../../data/cc'
 
 # time of correlation data
 time = pd.to_datetime('2015-01-15')
@@ -45,8 +45,8 @@ taper_params = dict(max_length=2/3.)
 
 
 ###############################################################################
-# Correlation results
-# -------------------
+# Correlations
+# ------------
 
 # file list with two channels
 ds = [

@@ -188,6 +188,7 @@ def spectrogram(
         'centered': np.byte(True),
         **kwargs
     }
+    y.encoding = {'zlib': True, 'complevel': 9}
 
     # log workflow
     historicize(y, f='psd', a={

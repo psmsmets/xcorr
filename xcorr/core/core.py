@@ -364,7 +364,7 @@ def read(
         Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
 
-    engine : `str`
+    engine : `str`, optional
         Set the xarray engine to read the file. Defaults to h5netcdf if the
         module is found instead of netcdf4.
 
@@ -392,8 +392,10 @@ def read(
 
     # verbose status
     if verb > 0:
+        src = (dataset.encoding['source'] if 'source' in dataset.encoding
+               else '[memory]')
         print('{s} #(status==1): {n} of {m}'.format(
-            s=dataset.encoding['source'],
+            s=src,
             n=np.sum(dataset.status.data == 1),
             m=dataset.time.size,
         ))
@@ -566,11 +568,15 @@ def validate(
     # check existance of main attributes
     if (
         'xcorr_version' not in dataset.attrs or
-        'sha256_hash_metadata' not in dataset.attrs or
-        'sha256_hash' not in dataset.attrs
+        'sha256_hash_metadata' not in dataset.attrs
+        # 'sha256_hash' not in dataset.attrs
     ):
         dataset.close()
         return None
+
+    # force fast?
+    if not 'sha256_hash' in dataset.attrs:
+        fast = True
 
     # fix single-element float/integers represented as np.arrays (h5netcdf)
     for var in dataset.variables:
@@ -826,8 +832,8 @@ def validate_list(
 
 def write(
     data, path: str, close: bool = True,
-    force_write: bool = False, verb: int = 1,
-    **kwargs
+    force_write: bool = False, engine: str = None,
+    hash_data: bool = True, verb: int = 1, **kwargs
 ):
     """
     Write an xcorr N-D labelled data array to a netCDF4 file using a
@@ -852,6 +858,14 @@ def write(
     force_write : `bool`, optional
         Always write file if `True` even if its empty. Default is `False`.
 
+    engine : `str`, optional
+        Set the xarray engine to read the file. Defaults to h5netcdf if the
+        module is found instead of netcdf4.
+
+    hash_data : `bool`, optional
+        Hash the data of each variable in the dataset or dataarray.
+        Defaults to `True`.
+
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 1.
 
@@ -864,13 +878,16 @@ def write(
     if not (isdataset or isinstance(data, xr.DataArray)):
         raise TypeError('data should be an xarray DataArray or Dataset.')
 
+    # set the engine
+    engine = engine or ('h5netcdf' if h5netcdf else None)
+
     # metadata hash
     metadata_hash = util.hasher.hash(data, metadata_only=True)
 
     if 'sha256_hash_metadata' not in data.attrs:
         data.attrs['sha256_hash_metadata'] = metadata_hash
 
-    if metadata_hash != data.attrs['sha256_hash_metadata']:
+    if verb > -1 and metadata_hash != data.attrs['sha256_hash_metadata']:
         warnings.warn(
             'Data metadata sha256 hash is updated.',
             UserWarning
@@ -910,9 +927,13 @@ def write(
         data.close()
 
     # calculate data hash
-    if verb > 0:
-        print('Hash', end='. ')
-    data.attrs['sha256_hash'] = util.hasher.hash(data, metadata_only=False)
+    if hash_data:
+        if verb > 0:
+            print('Hash', end='. ')
+        data.attrs['sha256_hash'] = util.hasher.hash(data, metadata_only=False)
+    else:
+        if 'sha256_hash' in data.attrs:
+            del data.attrs['sha256_hash']
 
     # convert preprocess operations
     if verb > 1:
@@ -926,7 +947,7 @@ def write(
         print('To temporary netcdf', end='. ')
     data.to_netcdf(
         path=tmp, mode='w', format='netcdf4',
-        **{'engine': 'h5netcdf' if h5netcdf else None, **kwargs}
+        **{'engine': engine, **kwargs},
     )
 
     # Replace file

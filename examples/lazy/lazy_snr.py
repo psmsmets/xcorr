@@ -78,7 +78,7 @@ def _mask_noise(ds):
 def _select_and_trim(ds, valid):
     """
     """
-    cc = ds.cc.where(valid, drop=True)
+    cc = ds.cc.where((valid) & (ds.status==1), drop=True)
     return cc
 
 
@@ -151,7 +151,7 @@ def lazy_snr_list(filenames: list):
 plotset = dict(aspect=2.5, size=4)
 
 # settings
-root = '../../data/results'
+root = '../../data/cc'
 pair = '*'
 year = 2015
 doy = '0*'
@@ -186,3 +186,6 @@ snr = ds.snr
 snr.plot.line(x='time', hue='pair', marker='o', markersize=8, **plotset)
 plt.tight_layout()
 plt.show()
+
+# to file
+xcorr.write(ds, 'snr.nc')

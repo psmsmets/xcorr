@@ -159,7 +159,7 @@ inventory = read_inventory('../../data/Monowai.xml')
 # root : `str`
 #     Path to output base directory. A folder will be created for each pair.
 # -----------------------------------------------------------------------------
-root = '../../data/results'
+root = '../../data/cc'
 
 
 ##############################################################################

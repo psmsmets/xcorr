@@ -16,8 +16,8 @@ import xcorr
 # Read and merge
 # --------------
 
-# results data root
-root = '../../data/results'
+# cc data root
+root = '../../data/cc'
 
 # get merged datasets using glob wildcards
 # returns radial and vertical components of RAR.10
