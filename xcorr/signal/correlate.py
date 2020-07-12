@@ -31,7 +31,7 @@ __all__ = ['correlate1d', 'correlate2d']
 
 def correlate1d(
     in1: xr.DataArray, in2: xr.DataArray, normalize: bool = True,
-    dim: str = None, **kwargs
+    dtype: np.dtype = None, dim: str = None, **kwargs
 ):
     """
     One-dimensional crosscorrelate two N-D labelled arrays of data.
@@ -47,6 +47,9 @@ def correlate1d(
     normalize : `bool`, optional
         If `True` (default), ``in1`` and ``in2`` are normalized before
         crosscorrelation.
+
+    dtype : :class:`np.dtype`, optional
+        Set the dtype. If `None` (default), the dtype of ``in1`` is used.
 
     dim : `str`, optional
         Coordinates name of ``in1`` and ``in2`` to crosscorrelate.
@@ -80,6 +83,12 @@ def correlate1d(
 
     # check regular spacing
     _check_dim(in1[dim])
+
+    # dtype
+    dtype = dtype or in1.dtype
+    if not isinstance(dtype, np.dtype):
+        raise TypeError('dtype should be a numpy.dtype')
+    dtype = np.dtype(dtype).type
 
     # new dim
     new_dim = f'delta_{dim}'
@@ -117,7 +126,7 @@ def correlate1d(
     cc = xr.apply_ufunc(_correlate1d, in1, in2,
                         input_core_dims=[[dim], [dim]],
                         output_core_dims=[[new_dim]],
-                        keep_attrs=True,  # need to update these!!
+                        keep_attrs=False,
                         vectorize=False,
                         **dargs,
                         **kwargs)
@@ -126,6 +135,23 @@ def correlate1d(
     cc = cc.assign_coords({
         new_dim: _new_coord(in1[dim]),
     })
+
+    # set attributes
+    cc.name = 'cc'
+    cc.attrs = {
+        **cc.attrs,
+        'long_name': 'Crosscorrelation Estimate',
+        'standard_name': 'crosscorrelation_estimate',
+        'units': '-',
+        'add_offset': dtype(0.),
+        'scale_factor': dtype(1.),
+        'valid_range': dtype([-1., 1.]),
+        'normalize': np.byte(normalize),
+        'bias_correct': np.byte(0),
+        'unbiased': np.byte(0),
+        'history_in1': in1.attrs['history'] if 'history' in in1.attrs else '',
+        'history_in2': in2.attrs['history'] if 'history' in in2.attrs else '',
+    }
 
     # log workflow
     historicize(cc, f='correlate1d', a={
@@ -140,7 +166,7 @@ def correlate1d(
 
 def correlate2d(
     in1: xr.DataArray, in2: xr.DataArray, normalize: bool = True,
-    dim: tuple = None, **kwargs
+    dtype: np.dtype = None, dim: tuple = None, **kwargs
 ):
     """
     Two-dimensional crosscorrelate two N-D labelled arrays of data.
@@ -156,6 +182,9 @@ def correlate2d(
     normalize : `bool`, optional
         If `True` (default), ``in1`` and ``in2`` are normalized before
         crosscorrelation.
+
+    dtype : :class:`np.dtype`, optional
+        Set the dtype. If `None` (default), the dtype of ``in1`` is used.
 
     dim : `tuple`, optional
         A tuple pair with the coordinates name of ``in1`` and ``in2`` to
@@ -191,6 +220,12 @@ def correlate2d(
     _check_dim(in1[dim[0]])
     _check_dim(in1[dim[1]])
 
+    # dtype
+    dtype = dtype or in1.dtype
+    if not isinstance(dtype, np.dtype):
+        raise TypeError('dtype should be a numpy.dtype')
+    dtype = np.dtype(dtype).type
+
     # new dim
     new_dim = (f'delta_{dim[0]}',  f'delta_{dim[1]}')
 
@@ -216,7 +251,7 @@ def correlate2d(
         G = fft.fft2(np.pad(g, pad_width=_npad, **pargs), axes=ax)
         FG = F * np.conjugate(G)
         cc = fft.fftshift(np.real(fft.ifft2(FG, axes=ax)), axes=ax)
-        return cc
+        return cc 
 
     # dask collection?
     dargs = {}
@@ -227,7 +262,7 @@ def correlate2d(
     cc = xr.apply_ufunc(_correlate2d, in1, in2,
                         input_core_dims=[dim, dim],
                         output_core_dims=[new_dim],
-                        keep_attrs=True,  # need to update these!!
+                        keep_attrs=False,
                         vectorize=False,
                         **dargs,
                         **kwargs)
@@ -237,6 +272,23 @@ def correlate2d(
         new_dim[0]: _new_coord(in1[dim[0]]),
         new_dim[1]: _new_coord(in1[dim[1]]),
     })
+
+    # set attributes
+    cc.name = 'cc'
+    cc.attrs = {
+        **cc.attrs,
+        'long_name': 'Crosscorrelation Estimate',
+        'standard_name': 'crosscorrelation_estimate',
+        'units': '-',
+        'add_offset': dtype(0.),
+        'scale_factor': dtype(1.),
+        'valid_range': dtype([-1., 1.]),
+        'normalize': np.byte(normalize),
+        'bias_correct': np.byte(0),
+        'unbiased': np.byte(0),
+        'history_in1': in1.attrs['history'] if 'history' in in1.attrs else '',
+        'history_in2': in2.attrs['history'] if 'history' in in2.attrs else '',
+    }
 
     # log workflow
     historicize(cc, f='correlate2d', a={

@@ -68,17 +68,22 @@ def norm1d(x: xr.DataArray, dim: str = None, **kwargs):
         dargs = dict(dask='parallelized', output_dtypes=[x.dtype])
 
     # apply ufunc (and optional dask distributed)
-    y = xr.apply_ufunc(np.linalg.norm, x,
+    n = xr.apply_ufunc(np.linalg.norm, x,
                        input_core_dims=[[dim]],
                        output_core_dims=[[dim]],
-                       keep_attrs=True,
                        vectorize=False,
                        **dargs,
                        kwargs={'axis': -1, **kwargs})
 
+    # normalize
+    y = x/n
+
+    # propagat attributes
+    y.attrs = x.attrs
+
     # log workflow
     historicize(y, f='norm', a={
-        'x': y.name,
+        'x': x.name,
         'dim': dim,
         '**kwargs': kwargs,
     })
@@ -136,9 +141,12 @@ def norm2d(x: xr.DataArray, dim: tuple = None, **kwargs):
     # normalize
     y = x/n
 
+    # propagat attributes
+    y.attrs = x.attrs
+
     # log workflow
     historicize(y, f='norm2d', a={
-        'x': y.name,
+        'x': x.name,
         'dim': dim,
         '**kwargs': kwargs,
     })
