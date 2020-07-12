@@ -91,7 +91,7 @@ def correlate1d(
         npad += [(edge, in1[d].size - 1 - edge)]
     pargs = dict(mode='constant', constant_values=0)
 
-    # axes
+    # set axes
     ax = -1
 
     # normalize?
@@ -201,7 +201,7 @@ def correlate2d(
         npad += [(edge, in1[d].size - 1 - edge)]
     pargs = dict(mode='constant', constant_values=0)
 
-    # axes
+    # set axes
     ax = (-2, -1)
 
     # normalize?
