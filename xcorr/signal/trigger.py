@@ -78,16 +78,17 @@ def coincidence_trigger(
 
     # check time dimension
     dim = dim or x.dims[-1]
-    assert dim in x.dims, f'Dimension {dim} not in dataset.'
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimension "{dim}"')
 
     # check attributes
-    assert 'window_length' in x[dim].attrs, (
-        f'Coordinate {dim} has no expected time attribute "window_length".'
-    )
+    if 'window_length' not in x[dim].attrs:
+        raise ValueError(f'Coordinate {dim} has no expected time attribute '
+                         '"window_length".')
 
-    assert 'window_overlap' in x[dim].attrs, (
-        f'Coordinate {dim} has no expected time attribute "window_overlap".'
-    )
+    if 'window_overlap' not in x[dim].attrs:
+        raise ValueError(f'Coordinate {dim} has no expected time attribute '
+                         '"window_overlap".')
 
     # window step
     win_step = (
@@ -137,7 +138,6 @@ def coincidence_trigger(
         thr_coincidence_sum < 1 or
         thr_coincidence_sum > len(st)
     ):
-
         raise TypeError('Threshold coincidence sum should be of type int '
                         'within (1 to number of elements).')
 

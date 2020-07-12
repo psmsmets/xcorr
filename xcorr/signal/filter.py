@@ -26,7 +26,7 @@ __all__ = ['filter']
 
 def filter(
     x: xr.DataArray, frequency, btype: str, order: int = 2,
-    dim: str = None, **kwargs
+    dim: str = None
 ):
     """
     Butterworth filter an N-D labelled array of data.
@@ -53,10 +53,6 @@ def filter(
         The coordinates name of ``x`` to be filtered over. Defaults to the
         last dimension of ``x``.
 
-    **kwargs :
-        Any additional keyword arguments will be passed to
-        :func:`xarray.apply_ufunc`.
-
     Returns
     -------
     y : :class:`xarray.DataArray`
@@ -66,16 +62,20 @@ def filter(
 
     # dim
     dim = dim or x.dims[-1]
-    assert dim in x.dims, f'x has no dimension "{dim}"!'
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimension "{dim}"')
 
     # check
-    assert 'sampling_rate' in x[dim].attrs, (
-        f'Dimension "{dim}" has no attribute "sampling_rate"!'
-    )
-    assert (
+    if 'sampling_rate' not in x[dim].attrs:
+        raise ValueError(f'Dimension "{dim}" has no attribute '
+                         '"sampling_rate"!')
+
+    if not (
         isinstance(frequency, float) or
         (isinstance(frequency, tuple) and len(frequency) == 2)
-    ), 'Corner frequency should be a `float` or tuple-pair with (min, max)!'
+    ):
+        raise ValueError('Corner frequency should be a `float` or tuple-pair '
+                         'with (min, max)!')
 
     # construct digital sos filter coefficients
     sos = signal.butter(
@@ -86,13 +86,9 @@ def filter(
         fs=x[dim].attrs['sampling_rate']
     )
 
-    # get index of dim
-    axis = x.dims.index(dim)
-    axis = -1 if axis == len(x.dims) - 1 else axis
-
     # sosfiltfilt wrapper to simplify ufunc input
     def _filter(obj):
-        return signal.sosfiltfilt(sos, obj, axis=axis)
+        return signal.sosfiltfilt(sos, obj, axis=-1)
 
     # dask collection?
     dargs = {}
@@ -105,8 +101,7 @@ def filter(
                        output_core_dims=[[dim]],
                        keep_attrs=True,
                        vectorize=False,
-                       **dargs,
-                       **kwargs)
+                       **dargs)
 
     # log workflow
     historicize(x, f='filter', a={
@@ -115,7 +110,6 @@ def filter(
         'btype': btype,
         'order': order,
         'dim': dim,
-        '**kwargs': kwargs,
     })
 
     return y

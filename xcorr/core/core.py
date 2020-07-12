@@ -575,7 +575,7 @@ def validate(
         return None
 
     # force fast?
-    if not 'sha256_hash' in dataset.attrs:
+    if 'sha256_hash' not in dataset.attrs:
         fast = True
 
     # fix single-element float/integers represented as np.arrays (h5netcdf)

@@ -8,18 +8,11 @@ Crosscorrelation functions for ``xcorr``.
 """
 
 # Mandatory imports
-import warnings
 import numpy as np
-from numpy.fft import fftshift, fftfreq
 try:
-    from pyfftw.interfaces.numpy_fft import fft, ifft
+    from pyfftw.interfaces.numpy_fft import fft, ifft, fftshift, fftfreq
 except ModuleNotFoundError:
-    from numpy.fft import fft, ifft
-    warnings.warn(
-        "Could not import fft and ifft from pyfftw. "
-        "Fallback on numpy's (i)fft.",
-        ImportWarning
-    )
+    from numpy.fft import fft, ifft, fftshift, fftfreq
 
 
 __all__ = ['cc', 'lag', 'weight', 'extract_shift', 'extract_shift_and_max',

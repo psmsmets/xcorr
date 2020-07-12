@@ -4,9 +4,11 @@ xcorr.signal init
 """
 
 # Import all main functions
+from ..signal.correlate import correlate2d
 from ..signal.detrend import detrend, demean
 from ..signal.filter import filter
 from ..signal.mask import mask, multi_mask
+from ..signal.normalize import norm1d, norm2d
 from ..signal.rms import rms
 from ..signal.snr import snr
 from ..signal.spectrogram import spectrogram
@@ -16,6 +18,6 @@ from ..signal.unbias import unbias
 from ..signal.window import window
 
 
-__all__ = ['coincidence_trigger', 'detrend', 'demean', 'filter',
-           'mask', 'multi_mask', 'rms', 'snr', 'spectrogram',
-           'taper', 'unbias', 'window']
+__all__ = ['coincidence_trigger', 'correlate2d', 'detrend', 'demean',
+           'filter', 'mask', 'multi_mask', 'norm1d', 'norm2d', 'rms', 'snr',
+           'spectrogram', 'taper', 'unbias', 'window']

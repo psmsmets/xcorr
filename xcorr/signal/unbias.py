@@ -56,8 +56,10 @@ def unbias(
 
     # check x
     dim = dim or x.dims[-1]
-    assert dim in x.dims, f'x has no dimension "{dim}"!'
-    assert 'unbiased' in x.attrs, 'x has no unbiased flag attribute!'
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimension "{dim}"')
+    if 'unbiased' not in x.attrs:
+        raise ValueError('x has no unbiased flag attribute!')
 
     if x.unbiased != 0:
         warn('No need to bias correct again.')
@@ -67,8 +69,10 @@ def unbias(
     wv = get_weights(x[dim]) if w is None else w
 
     # check w
-    assert dim in wv.dims, f'w has no dimension "{dim}"!'
-    assert len(wv.coords) == 1, 'w should have a single dimension!'
+    if dim not in wv.dims:
+        raise ValueError(f'w has no dimension "{dim}"!')
+    if len(wv.coords) != 1:
+        raise ValueError('w should have a single dimension!')
 
     # mask wv for safety
     wv = wv.where((wv[dim] >= x[dim][0]) & (wv[dim] <= x[dim][-1]), drop=True)
@@ -118,10 +122,8 @@ def get_weights(
     update_lag_indices(lag)
 
     for attr in ['sampling_rate', 'delta', 'npts', 'index_min', 'index_max']:
-
-        assert attr in lag.attrs, (
-            f'Lag has no attribute "{attr}"!'
-        )
+        if attr not in lag.attrs:
+            raise ValueError(f'Lag has no attribute "{attr}"!')
 
     w = xr.DataArray(
         data=weight(

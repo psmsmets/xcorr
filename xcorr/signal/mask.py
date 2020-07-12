@@ -26,9 +26,9 @@ def get_scalar_value(
     """
     Convert a dimensionless array to a scalar value.
     """
-    assert not (not x and not x0), (
-        'Input parameter cannot be empty without a default value!'
-    )
+    if not x and not x0:
+        raise ValueError('Input parameter cannot be empty without a '
+                         'default value!')
     if isinstance(x, np.ndarray) or isinstance(x, xr.DataArray):
         y = x.item() if x else x0
     else:
@@ -78,9 +78,10 @@ def mask(
         returned whereas non-masked values become `NaN`.
 
     """
-    assert len(x.coords) == 1, (
-        'x should be a coordinate or variable with a single dimension!'
-    )
+    if len(x.coords) != 1:
+        raise ValueError('x should be a coordinate or variable with a single '
+                         'dimension!')
+
     scalar = get_scalar_value(scalar, 1.)
     lower = get_scalar_value(lower) if lower else None
     upper = get_scalar_value(upper) if upper else None
@@ -151,18 +152,17 @@ def multi_mask(
         become `True`, else `False`.
 
     """
-    assert len(x.coords) == 1, (
-        '``x`` should be a coordinate or variable with a single dimension!'
-    )
-    assert len(y.coords) == 1, (
-        '``y`` should be a coordinate or variable with a single dimension!'
-    )
-    assert y.name != x.name and x.dims != y.dims, (
-        '``x`` and ``y`` should have a different coordinate !'
-    )
-    assert lower or upper, (
-        'At least ``lower`` or ``upper`` is required!'
-    )
+    if len(x.coords) != 1:
+        raise ValueError('``x`` should be a coordinate or variable with a '
+                         'single dimension!')
+    if len(y.coords) != 1:
+        raise ValueError('``y`` should be a coordinate or variable with a '
+                         'single dimension!')
+    if y.name is not x.name and x.dims != y.dims:
+        raise ValueError('``x`` and ``y`` should have a different '
+                         'coordinate !')
+    if not (lower or upper):
+        raise ValueError('At least ``lower`` or ``upper`` is required!')
     lower = get_scalar_value(lower) if lower else None
     upper = get_scalar_value(upper) if upper else None
 
@@ -174,7 +174,6 @@ def multi_mask(
 
     # mask for each value in y
     for y0 in y:
-
         m0 = mask(x, lower=lower, upper=upper, scalar=y0.values, invert=invert)
         m.append(m0.assign_coords({d: y0[d]}))
 

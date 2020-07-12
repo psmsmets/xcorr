@@ -57,7 +57,8 @@ def taper(
 
     """
     dim = dim or x.dims[-1]
-    assert dim in x.dims, f'x has no dimension "{dim}"!'
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimension "{dim}"')
 
     w = window(x[dim], wtype, max_percentage, max_length, side)
 

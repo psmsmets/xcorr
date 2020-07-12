@@ -24,10 +24,7 @@ from ..util.history import historicize
 __all__ = ['detrend', 'demean']
 
 
-def detrend(
-    x: xr.DataArray, type: str = 'constant', dim: str = None,
-    **kwargs
-):
+def detrend(x: xr.DataArray, dim: str = None, **kwargs):
     """
     Detrend an N-D labelled array of data.
 
@@ -39,18 +36,13 @@ def detrend(
     x : :class:`xarray.DataArray`
         The data array to be detrended.
 
-    type : `str` {‘constant’, ‘linear’}, optional
-       The type of detrending. If type == 'constant' (default), only the
-       mean of ``x`` is subtracted. If type == 'linear', the result of a
-       linear least-squares fit to ``x`` is subtracted from ``x``.
-
     dim : `str`, optional
         The coordinates name of ``x`` to be detrended over. Defaults to the
         last dimension of ``x``.
 
     **kwargs :
         Any additional keyword arguments will be passed to
-        :func:`xarray.apply_ufunc`.
+        :func:`scipy.signal.detrend`.
 
     Returns
     -------
@@ -61,19 +53,8 @@ def detrend(
 
     # dim
     dim = dim or x.dims[-1]
-    assert dim in x.dims, f'x has no dimension "{dim}"!'
-
-    # get index of dim
-    axis = x.dims.index(dim)
-    axis = -1 if axis == len(x.dims) - 1 else axis
-
-    # detrend wrapper to simplify ufinc input
-    def _detrend(obj):
-        return signal.detrend(
-            data=obj.data,
-            axis=axis,
-            type=type,
-        )
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimension "{dim}"')
 
     # dask collection?
     dargs = {}
@@ -81,19 +62,19 @@ def detrend(
         dargs = dict(dask='parallelized', output_dtypes=[x.dtype])
 
     # apply sosfiltfilt as ufunc (and optional dask distributed)
-    y = xr.apply_ufunc(_detrend, x,
+    y = xr.apply_ufunc(signal.detrend, x,
                        input_core_dims=[[dim]],
                        output_core_dims=[[dim]],
                        keep_attrs=True,
                        vectorize=False,
                        **dargs,
-                       **kwargs)
+                       kwargs={'axis': -1, **kwargs})
 
     # log workflow
     historicize(y, f='detrend', a={
         'x': y.name,
-        'type': type,
         'dim': dim,
+        '**kwargs': kwargs,
     })
 
     return y

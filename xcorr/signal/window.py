@@ -57,22 +57,21 @@ def window(
 
     """
 
-    assert len(x.coords) == 1 and x.name in x.dims, (
-        '``x`` should be a coordinate or variable with a single dimension!'
-    )
-    assert 'sampling_rate' in x.attrs, (
-        '``x`` has no attribute "sampling_rate"!'
-    )
+    if len(x.coords) != 1 or x.name not in x.dims:
+        raise ValueError('``x`` should be a coordinate or variable with '
+                         'a single dimension!')
+
+    if 'sampling_rate' not in x.attrs:
+        raise ValueError('``x`` has no attribute "sampling_rate"!')
 
     wtype = wtype or 'hann'
-    assert wtype in signal.windows.__all__, (
-        '``wtype`` should be a :func:`scipy.signal.windows`!'
-    )
+    if wtype not in signal.windows.__all__:
+        raise ValueError('``wtype`` should be a :func:`scipy.signal.windows`!')
 
     side = side or 'both'
-    assert side in _sides, (
-        '``side`` should be either "left", "right" or "both"!'
-    )
+    if side not in _sides:
+        raise ValueError('``side`` should be either "left", "right" or '
+                         '"both"!')
 
     nmax = 0.5 * len(x)
 

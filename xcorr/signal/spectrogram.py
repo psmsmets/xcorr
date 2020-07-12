@@ -74,14 +74,14 @@ def spectrogram(
 
     """
     dim = dim or x.dims[-1]
-    assert dim in x.dims, f'x has no dimension "{dim}"!'
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimension "{dim}"')
 
-    assert 'sampling_rate' in x[dim].attrs, (
-        'Dimension has no attribute "{sampling_rate}"!'
-    )
-    assert 'delta' in x[dim].attrs, (
-        'Dimension has no attribute "{delta}"!'
-    )
+    if 'sampling_rate' not in x[dim].attrs:
+        raise ValueError('Dimension has no attribute "{sampling_rate}"!')
+
+    if 'delta' not in x[dim].attrs:
+        raise ValueError('Dimension has no attribute "{delta}"!')
 
     duration = duration if (
         duration and duration > x[dim].delta
@@ -92,9 +92,9 @@ def spectrogram(
     ) else 1
 
     scaling = scaling or 'density'
-    assert scaling in ['density', 'spectrum'], (
-        'Scaling should be either "density" or "spectrum"!'
-    )
+    if scaling not in ['density', 'spectrum']:
+        raise ValueError('Scaling should be either "density" or "spectrum"!')
+
     if scaling == 'density':
         units = f'{x[dim].units}-1'
         units = f'{x.units}2 {units}' if x.units != '-' else units
@@ -108,7 +108,8 @@ def spectrogram(
     sampling_rate = x[dim].attrs['sampling_rate']
 
     win_len = int(duration * sampling_rate)
-    assert win_len >= 16, 'Change duration to have at least 16 sample points!'
+    if win_len < 16:
+        raise ValueError('Change duration to have at least 16 sample points!')
 
     # static dimensions
     nfft = int(win_len * padding_factor)
@@ -117,11 +118,8 @@ def spectrogram(
     # expand x with frequency coordinate
     freq = np.linspace(0., sampling_rate/2, int(nfft/2 + 1))
 
-    # get lag index
-    axis = x.dims.index(dim)
-    axis = -1 if axis == len(x.dims) - 1 else axis
-
     def _spectrogram(lag):
+        # scipy spectrogram
         _f, _t, Sxx = signal.spectrogram(
             x=lag,
             fs=sampling_rate,
@@ -130,22 +128,15 @@ def spectrogram(
             nfft=nfft,
             scaling=scaling,
             mode='psd',
-            axis=axis,
+            axis=-1,
             return_onesided=True,
             **kwargs
         )
-        # get basic shape (in loop for dask!)
-        shape = list(Sxx.shape)
+        # extend spectrogram at edges
+        npad = ([(0, 0)]*(len(Sxx.shape)-1) +
+                [(edge, lag.shape[-1] - Sxx.shape[-1] - edge)])
 
-        # make top sponge for lag
-        shape[axis] = len(x[dim]) - shape[axis] - edge
-        e1 = np.zeros(shape, dtype=x.dtype)
-
-        # make bot sponge for lag
-        shape[axis] = edge
-        e0 = np.zeros(shape, dtype=x.dtype)
-
-        return np.concatenate((e0, Sxx, e1), axis=axis)
+        return np.pad(Sxx, pad_width=npad, mode='constant', constant_values=0)
 
     # dask collection?
     dargs = {}
@@ -162,8 +153,7 @@ def spectrogram(
                        output_core_dims=[['freq', dim]],
                        keep_attrs=True,
                        vectorize=False,
-                       **dargs,
-                       **kwargs)
+                       **dargs)
 
     # add frequency coordinate
     y = y.assign_coords(freq=freq)
@@ -249,15 +239,14 @@ def spectrogram_mtc(
         The computed spectrogram for ``x``.
 
     """
-    assert dim in x.dims, (
-        f'x has no dimension "{dim}"!'
-    )
-    assert 'sampling_rate' in x[dim].attrs, (
-        'Dimension has no attribute "{sampling_rate}"!'
-    )
-    assert 'delta' in x[dim].attrs, (
-        'Dimension has no attribute "{delta}"!'
-    )
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimension "{dim}"')
+
+    if 'sampling_rate' not in x[dim].attrs:
+        raise ValueError('Dimension has no attribute "{sampling_rate}"!')
+
+    if 'delta' not in x[dim].attrs:
+        raise ValueError('Dimension has no attribute "{delta}"!')
 
     padding_factor = padding_factor if (
         padding_factor and padding_factor >= 1
@@ -269,7 +258,8 @@ def spectrogram_mtc(
 
     win_len = int(duration * x[dim].attrs['sampling_rate'])
 
-    assert win_len >= 16, 'Change duration to have at least 16 sample points!'
+    if win_len < 16:
+        raise ValueError('Change duration to have at least 16 sample points!')
 
     overlap = overlap if overlap and (0. < overlap < 1.) else .9
     win_shift = int(win_len*overlap)
