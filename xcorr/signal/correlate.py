@@ -324,5 +324,5 @@ def _new_coord(old):
 def _check_dim(dim):
     """Private helper to verify the dimension.
     """
-    if not np.all(dim.diff(dim.name, 2) < 1e-10):
+    if not np.all(np.abs(dim.diff(dim.name, 2)) < 1e-10):
         raise ValueError(f'coordinate "{dim.name}" should be regularly spaced')
