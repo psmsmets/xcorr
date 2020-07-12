@@ -46,10 +46,12 @@ Main xcorr features listed per submodule:
   with a (lag) time dimension. Each signal routine is **Dask** capable for
   large datasets.
 
+  - ``correlate``: frequency domain correlation estimator with zero-padding 1d or 2d data.
   - ``detrend``: demean and linear detrend.
   - ``filter``: time-domain filter using a forward-backward (zero-phase) digital
     butterworth filter by cascaded second-order sections.
   - ``mask``: mask coordinates of interest (one or two-dimensional).
+  - ``normalize``: broadcast normalize a vector or 2d matrix.
   - ``rms``: root-mean-square.
   - ``snr``: signal-to-noise ratio.
   - ``spectrogram``: compute the power spectrogram (density or spectrum).
