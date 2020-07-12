@@ -499,7 +499,8 @@ def mfread(
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
 
     # update some global attrs
-    del dataset.attrs['sha256_hash']
+    if 'sha256_hash' in dataset.attrs:
+        del dataset.attrs['sha256_hash']
 
     strt0 = pd.to_datetime(dataset.time.values[0]).strftime('%Y.%j')
     strt1 = pd.to_datetime(dataset.time.values[-1]).strftime('%Y.%j')
@@ -1007,10 +1008,12 @@ def merge(
     # close
     for dset in dsets:
         dset.close()
+    del dsets
 
     # update global attrs
     ds.attrs = dsets[0].attrs
-    del ds.attrs['sha256_hash'], dsets
+    if 'sha256_hash' in ds.attrs:
+        ds.attrs['sha256_hash']
 
     strt0 = pd.to_datetime(ds.time.values[0]).strftime('%Y.%j')
     strt1 = pd.to_datetime(ds.time.values[-1]).strftime('%Y.%j')
