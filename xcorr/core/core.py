@@ -1005,11 +1005,6 @@ def merge(
     # merge
     ds = xr.combine_by_coords(dsets, data_vars='minimal', join='outer')
 
-    # close
-    for dset in dsets:
-        dset.close()
-    del dsets
-
     # update global attrs
     ds.attrs = dsets[0].attrs
     if 'sha256_hash' in ds.attrs:
@@ -1028,6 +1023,11 @@ def merge(
     # extract valid data
     if extract:
         ds['cc'] = ds.cc.where(ds.status == 1)
+
+    # cleanup 
+    for dset in dsets:
+        dset.close()
+    del dsets
 
     return ds
 

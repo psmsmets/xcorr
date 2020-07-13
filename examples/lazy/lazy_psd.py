@@ -134,7 +134,7 @@ def lazy_spectrogram(snr, trigs, root):
             ds = _load(pair, period, root)
             cc = _preprocess(ds)
             psd = _spectrogram(cc)
-            ds = _combine(ds, cc, psd, snr)
+            ds = _combine(ds, cc, psd, snr_period)
             fname = _write(ds, period, root)
             fnames.append(fname)
     return fnames
