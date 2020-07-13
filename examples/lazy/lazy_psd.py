@@ -38,6 +38,7 @@ def _load(pair, period, root):
     # extract valid data
     vel = dict(min=1.465, max=1.495)
     t0, t1 = np.datetime64(period.start), np.datetime64(period.end)
+
     mask = xcorr.signal.multi_mask(
         x=ds.lag,
         y=ds.distance,
@@ -149,7 +150,7 @@ plotset = dict(aspect=2.5, size=4, add_legend=False)
 
 # settings
 root = '../../data'
-threads = 2
+threads = 1
 
 
 # dask compute arguments

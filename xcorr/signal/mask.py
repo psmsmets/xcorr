@@ -158,7 +158,7 @@ def multi_mask(
     if len(y.coords) != 1:
         raise ValueError('``y`` should be a coordinate or variable with a '
                          'single dimension!')
-    if y.name is not x.name and x.dims != y.dims:
+    if y.name == x.name or x.dims == y.dims:
         raise ValueError('``x`` and ``y`` should have a different '
                          'coordinate !')
     if not (lower or upper):
