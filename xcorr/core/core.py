@@ -574,7 +574,6 @@ def validate(
     if (
         'xcorr_version' not in dataset.attrs or
         'sha256_hash_metadata' not in dataset.attrs
-        # 'sha256_hash' not in dataset.attrs
     ):
         dataset.close()
         return None
@@ -607,7 +606,6 @@ def validate(
 
     # check if at least pair and time variables exist
     if not ('pair' in dataset.coords and 'time' in dataset.coords):
-
         if verb > 0:
             warnings.warn('Dataset contains no pair and time coordinate.',
                           UserWarning)
@@ -621,7 +619,7 @@ def validate(
     if not quick_and_dirty:
 
         sha256_hash_metadata = util.hasher.hash_Dataset(
-            dataset, metadata_only=True, debug=False
+            dataset, metadata_only=True, debug=verb > 3
         )
 
         if sha256_hash_metadata != dataset.sha256_hash_metadata:
@@ -645,7 +643,7 @@ def validate(
 
     if not (quick_and_dirty or fast):
         sha256_hash = util.hasher.hash_Dataset(
-            dataset, metadata_only=False, debug=False
+            dataset, metadata_only=False, debug=verb > 3
         )
         if sha256_hash != dataset.sha256_hash:
             if verb > 0:
@@ -887,16 +885,18 @@ def write(
     engine = engine or ('h5netcdf' if h5netcdf else None)
 
     # metadata hash
-    metadata_hash = util.hasher.hash(data, metadata_only=True)
+    metadata_hash = util.hasher.hash(data, metadata_only=True, debug=verb > 3)
 
     if 'sha256_hash_metadata' not in data.attrs:
         data.attrs['sha256_hash_metadata'] = metadata_hash
 
-    if verb > -1 and metadata_hash != data.attrs['sha256_hash_metadata']:
-        warnings.warn(
-            'Data metadata sha256 hash is updated.',
-            UserWarning
-        )
+    if metadata_hash != data.attrs['sha256_hash_metadata']:
+        data.attrs['sha256_hash_metadata'] = metadata_hash
+        if verb > -1:
+            warnings.warn(
+                'Data metadata sha256 hash is updated.',
+                UserWarning
+            )
 
     # check status?
     if isdataset and 'status' in data.variables:
@@ -935,7 +935,8 @@ def write(
     if hash_data:
         if verb > 0:
             print('Hash', end='. ')
-        data.attrs['sha256_hash'] = util.hasher.hash(data, metadata_only=False)
+        data.attrs['sha256_hash'] = util.hasher.hash(data, metadata_only=False,
+                                                     debug=verb > 3)
     else:
         if 'sha256_hash' in data.attrs:
             del data.attrs['sha256_hash']
