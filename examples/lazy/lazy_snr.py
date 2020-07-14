@@ -99,10 +99,10 @@ def _filter(cc):
 
 
 @ dask.delayed
-def _detrend(cc):
+def _demean(cc):
     """
     """
-    cc = xcorr.signal.detrend(cc)
+    cc = xcorr.signal.demean(cc)
     return cc
 
 
@@ -135,7 +135,7 @@ def lazy_snr_list(filenames: list):
         noise = _mask_noise(ds)
         cc = _select_and_trim(ds, valid)
         cc = _filter(cc)
-        cc = _detrend(cc)
+        cc = _demean(cc)
         cc = _taper(cc)
         snr = _snr(cc, signal, noise)
         ds = _close(ds)
@@ -152,7 +152,7 @@ plotset = dict(aspect=2.5, size=4)
 
 # settings
 root = '../../data/cc'
-pair = '*'
+pair = 'IM.H03S*'
 year = 2015
 doy = '0*'
 threads = 2
