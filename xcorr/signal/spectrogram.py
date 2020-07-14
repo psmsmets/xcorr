@@ -142,7 +142,7 @@ def spectrogram(
     dargs = {}
     if dask and dask.is_dask_collection(x):
         dargs = dict(
-            dask='parallelized',
+            dask='allowed',
             output_dtypes=[x.dtype],
             output_sizes={'freq': len(freq)}
         )

@@ -120,7 +120,7 @@ def correlate1d(
     # dask collection?
     dargs = {}
     if dask and (dask.is_dask_collection(in1) or dask.is_dask_collection(in2)):
-        dargs = dict(dask='parallelized', output_dtypes=[in1.dtype])
+        dargs = dict(dask='allowed', output_dtypes=[in1.dtype])
 
     # apply _correlate2d as ufunc (and optional dask distributed)
     cc = xr.apply_ufunc(_correlate1d, in1, in2,
@@ -256,7 +256,7 @@ def correlate2d(
     # dask collection?
     dargs = {}
     if dask and (dask.is_dask_collection(in1) or dask.is_dask_collection(in2)):
-        dargs = dict(dask='parallelized', output_dtypes=[in1.dtype])
+        dargs = dict(dask='allowed', output_dtypes=[in1.dtype])
 
     # apply _correlate2d as ufunc (and optional dask distributed)
     cc = xr.apply_ufunc(_correlate2d, in1, in2,

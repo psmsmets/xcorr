@@ -93,7 +93,7 @@ def filter(
     # dask collection?
     dargs = {}
     if dask and dask.is_dask_collection(x):
-        dargs = dict(dask='parallelized', output_dtypes=[x.dtype])
+        dargs = dict(dask='allowed', output_dtypes=[x.dtype])
 
     # apply sosfiltfilt as ufunc (and optional dask distributed)
     y = xr.apply_ufunc(_filter, x,

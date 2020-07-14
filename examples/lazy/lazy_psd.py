@@ -189,7 +189,6 @@ plt.ylim(0, 200)
 plt.tight_layout()
 plt.show()
 
-
 # construct datasets with preprocessed cc, snr and psd
 files = lazy_spectrogram(snr, ct, os.path.join(root, 'cc'))
 files = dask.compute(files, **compute_args)[0]

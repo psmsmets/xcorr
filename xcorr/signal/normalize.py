@@ -65,7 +65,7 @@ def norm1d(x: xr.DataArray, dim: str = None, **kwargs):
     # dask collection?
     dargs = {}
     if dask and dask.is_dask_collection(x):
-        dargs = dict(dask='parallelized', output_dtypes=[x.dtype])
+        dargs = dict(dask='allowed', output_dtypes=[x.dtype])
 
     # apply ufunc (and optional dask distributed)
     n = xr.apply_ufunc(np.linalg.norm, x,
@@ -129,7 +129,7 @@ def norm2d(x: xr.DataArray, dim: tuple = None, **kwargs):
     # dask collection?
     dargs = {}
     if dask and dask.is_dask_collection(x):
-        dargs = dict(dask='parallelized', output_dtypes=[x.dtype])
+        dargs = dict(dask='allowed', output_dtypes=[x.dtype])
 
     # apply ufunc to get norms (and optional dask distributed)
     n = xr.apply_ufunc(np.linalg.norm, x,
