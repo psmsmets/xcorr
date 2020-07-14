@@ -390,6 +390,10 @@ def read(
     dataset = validate(xr.open_dataset(path, engine=engine),
                        verb=verb, **kwargs)
 
+    # early return?
+    if dataset is None:
+        return
+
     # verbose status
     if verb > 0:
         src = (dataset.encoding['source'] if 'source' in dataset.encoding
