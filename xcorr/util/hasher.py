@@ -252,14 +252,14 @@ def hash_Dataset(
     h = hashlib_obj or hashlib.sha256()
     if not metadata_only:
         h.update(to_json(dataset.attrs).encode(_enc))
-    for coord in dataset.coords:
+    for coord in sorted(dataset.coords):
         hash_DataArray(
             dataset[coord],
             hashlib_obj=h,
             metadata_only=metadata_only,
             debug=debug
         )
-    for var in dataset:
+    for var in sorted(dataset):
         hash_DataArray(
             dataset[var],
             hashlib_obj=h,
