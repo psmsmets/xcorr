@@ -53,8 +53,10 @@ def detrend(x: xr.DataArray, dim: str = None, **kwargs):
 
     # dim
     dim = dim or x.dims[-1]
+    if not isinstance(dim, str):
+        raise TypeError('dim should be a string')
     if dim not in x.dims:
-        raise ValueError(f'x has no dimension "{dim}"')
+        raise ValueError(f'x has no dimensions "{dim}"')
 
     # dask collection?
     dargs = {}

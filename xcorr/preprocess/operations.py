@@ -631,7 +631,7 @@ def preprocess_operations_to_dict(pair: xr.DataArray, attribute: str = None):
 
     """
     attribute = attribute or 'preprocess'
-    if isinstance(pair.attrs[attribute], str):
+    if attribute in pair.attrs and isinstance(pair.attrs[attribute], str):
         pair.attrs[attribute] = operations_to_dict(pair.attrs[attribute])
 
 
@@ -653,5 +653,5 @@ def preprocess_operations_to_json(pair: xr.DataArray, attribute: str = None):
 
     """
     attribute = attribute or 'preprocess'
-    if isinstance(pair.attrs[attribute], dict):
+    if attribute in pair.attrs and isinstance(pair.attrs[attribute], dict):
         pair.attrs[attribute] = operations_to_json(pair.attrs[attribute])

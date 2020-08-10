@@ -1029,7 +1029,7 @@ def merge(
     if extract:
         ds['cc'] = ds.cc.where(ds.status == 1)
 
-    # cleanup 
+    # cleanup
     for dset in dsets:
         dset.close()
     del dsets

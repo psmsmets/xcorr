@@ -62,7 +62,7 @@ def correlate1d(
     Returns
     -------
     cc : :class:`xarray.DataArray`
-        Data array containing a the discrete linear crosscorrelation of
+        Data array containing the discrete linear crosscorrelation of
         ``in1`` with ``in2``.
 
     """
@@ -70,7 +70,7 @@ def correlate1d(
     # dim
     dim = dim or in1.dims[-1]
     if not isinstance(dim, str):
-        raise TypeError('dim should be a tuple of length 2')
+        raise TypeError('dim should be a string')
 
     if dim not in in1.dims:
         raise ValueError(f'in1 has no dimensions "{dim}"')
@@ -82,7 +82,7 @@ def correlate1d(
         raise ValueError('in1 and in2 should have the same shape!')
 
     # check regular spacing
-    _check_dim(in1[dim])
+    _regular_dim(in1[dim])
 
     # dtype
     dtype = dtype or in1.dtype
@@ -96,11 +96,11 @@ def correlate1d(
     # pad
     npad = []
     for d in dim:
-        edge = np.int(np.round((in1[d].size - 1)))
+        edge = np.int(np.round((in1[d].size - 1)/2))
         npad += [(edge, in1[d].size - 1 - edge)]
     pargs = dict(mode='constant', constant_values=0)
 
-    # set axes
+    # set axis
     ax = -1
 
     # normalize?
@@ -111,10 +111,10 @@ def correlate1d(
     # correlate2d wrapper to simplify ufunc input
     def _correlate1d(f, g):
         _npad = [(0, 0)] * (len(f.shape)-2) + npad
-        F = fft.fft(np.pad(f, pad_width=_npad, **pargs), axes=ax)
-        G = fft.fft(np.pad(g, pad_width=_npad, **pargs), axes=ax)
+        F = fft.fft(np.pad(f, pad_width=_npad, **pargs), axis=ax)
+        G = fft.fft(np.pad(g, pad_width=_npad, **pargs), axis=ax)
         FG = F * np.conjugate(G)
-        cc = fft.fftshift(np.real(fft.ifft(FG, axes=ax)), axes=ax)
+        cc = fft.fftshift(np.real(fft.ifft(FG, axis=ax)), axes=ax)
         return cc
 
     # dask collection?
@@ -197,7 +197,7 @@ def correlate2d(
     Returns
     -------
     cc : :class:`xarray.DataArray`
-        Data array containing a the discrete linear crosscorrelation of
+        Data array containing the discrete linear crosscorrelation of
         ``in1`` with ``in2``.
 
     """
@@ -217,8 +217,8 @@ def correlate2d(
         raise ValueError('in1 and in2 should have the same shape!')
 
     # check regular spacing
-    _check_dim(in1[dim[0]])
-    _check_dim(in1[dim[1]])
+    _regular_dim(in1[dim[0]])
+    _regular_dim(in1[dim[1]])
 
     # dtype
     dtype = dtype or in1.dtype
@@ -232,7 +232,7 @@ def correlate2d(
     # pad
     npad = []
     for d in dim:
-        edge = np.int(np.round((in1[d].size - 1)))
+        edge = np.int(np.round((in1[d].size - 1)/2))
         npad += [(edge, in1[d].size - 1 - edge)]
     pargs = dict(mode='constant', constant_values=0)
 
@@ -251,7 +251,7 @@ def correlate2d(
         G = fft.fft2(np.pad(g, pad_width=_npad, **pargs), axes=ax)
         FG = F * np.conjugate(G)
         cc = fft.fftshift(np.real(fft.ifft2(FG, axes=ax)), axes=ax)
-        return cc 
+        return cc
 
     # dask collection?
     dargs = {}
@@ -321,7 +321,7 @@ def _new_coord(old):
     return new
 
 
-def _check_dim(dim):
+def _regular_dim(dim):
     """Private helper to verify the dimension.
     """
     if not np.all(np.abs(dim.diff(dim.name, 2)) < 1e-10):

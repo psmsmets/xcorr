@@ -56,8 +56,7 @@ def window(
         The window for coordinates ``x``.
 
     """
-
-    if len(x.coords) != 1 or x.name not in x.dims:
+    if len(x.dims) != 1 or x.name not in x.dims:
         raise ValueError('``x`` should be a coordinate or variable with '
                          'a single dimension!')
 

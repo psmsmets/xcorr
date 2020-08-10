@@ -10,6 +10,7 @@ Utilities for ``xcorr`` for file naming.
 
 # Mandatory imports
 import pandas as pd
+import xarray as xr
 import os
 
 
@@ -45,6 +46,11 @@ def ncfile(pair, time: pd.Timestamp, root: str = None):
 
     """
     # check pair
+    if isinstance(pair, xr.DataArray):
+        if pair.size == 1:
+            pair = str(pair.values)
+        else:
+            raise ValueError('pair should be a single element')
     if isinstance(pair, str):
         pair = split_pair(pair, to_dict=False)
     elif isinstance(pair, tuple) and len(pair) == 2:
@@ -61,6 +67,11 @@ def ncfile(pair, time: pd.Timestamp, root: str = None):
             raise TypeError(_pair_type_error)
 
     # check time
+    if isinstance(time, xr.DataArray):
+        if time.size == 1:
+            time = pd.to_datetime(time.values)
+        else:
+            raise ValueError('time should be a single element')
     if not isinstance(time, pd.Timestamp):
         raise TypeError('``time`` should be of type `pd.Timestamp`!')
 

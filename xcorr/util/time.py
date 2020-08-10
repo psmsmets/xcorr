@@ -63,11 +63,11 @@ def to_datetime(time):
         Pandas datetime object.
 
     """
-
     if time is None:
         return
-
-    if isinstance(time, object) and hasattr(time, 'datetime'):
+    if isinstance(time, xr.DataArray):
+        time = time.values
+    elif isinstance(time, object) and hasattr(time, 'datetime'):
         time = time.datetime
 
     return pd.to_datetime(time)

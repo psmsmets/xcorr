@@ -54,10 +54,14 @@ def unbias(
 
     """
 
-    # check x
+    # check dim
     dim = dim or x.dims[-1]
+    if not isinstance(dim, str):
+        raise TypeError('dim should be a string')
     if dim not in x.dims:
-        raise ValueError(f'x has no dimension "{dim}"')
+        raise ValueError(f'x has no dimensions "{dim}"')
+
+    # check x
     if 'unbiased' not in x.attrs:
         raise ValueError('x has no unbiased flag attribute!')
 
@@ -71,7 +75,7 @@ def unbias(
     # check w
     if dim not in wv.dims:
         raise ValueError(f'w has no dimension "{dim}"!')
-    if len(wv.coords) != 1:
+    if len(wv.dims) != 1:
         raise ValueError('w should have a single dimension!')
 
     # mask wv for safety

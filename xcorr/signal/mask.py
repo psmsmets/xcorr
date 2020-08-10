@@ -78,7 +78,7 @@ def mask(
         returned whereas non-masked values become `NaN`.
 
     """
-    if len(x.coords) != 1:
+    if len(x.dims) != 1:
         raise ValueError('x should be a coordinate or variable with a single '
                          'dimension!')
 
@@ -152,10 +152,10 @@ def multi_mask(
         become `True`, else `False`.
 
     """
-    if len(x.coords) != 1:
+    if len(x.dims) != 1:
         raise ValueError('``x`` should be a coordinate or variable with a '
                          'single dimension!')
-    if len(y.coords) != 1:
+    if len(y.dims) != 1:
         raise ValueError('``y`` should be a coordinate or variable with a '
                          'single dimension!')
     if y.name == x.name or x.dims == y.dims:

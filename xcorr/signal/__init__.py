@@ -13,6 +13,7 @@ from ..signal.rms import rms
 from ..signal.snr import snr
 from ..signal.spectrogram import spectrogram
 from ..signal.taper import taper
+from ..signal.timeshift import timeshift
 from ..signal.trigger import coincidence_trigger
 from ..signal.unbias import unbias
 from ..signal.window import window
@@ -20,4 +21,4 @@ from ..signal.window import window
 
 __all__ = ['coincidence_trigger', 'correlate2d', 'detrend', 'demean',
            'filter', 'mask', 'multi_mask', 'norm1d', 'norm2d', 'rms', 'snr',
-           'spectrogram', 'taper', 'unbias', 'window']
+           'spectrogram', 'taper', 'timeshift', 'unbias', 'window']
