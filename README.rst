@@ -77,6 +77,13 @@ Main xcorr features listed per submodule:
     pair handlers and geodetic operations.
 
 
+Scripts
+=======
+
+All core scripts used to generate the results of the manuscript
+`Long-range hydroacoustic observations of the Monowai Volcanic Centre: a proxy for seasonal variations in sound propagation <#>`_.
+
+
 Installation
 ============
 
@@ -111,10 +118,12 @@ Citation
 ========
 
 If you publish results for which you used xcorr, please give credit by citing
-`Smets (2020)  <#>`_:
+`Smets et al. (2020)  <#>`_:
 
-    Smets, P. S. M., ... (2020), title: Journal (number), pages; DOI:
-    `doi <#>`_.
+    Smets, P. S. M., ... (2020),
+    Long-range hydroacoustic observations of the Monowai Volcanic Centre:
+    a proxy for seasonal variations in sound propagation,
+    Journal (number), pages, DOI: `doi <#>`_.
 
 All releases have a Zenodo-DOI, which can be found on `Zenodo-DOI <#>`_.
 

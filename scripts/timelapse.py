@@ -141,7 +141,7 @@ def fill_upper_triangle(ds):
         ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
 
 
-def init_timelapse(snr, pair, starttime, endtime, freq, **kwargs):
+def init_timelapse(snr, pair, starttime, endtime, freq, root, **kwargs):
     """Init a timelapse dataset.
     """
 
@@ -163,6 +163,14 @@ def init_timelapse(snr, pair, starttime, endtime, freq, **kwargs):
 
     # new dataset
     ds = xr.Dataset()
+
+    # set global attributes
+    nc = xcorr.util.ncfile(snr.pair[0], time[0], os.path.join(root, 'cc'))
+    cc = xcorr.read(nc, quick_and_dirty=True)
+    ds.attrs = cc.attrs
+    cc.close()
+    ds.attrs['xcorr_version'] = xcorr.__version__
+    ds.attrs['dependencies_version'] = xcorr.core.core.dependencies_version()
 
     # set coordinates
     ds['pair'] = snr.pair
@@ -202,6 +210,9 @@ def init_timelapse(snr, pair, starttime, endtime, freq, **kwargs):
             'units': '-',
         },
     )
+
+    ds['snr'] = snr
+    ds['ct'] = ct
 
     ds['cc'] = ds.status.astype(np.float64) * 0
     ds['cc'].attrs = {
@@ -282,11 +293,10 @@ def main(argv):
             endtime = arg
         elif opt in ('-f', '--frequency'):
             freq = np.array(eval(arg))
-            if len(freq.shape) !=2 or freq.shape[-1] != 2:
+            if len(freq.shape) != 2 or freq.shape[-1] != 2:
                 raise ValueError('frequency should be a list of tuple-pairs '
                                  'with start and end frequencies. Example: '
-                                 '--frequencies="(3., 6.), (6., 12.)"'
-                                )
+                                 '--frequencies="(3., 6.), (6., 12.)"')
         elif opt in ('-r', '--root'):
             root = arg
         elif opt in ('-n', '--nworkers'):
@@ -323,7 +333,7 @@ def main(argv):
                     glob(os.path.join(root, 'snr', 'snr_20??.nc'))]).snr
 
     # init timelapse
-    ds = init_timelapse(snr, pair, starttime, endtime, freq,
+    ds = init_timelapse(snr, pair, starttime, endtime, freq, root,
                         thr_on=10., extend=0, thr_coincidence_sum=None)
 
     # map

@@ -44,7 +44,8 @@ from ..preprocess import (
 
 
 __all__ = ['init', 'read', 'write', 'merge', 'mfread', 'process',
-           'validate', 'validate_list', 'bias_correct']
+           'validate', 'validate_list', 'bias_correct',
+           'dependencies_version']
 
 
 def init(
@@ -1254,7 +1255,7 @@ def bias_correct(
     )
 
 
-def dependencies_version(as_str: bool = False):
+def dependencies_version(as_str: bool = True):
     """Returns a `dict` with core dependencies and its version.
     """
     versions = {
