@@ -283,13 +283,14 @@ def main(argv):
     freq = None
     n_workers = None
     plot = False
+    debug = False
 
     try:
         opts, args = getopt.getopt(
             argv,
             'hp:s:e:f:r:n:',
             ['help', 'pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'plot']
+             'nworkers=', 'plot', 'debug']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -315,6 +316,8 @@ def main(argv):
             n_workers = int(arg)
         elif opt in ('--plot'):
             plot = True
+        elif opt in ('--debug'):
+            debug = True
 
     pair = pair or ''
     starttime = pd.to_datetime(starttime or '2015-01-15')
@@ -343,28 +346,37 @@ def main(argv):
     # snr
     snr = xr.merge([xr.open_dataarray(f) for f in
                     glob(os.path.join(root, 'snr', 'snr_20??.nc'))]).snr
+    if debug:
+        print(snr)
 
     # init timelapse
     ds = init_timelapse(snr, pair, starttime, endtime, freq, root,
                         thr_on=10., extend=0, thr_coincidence_sum=None)
+    if debug:
+        print(ds)
 
     # create all locks
     locks = create_locks(ds, os.path.join(root, 'cc'))
 
-    # map
+    # map nodes
     mapped = xr.map_blocks(
         correlate_spectrograms, ds, kwargs={'root': os.path.join(root, 'cc')}
     )
 
+    # load results
     result = mapped.load()
     fill_upper_triangle(result)
 
+    if debug:
+        print(result)
+
     # to netcdf (check if all parameters are logged!)
-    result.to_netcdf('timelapse_{}_{}_{}.nc'.format(
+    nc = 'timelapse_{}_{}_{}.nc'.format(
         pair,
         str(result.time1[0].dt.strftime('%Y%j').values),
         str(result.time1[-1].dt.strftime('%Y%j').values),
-    ))
+    )
+    xcorr.write(result, nc)
 
     # Plot?
     if plot:
