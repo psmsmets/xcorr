@@ -22,8 +22,7 @@ import xcorr
 # Local functions
 # -----------------
 
-def get_spectrogram(pair, time, root: str = None,
-                    client: distributed.Client = None):
+def get_spectrogram(pair, time, root: str = None):
     """Load spectrogram for a pair and time.
     """
     # construct abs path and filename
@@ -33,26 +32,29 @@ def get_spectrogram(pair, time, root: str = None,
     sel = {'pair': pair, 'time': time}
 
     # set lock
-    lock = distributed.Lock(nc, client)
+    lock = distributed.Lock(nc)
     lock.acquire()
 
     # read file
     ds = xcorr.read(nc, quick_and_dirty=True)
-    ds.load().close()
+
+    # extract a single cc
+    cc = ds.cc.loc[sel]
+
+    # get pair relative distance
+    d_km = ds.distance.loc[{'pair': pair}].values
+
+    # extract cc for velocity range (km/s)
+    cc = cc.where((cc.lag >= d_km/1.495) & (cc.lag <= d_km/1.465), drop=True)
+
+    # extract lag offset
+    delay = xcorr.util.time.to_seconds(
+        (ds.pair_offset.loc[sel] + ds.time_offset.loc[sel]).values
+    )
 
     # release lock
+    ds.close()
     lock.release()
-
-    # extract cc
-    mask = xcorr.signal.multi_mask(
-        x=ds.lag,
-        y=ds.distance,
-        lower=1.465,
-        upper=1.495,
-        invert=True,
-    )
-    cc = ds.cc.where(mask, drop=True)
-    cc = cc.loc[sel]
 
     # process cc
     cc = xcorr.signal.unbias(cc)
@@ -61,9 +63,6 @@ def get_spectrogram(pair, time, root: str = None,
     cc = xcorr.signal.taper(cc, max_length=2/3.)
 
     # solve time_offset and pair_offset
-    delay = xcorr.util.time.to_seconds(
-        (ds.pair_offset.loc[sel] + ds.time_offset.loc[sel]).values
-    )
     if delay != 0.:
         cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', pad=True)
 
@@ -248,6 +247,19 @@ def init_timelapse(snr, pair, starttime, endtime, freq, root, **kwargs):
     return ds
 
 
+def create_locks(ds, root):
+    """Initate distributed cc file access locking.
+    """
+    locks = []
+    for pair in ds.pair:
+        for time in ds.time1:
+            nc = xcorr.util.ncfile(pair, time, root)
+            if nc not in locks:
+                locks.append(nc)
+    locks = [distributed.Lock(nc) for nc in locks]
+    return locks
+
+
 ###############################################################################
 # Main functions
 # --------------
@@ -335,6 +347,9 @@ def main(argv):
     # init timelapse
     ds = init_timelapse(snr, pair, starttime, endtime, freq, root,
                         thr_on=10., extend=0, thr_coincidence_sum=None)
+
+    # create all locks
+    locks = create_locks(ds, os.path.join(root, 'cc'))
 
     # map
     mapped = xr.map_blocks(
