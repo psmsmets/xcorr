@@ -150,7 +150,7 @@ def lazy_spectrogram(snr, trigs, root):
 def help(e=None):
     """
     """
-    print('psd.py -p <pair> -y <year> -r <root> -n <nthreads>')
+    print('psd.py -s <starttime>  -e <endtime> -r <root> -n <nworkers>')
     raise SystemExit(e)
 
 
@@ -167,7 +167,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(
             argv,
-            'hp:s:e:r:n:',
+            'hs:e:r:n:',
             ['help', 'starttime=', 'endtime=', 'root=', 'nworkers=', 'plot']
         )
     except getopt.GetoptError as e:
@@ -207,7 +207,6 @@ def main(argv):
     print('{:>25} : {}'.format('root', root))
     print('{:>25} : {}'.format('starttime', starttime))
     print('{:>25} : {}'.format('endtime', endtime))
-    print('{:>25} : {}'.format('nworkers', n_workers))
 
     # get snr
     snr = xr.merge([
@@ -226,7 +225,8 @@ def main(argv):
     # action?
     if plot:
         # plot
-        snr.plot.line(x='time', hue='pair', aspect=2.5, size=4, add_legend=False)
+        snr.plot.line(x='time', hue='pair', aspect=2.5, size=4,
+                      add_legend=False)
         xcorr.signal.trigger.plot_trigs(snr, ct)
         plt.ylim(0, 200)
         plt.tight_layout()
