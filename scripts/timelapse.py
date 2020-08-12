@@ -257,15 +257,16 @@ def main(argv):
     pair = None
     starttime = None
     endtime = None
+    freq = None
     n_workers = None
     plot = False
 
     try:
         opts, args = getopt.getopt(
             argv,
-            'hp:s:e:r:n:',
-            ['help', 'pair=', 'starttime=', 'endtime=', 'root=', 'nworkers=',
-             'plot']
+            'hp:s:e:f:r:n:',
+            ['help', 'pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
+             'nworkers=', 'plot']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -279,6 +280,13 @@ def main(argv):
             starttime = arg
         elif opt in ('-e', '--endtime'):
             endtime = arg
+        elif opt in ('-f', '--frequency'):
+            freq = np.array(eval(arg))
+            if len(freq.shape) !=2 or freq.shape[-1] != 2:
+                raise ValueError('frequency should be a list of tuple-pairs '
+                                 'with start and end frequencies. Example: '
+                                 '--frequencies="(3., 6.), (6., 12.)"'
+                                )
         elif opt in ('-r', '--root'):
             root = arg
         elif opt in ('-n', '--nworkers'):
@@ -289,7 +297,7 @@ def main(argv):
     pair = pair or ''
     starttime = pd.to_datetime(starttime or '2015-01-15')
     endtime = pd.to_datetime(endtime or '2015-01-16')
-    freq = np.array(((3., 6.), (6., 12.)))
+    freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
     n_workers = n_workers or 1
 
     # check root
