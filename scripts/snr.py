@@ -215,7 +215,7 @@ def main(argv):
     # save
     xcorr.write(ds.snr, os.path.join(root, 'snr', f'snr_{year}.nc'), verb=0)
 
-    # Cleanup
+    # cleanup
     dclient.close()
     dcluster.close()
     rmtree('dask-worker-space', ignore_errors=True)
