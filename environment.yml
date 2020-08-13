@@ -15,15 +15,17 @@ dependencies:
   - gdal
   - pandas
   - xarray
+  - dask
+  - distributed
+  - bottleneck
   - matplotlib
+  - nc-time-axis
   - pyproj
   - basemap
   - cartopy
   - humanfriendly
   - tabulate
   - dateparser
-  - dask
-  - distributed
   - python-graphviz
   - bokeh=2.0
   - seaborn
