@@ -106,8 +106,9 @@ def correlate_spectrograms(obj, **kwargs):
     for freq in obj.freq:
 
         # set (min, max) frequency
-        fmin = (obj.freq - obj.freq_bw/2).values[0]
-        fmax = (obj.freq + obj.freq_bw/2).values[0]
+        bw = obj.freq_bw.loc[{'freq': freq}]
+        fmin = (obj.freq - bw/2).values[0]
+        fmax = (obj.freq + bw/2).values[0]
 
         # extract freq
         in1 = psd1.where((psd1.freq >= fmin) & (psd1.freq < fmax), drop=True)
@@ -366,7 +367,7 @@ def main(argv):
     if plot:
         snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
                       add_legend=False)
-        xcorr.signal.trigger.plot_trigs(snr, ct)  
+        xcorr.signal.trigger.plot_trigs(snr, ct)
         plt.tight_layout()
         plt.show()
 
@@ -393,12 +394,12 @@ def main(argv):
     # to netcdf (check if all parameters are logged!)
     nc = 'timelapse_{}_{}_{}.nc'.format(
         pair,
-        str(result.time1[0].dt.strftime('%Y%j').values),
-        str(result.time1[-1].dt.strftime('%Y%j').values),
+        str(result.time[0].dt.strftime('%Y%j').values),
+        str(result.time[-1].dt.strftime('%Y%j').values),
     )
     xcorr.write(result, nc)
 
-    # Plot?
+    # plot?
     if plot:
         # plot cc
         plt.figure()
@@ -418,7 +419,7 @@ def main(argv):
         plt.gca().invert_yaxis()
         plt.show()
 
-    # Cleanup
+    # cleanup
     dclient.close()
     dcluster.close()
     rmtree('dask-worker-space', ignore_errors=True)
