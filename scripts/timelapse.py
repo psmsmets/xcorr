@@ -35,26 +35,38 @@ def get_spectrogram(pair, time, root: str = None):
     lock = distributed.Lock(nc)
     lock.acquire()
 
-    # read file
-    ds = xcorr.read(nc, quick_and_dirty=True)
+    try:
+        # read file
+        ds = xcorr.read(nc, quick_and_dirty=True)
 
-    # extract a single cc
-    cc = ds.cc.loc[sel]
+        # extract a single cc
+        cc = ds.cc.loc[sel]
 
-    # get pair relative distance
-    d_km = ds.distance.loc[{'pair': pair}].values
+        # get pair relative distance
+        d_km = ds.distance.loc[{'pair': pair}].values
 
-    # extract cc for velocity range (km/s)
-    cc = cc.where((cc.lag >= d_km/1.495) & (cc.lag <= d_km/1.465), drop=True)
+        # extract cc for velocity range (km/s)
+        cc = cc.where(
+            (cc.lag >= d_km/1.495) & (cc.lag <= d_km/1.465),
+            drop=True,
+        )
 
-    # extract lag offset
-    delay = xcorr.util.time.to_seconds(
-        (ds.pair_offset.loc[sel] + ds.time_offset.loc[sel]).values
-    )
+        # extract lag offset
+        delay = xcorr.util.time.to_seconds(
+            (ds.pair_offset.loc[sel] + ds.time_offset.loc[sel]).values
+        )
+
+        # close
+        ds.close()
+
+    except Exception as e:
+        ds = None
 
     # release lock
-    ds.close()
     lock.release()
+
+    if ds is None:
+        return
 
     # process cc
     cc = xcorr.signal.unbias(cc)
@@ -86,6 +98,9 @@ def correlate_spectrograms(obj, **kwargs):
     # load cc and compute psd on-the-fly
     psd1 = get_spectrogram(obj.pair[0], obj.time1[0], **kwargs)
     psd2 = get_spectrogram(obj.pair[0], obj.time2[0], **kwargs)
+
+    if psd1 is None or psd2 is None:
+        return obj
 
     # per freq
     for freq in obj.freq:
