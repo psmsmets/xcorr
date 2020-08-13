@@ -95,8 +95,8 @@ def correlate_spectrograms(obj, **kwargs):
         fmax = (obj.freq + obj.freq_bw/2).values[0]
 
         # extract freq
-        in1 = psd1.where((psd1.freq >= fmin) & (psd1.freq <= fmax), drop=True)
-        in2 = psd2.where((psd2.freq >= fmin) & (psd2.freq <= fmax), drop=True)
+        in1 = psd1.where((psd1.freq >= fmin) & (psd1.freq < fmax), drop=True)
+        in2 = psd2.where((psd2.freq >= fmin) & (psd2.freq < fmax), drop=True)
 
         # correlate psd's
         cc = xcorr.signal.correlate2d(in1, in2)
@@ -121,9 +121,10 @@ def mask_upper_triangle(ds):
     """
     ind1, ind2 = np.triu_indices(ds.time1.size, 1)
     for i in range(len(ind1)):
-        time1 = ds.time1[ind1[i]]
-        time2 = ds.time2[ind2[i]]
-        ds.status.loc[{'time1': time1, 'time2': time2}] = np.byte(1)
+        ds.status.loc[{
+            'time1': ds.time1[ind1[i]],
+            'time2': ds.time2[ind2[i]],
+        }] = np.byte(1)
 
 
 def fill_upper_triangle(ds):
@@ -140,23 +141,9 @@ def fill_upper_triangle(ds):
         ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
 
 
-def init_timelapse(snr, pair, starttime, endtime, freq, root, **kwargs):
+def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
     """Init a timelapse dataset.
     """
-
-    # filter snr
-    snr = snr.where(
-        (
-            (snr.time >= starttime.to_datetime64()) &
-            (snr.time <= endtime.to_datetime64()) &
-            (snr.pair.str.contains(pair))
-        ),
-        drop=True,
-    )
-
-    # get confindence triggers
-    ct = xcorr.signal.coincidence_trigger(snr, **kwargs)
-
     # extract times with activity
     time = ct.time.where(ct >= 0, drop=True)
 
@@ -199,10 +186,10 @@ def init_timelapse(snr, pair, starttime, endtime, freq, root, **kwargs):
     )
 
     ds['status'] = xr.DataArray(
-        np.zeros((time.size, time.size, len(freq), len(ds.pair)),
+        np.zeros((len(ds.pair), len(freq), time.size, time.size),
                  dtype=np.byte),
-        dims=('time1', 'time2', 'freq', 'pair'),
-        coords=(time, time, ds.freq, ds.pair),
+        dims=('pair', 'freq', 'time1', 'time2'),
+        coords=(ds.pair, ds.freq, time, time),
         attrs={
             'long_name': 'Crosscorrelation status',
             'standard_name': 'crosscorrelation_status',
@@ -320,13 +307,11 @@ def main(argv):
             debug = True
 
     pair = pair or ''
-    starttime = pd.to_datetime(starttime or '2015-01-15')
-    endtime = pd.to_datetime(endtime or '2015-01-16')
     freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
-    n_workers = n_workers or 1
-
-    # check root
+    starttime = pd.to_datetime(starttime or '2015-01-15')
+    endtime = pd.to_datetime(endtime or '2015-01-18')
     root = os.path.abspath(root) if root is not None else os.getcwd()
+    n_workers = n_workers or 1
 
     # dask client
     dcluster = distributed.LocalCluster(
@@ -346,12 +331,32 @@ def main(argv):
     # snr
     snr = xr.merge([xr.open_dataarray(f) for f in
                     glob(os.path.join(root, 'snr', 'snr_20??.nc'))]).snr
+    snr = snr.where(
+        (
+            (snr.time >= starttime.to_datetime64()) &
+            (snr.time < endtime.to_datetime64()) &
+            (snr.pair.str.contains(pair))
+        ),
+        drop=True,
+    )
     if debug:
         print(snr)
 
+    # get confindence triggers
+    ct = xcorr.signal.coincidence_trigger(
+        snr, thr_on=10., extend=0, thr_coincidence_sum=None,
+    )
+    if debug:
+        print(ct)
+    if plot:
+        snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
+                      add_legend=False)
+        xcorr.signal.trigger.plot_trigs(snr, ct)  
+        plt.tight_layout()
+        plt.show()
+
     # init timelapse
-    ds = init_timelapse(snr, pair, starttime, endtime, freq, root,
-                        thr_on=10., extend=0, thr_coincidence_sum=None)
+    ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root)
     if debug:
         print(ds)
 
