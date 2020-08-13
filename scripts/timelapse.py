@@ -59,7 +59,7 @@ def get_spectrogram(pair, time, root: str = None):
         # close
         ds.close()
 
-    except Exception as e:
+    except Exception:
         ds = None
 
     # release lock
@@ -111,8 +111,14 @@ def correlate_spectrograms(obj, **kwargs):
         fmax = (obj.freq + bw/2).values[0]
 
         # extract freq
-        in1 = psd1.where((psd1.freq >= fmin) & (psd1.freq < fmax), drop=True)
-        in2 = psd2.where((psd2.freq >= fmin) & (psd2.freq < fmax), drop=True)
+        in1 = psd1.where(
+            (psd1.freq >= fmin) & (psd1.freq < fmax),
+            drop=True,
+        )
+        in2 = psd2.where(
+            (psd2.freq >= fmin) & (psd2.freq < fmax),
+            drop=True,
+        )
 
         # correlate psd's
         cc = xcorr.signal.correlate2d(in1, in2)
@@ -423,6 +429,8 @@ def main(argv):
     dclient.close()
     dcluster.close()
     rmtree('dask-worker-space', ignore_errors=True)
+    locks = None
+    del(locks)
 
 
 if __name__ == "__main__":
