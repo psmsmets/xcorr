@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from dask import distributed
 from shutil import rmtree
 from glob import glob
+from warnings import warn
 import os
 import sys
 import getopt
@@ -29,7 +30,7 @@ def get_spectrogram(pair, time, root: str = None):
     nc = xcorr.util.ncfile(pair, time, root)
 
     # select pair time location
-    sel = {'pair': pair, 'time': time}
+    item = {'pair': pair, 'time': time}
 
     # set lock
     lock = distributed.Lock(nc)
@@ -39,33 +40,42 @@ def get_spectrogram(pair, time, root: str = None):
         # read file
         ds = xcorr.read(nc, quick_and_dirty=True)
 
-        # extract a single cc
-        cc = ds.cc.loc[sel]
+        # status okay?
+        ok = ds.status.loc[item] == 1
+        if ok:
+            # extract a single cc
+            cc = ds.cc.loc[item]
 
-        # get pair relative distance
-        d_km = ds.distance.loc[{'pair': pair}].values
+            # get pair relative distance
+            d_km = ds.distance.loc[{'pair': pair}].values
 
-        # extract cc for velocity range (km/s)
-        cc = cc.where(
-            (cc.lag >= d_km/1.495) & (cc.lag <= d_km/1.465),
-            drop=True,
-        )
+            # extract cc for velocity range (km/s)
+            cc = cc.where(
+                (cc.lag >= d_km/1.495) & (cc.lag <= d_km/1.465),
+                drop=True,
+            )
 
-        # extract lag offset
-        delay = xcorr.util.time.to_seconds(
-            (ds.pair_offset.loc[sel] + ds.time_offset.loc[sel]).values
-        )
+            # extract lag offset
+            delay = xcorr.util.time.to_seconds(
+                (ds.pair_offset.loc[item] + ds.time_offset.loc[item]).values
+            )
 
         # close
         ds.close()
 
-    except Exception:
+    except Exception as e:
+        warn(e)
         ds = None
 
     # release lock
     lock.release()
 
-    if ds is None:
+    # no data?
+    if ds is None or not ok:
+        return
+
+    # no valid data?
+    if xr.ufuncs.isnan(cc).any():
         return
 
     # process cc
