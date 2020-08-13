@@ -13,7 +13,7 @@ dependencies:
   - h5netcdf
   - netcdf4
   - gdal
-  - pandas
+  - pandas=1.0.5
   - xarray
   - dask
   - distributed
