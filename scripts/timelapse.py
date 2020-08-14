@@ -356,8 +356,7 @@ def main(argv):
 
     # snr
     if verb:
-        print('')
-        print('Signal-to-noise ratio')
+        print('.. signal-to-noise ratio')
     snr = xr.merge([xr.open_dataarray(f) for f in
                     glob(os.path.join(root, 'snr', 'snr_20??.nc'))]).snr
     snr = snr.where(
@@ -373,8 +372,7 @@ def main(argv):
 
     # get confindence triggers
     if verb:
-        print('')
-        print('Coincidence trigger')
+        print('.. coincidence trigger')
     ct = xcorr.signal.coincidence_trigger(
         snr, thr_on=10., extend=0, thr_coincidence_sum=None,
     )
@@ -389,31 +387,31 @@ def main(argv):
 
     # init timelapse
     if verb:
-        print('')
-        print('Init timelapse dataset')
+        print('.. init timelapse dataset')
     ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root)
     if debug:
         print(ds)
 
     # create all locks
     if verb:
-        print('')
-        print('Init locks')
+        print('.. init locks')
     locks = create_locks(ds, os.path.join(root, 'cc'))
 
     # map nodes
     if verb:
-        print('')
-        print('Map blocks')
+        print('.. map blocks')
     mapped = xr.map_blocks(
         correlate_spectrograms, ds, kwargs={'root': os.path.join(root, 'cc')}
     )
 
     # load results
     if verb:
-        print('')
-        print('Load blocks (Dask!)')
+        print('.. load blocks (Dask)')
     result = mapped.load()
+
+    # fill upper triangle
+    if verb:
+        print('.. fill upper triangle from lower')
     fill_upper_triangle(result)
     if debug:
         print(result)
@@ -425,8 +423,7 @@ def main(argv):
         str(result.time[-1].dt.strftime('%Y%j').values),
     ))
     if verb:
-        print('')
-        print(f'Write to "{nc}"')
+        print(f'.. write to "{nc}"')
     xcorr.write(result, nc, verb=1 if debug else 0)
 
     # plot?
@@ -456,6 +453,8 @@ def main(argv):
     locks = None
     del(locks)
 
+    if verb:
+        print('.. done')
 
 if __name__ == "__main__":
     main(sys.argv[1:])
