@@ -289,6 +289,6 @@ def plot_trigs(x: xr.DataArray, trigs: xr.DataArray, ax: plt.Axes = None):
     ymin, ymax = x.min().values, x.max().values
     for i in range(trigs.nperiods):
         ax.fill_between(
-            trigs.time.where(trigs == i), ymin, ymax,
+            trigs.time.where(trigs == i, drop=True).values, ymin, ymax,
             alpha=0.2, color='black'
         )
