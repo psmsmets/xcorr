@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 from dask import distributed
 from shutil import rmtree
 from glob import glob
-from warnings import warn
 import os
 import sys
 import getopt
@@ -36,36 +35,26 @@ def get_spectrogram(pair, time, root: str = None):
     lock = distributed.Lock(nc)
     lock.acquire()
 
+    # read file
     try:
-        # read file
-        ds = xcorr.read(nc, quick_and_dirty=True)
+        ds = xcorr.read(nc, fast=True, engine='netcdf4')
+    except Exception:
+        ds = None
+
+    if ds is not None:
 
         # status okay?
         ok = ds.status.loc[item] == 1
+
+        # extract data
         if ok:
-            # extract a single cc
-            cc = ds.cc.loc[item]
-
-            # get pair relative distance
+            cc = ds.cc.loc[item].load()
+            lag = ds.lag.load()
             d_km = ds.distance.loc[{'pair': pair}].values
-
-            # extract cc for velocity range (km/s)
-            cc = cc.where(
-                (cc.lag >= d_km/1.495) & (cc.lag <= d_km/1.465),
-                drop=True,
-            )
-
-            # extract lag offset
-            delay = xcorr.util.time.to_seconds(
-                (ds.pair_offset.loc[item] + ds.time_offset.loc[item]).values
-            )
+            delay = ds.pair_offset.loc[item] + ds.time_offset.loc[item]
 
         # close
         ds.close()
-
-    except Exception as e:
-        warn(e)
-        ds = None
 
     # release lock
     lock.release()
@@ -79,12 +68,14 @@ def get_spectrogram(pair, time, root: str = None):
         return
 
     # process cc
+    cc = cc.where((lag >= d_km/1.495) & (lag <= d_km/1.465), drop=True)
     cc = xcorr.signal.unbias(cc)
     cc = xcorr.signal.detrend(cc)
     cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
     cc = xcorr.signal.taper(cc, max_length=2/3.)
 
     # solve time_offset and pair_offset
+    delay = xcorr.util.time.to_seconds(delay.values)
     if delay != 0.:
         cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', pad=True)
 
@@ -302,14 +293,15 @@ def main(argv):
     freq = None
     n_workers = None
     plot = False
+    verb = False
     debug = False
 
     try:
         opts, args = getopt.getopt(
             argv,
-            'hp:s:e:f:r:n:',
-            ['help', 'pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'plot', 'debug']
+            'hvp:s:e:f:r:n:',
+            ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
+             'nworkers=', 'help', 'plot', 'verbose', 'debug']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -317,6 +309,8 @@ def main(argv):
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             help()
+        elif opt in ('-v', '--verbose'):
+            verb = True
         elif opt in ('-p', '--pair'):
             pair = arg
         elif opt in ('-s', '--starttime'):
@@ -336,6 +330,7 @@ def main(argv):
         elif opt in ('--plot'):
             plot = True
         elif opt in ('--debug'):
+            verb = True
             debug = True
 
     pair = pair or ''
@@ -351,16 +346,18 @@ def main(argv):
     )
     dclient = distributed.Client(dcluster)
 
-    print('Dask client:', dclient)
-    print('Dask dashboard:', dclient.dashboard_link)
-
-    # verbose
-    print('{:>25} : {}'.format('root', root))
-    print('{:>25} : {}'.format('pair', pair))
-    print('{:>25} : {}'.format('starttime', starttime))
-    print('{:>25} : {}'.format('endtime', endtime))
+    if verb:
+        print('Dask client:', dclient)
+        print('Dask dashboard:', dclient.dashboard_link)
+        print('{:>25} : {}'.format('root', root))
+        print('{:>25} : {}'.format('pair', pair))
+        print('{:>25} : {}'.format('starttime', starttime))
+        print('{:>25} : {}'.format('endtime', endtime))
 
     # snr
+    if verb:
+        print('')
+        print('Signal-to-noise ratio')
     snr = xr.merge([xr.open_dataarray(f) for f in
                     glob(os.path.join(root, 'snr', 'snr_20??.nc'))]).snr
     snr = snr.where(
@@ -375,6 +372,9 @@ def main(argv):
         print(snr)
 
     # get confindence triggers
+    if verb:
+        print('')
+        print('Coincidence trigger')
     ct = xcorr.signal.coincidence_trigger(
         snr, thr_on=10., extend=0, thr_coincidence_sum=None,
     )
@@ -388,51 +388,65 @@ def main(argv):
         plt.show()
 
     # init timelapse
+    if verb:
+        print('')
+        print('Init timelapse dataset')
     ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root)
     if debug:
         print(ds)
 
     # create all locks
+    if verb:
+        print('')
+        print('Init locks')
     locks = create_locks(ds, os.path.join(root, 'cc'))
 
     # map nodes
+    if verb:
+        print('')
+        print('Map blocks')
     mapped = xr.map_blocks(
         correlate_spectrograms, ds, kwargs={'root': os.path.join(root, 'cc')}
     )
 
     # load results
+    if verb:
+        print('')
+        print('Load blocks (Dask!)')
     result = mapped.load()
     fill_upper_triangle(result)
-
     if debug:
         print(result)
 
     # to netcdf (check if all parameters are logged!)
-    nc = 'timelapse_{}_{}_{}.nc'.format(
-        pair,
+    nc = os.path.join(root, 'timelapse', 'timelapse_{}_{}_{}.nc'.format(
+        'all' if pair == '' else pair,
         str(result.time[0].dt.strftime('%Y%j').values),
         str(result.time[-1].dt.strftime('%Y%j').values),
-    )
-    xcorr.write(result, nc)
+    ))
+    if verb:
+        print('')
+        print(f'Write to "{nc}"')
+    xcorr.write(result, nc, verb=1 if debug else 0)
 
     # plot?
     if plot:
+        # common plot settings
+        plotset = dict(col='freq', yincrease=False, size=4, aspect=1)
+
         # plot cc
         plt.figure()
-        result.cc.isel(pair=1, freq=0).plot()
-        plt.gca().invert_yaxis()
+        result.cc.isel(pair=-1).plot(vmin=0, **plotset)
         plt.show()
 
         # plot delta_lag
         plt.figure()
-        result.delta_lag.isel(pair=1, freq=0).plot()
-        plt.gca().invert_yaxis()
+        result.delta_lag.isel(pair=-1).plot(robust=True, **plotset)
         plt.show()
 
         # plot delta_freq
         plt.figure()
-        result.delta_freq.isel(pair=1, freq=0).plot()
-        plt.gca().invert_yaxis()
+        result.delta_freq.isel(pair=-1).plot(robust=True, **plotset)
         plt.show()
 
     # cleanup
