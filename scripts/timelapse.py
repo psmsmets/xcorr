@@ -89,53 +89,71 @@ def correlate_spectrograms(obj, **kwargs):
     """Correlate spectrograms.
     """
     # already set?
-    if obj.status.any():
+    if obj.status.all():
         return obj
 
     # test if object is loaded
     if not (obj.freq.any() and obj.pair.any()):
         return obj
 
-    # load cc and compute psd on-the-fly
-    psd1 = get_spectrogram(obj.pair[0], obj.time1[0], **kwargs)
-    psd2 = get_spectrogram(obj.pair[0], obj.time2[0], **kwargs)
+    # process per item
+    for pair in obj.pair:
+        for time1 in obj.time1:
+            for time2 in obj.time2:
 
-    if psd1 is None or psd2 is None:
-        return obj
+                # already done?
+                if obj.status.loc[{
+                    'pair': pair,
+                    'time1': time1,
+                    'time2': time2,
+                }].all():
+                    continue
 
-    # per freq
-    for freq in obj.freq:
+                # load cc and compute psd on-the-fly
+                psd1 = get_spectrogram(pair, time1, **kwargs)
+                psd2 = get_spectrogram(pair, time2, **kwargs)
 
-        # set (min, max) frequency
-        bw = obj.freq_bw.loc[{'freq': freq}]
-        fmin = (obj.freq - bw/2).values[0]
-        fmax = (obj.freq + bw/2).values[0]
+                if psd1 is None or psd2 is None:
+                    continue
 
-        # extract freq
-        in1 = psd1.where(
-            (psd1.freq >= fmin) & (psd1.freq < fmax),
-            drop=True,
-        )
-        in2 = psd2.where(
-            (psd2.freq >= fmin) & (psd2.freq < fmax),
-            drop=True,
-        )
+                # correlate per freq range
+                for freq in obj.freq:
 
-        # correlate psd's
-        cc = xcorr.signal.correlate2d(in1, in2)
+                    # set (min, max) frequency
+                    bw = obj.freq_bw.loc[{'freq': freq}]
+                    fmin = (obj.freq - bw/2).values[0]
+                    fmax = (obj.freq + bw/2).values[0]
 
-        # split dims
-        dim1, dim2 = cc.dims[-2:]
+                    # extract freq
+                    in1 = psd1.where(
+                        (psd1.freq >= fmin) & (psd1.freq < fmax),
+                        drop=True,
+                    )
+                    in2 = psd2.where(
+                        (psd2.freq >= fmin) & (psd2.freq < fmax),
+                        drop=True,
+                    )
 
-        # get max index
-        amax1, amax2 = np.unravel_index(cc.argmax(), cc.shape)
+                    # correlate psd's
+                    cc = xcorr.signal.correlate2d(in1, in2)
 
-        # store values in object
-        obj['status'].loc[{'freq': freq}] = np.byte(1)
-        obj['cc'].loc[{'freq': freq}] = cc.isel({dim1: amax1, dim2: amax2})
-        obj[dim1].loc[{'freq': freq}] = cc[dim1][amax1]
-        obj[dim2].loc[{'freq': freq}] = cc[dim2][amax2]
+                    # split dims
+                    dim1, dim2 = cc.dims[-2:]
 
+                    # get max index
+                    amax1, amax2 = np.unravel_index(cc.argmax(), cc.shape)
+
+                    # store values in object
+                    item = {
+                        'pair': pair,
+                        'freq': freq,
+                        'time1': time1,
+                        'time2': time2,
+                    }
+                    obj['status'].loc[item] = np.byte(1)
+                    obj['cc'].loc[item] = cc.isel({dim1: amax1, dim2: amax2})
+                    obj[dim1].loc[item] = cc[dim1][amax1]
+                    obj[dim2].loc[item] = cc[dim2][amax2]
     return obj
 
 
@@ -252,7 +270,7 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
     mask_upper_triangle(ds)
 
     # piecewise chunk dataset
-    ds = ds.chunk({'pair': 1, 'time1': 1, 'time2': 1})
+    ds = ds.chunk({'time1': 3, 'time2': 3})
 
     return ds
 
@@ -455,6 +473,7 @@ def main(argv):
 
     if verb:
         print('.. done')
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
