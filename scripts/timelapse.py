@@ -37,22 +37,19 @@ def get_spectrogram(pair, time, root: str = None):
 
     # read file
     try:
-        ds = xcorr.read(nc, fast=True, engine='netcdf4')
+        ds = xcorr.read(nc, fast=True, engine='h5netcdf')
     except Exception:
         ds = None
 
     if ds is not None:
-
         # status okay?
         ok = ds.status.loc[item] == 1
-
         # extract data
         if ok:
             cc = ds.cc.loc[item].load()
             lag = ds.lag.load()
             d_km = ds.distance.loc[{'pair': pair}].values
             delay = ds.pair_offset.loc[item] + ds.time_offset.loc[item]
-
         # close
         ds.close()
 
