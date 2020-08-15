@@ -371,8 +371,11 @@ def main(argv):
 
     # dask client
     if scheduler:
+        print('MPI Dask:', dclient)
+        print('{:>25} : {}'.format('scheduler', scheduler))
         dclient = distributed.Client(scheduler_file=scheduler)
     else:
+        print('Local Cluster:', dclient)
         dcluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
         )
