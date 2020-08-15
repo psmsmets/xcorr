@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
-from dask import distributed
+import dask
+import distributed
 from shutil import rmtree
 from glob import glob
 import os
@@ -19,8 +20,17 @@ import xcorr
 
 
 ###############################################################################
+# Dask settings
+# ---------------
+
+dask.config.set({'scheduler.work-stealing': True})
+dask.config.set({'scheduler.allowed-failures': 5})
+dask.config.set({'scheduler.timeouts': {'connect': '60s', 'tcp': '120s'}})
+
+
+###############################################################################
 # Local functions
-# -----------------
+# ---------------
 
 def get_spectrogram(pair, time, root: str = None):
     """Load spectrogram for a pair and time.
@@ -311,13 +321,14 @@ def main(argv):
     plot = False
     verb = False
     debug = False
+    scheduler = None
 
     try:
         opts, args = getopt.getopt(
             argv,
             'hvp:s:e:f:r:n:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'verbose', 'debug']
+             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'scheduler']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -348,6 +359,8 @@ def main(argv):
         elif opt in ('--debug'):
             verb = True
             debug = True
+        elif opt in ('--scheduler'):
+            scheduler = arg
 
     pair = pair or ''
     freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
@@ -357,10 +370,13 @@ def main(argv):
     n_workers = n_workers or 1
 
     # dask client
-    dcluster = distributed.LocalCluster(
-        processes=False, threads_per_worker=1, n_workers=n_workers,
-    )
-    dclient = distributed.Client(dcluster)
+    if scheduler:
+        dclient = distributed.Client(scheduler_file=scheduler)
+    else:
+        dcluster = distributed.LocalCluster(
+            processes=False, threads_per_worker=1, n_workers=n_workers,
+        )
+        dclient = distributed.Client(dcluster)
 
     if verb:
         print('Dask client:', dclient)
@@ -464,7 +480,8 @@ def main(argv):
 
     # cleanup
     dclient.close()
-    dcluster.close()
+    if scheduler is None:
+        dcluster.close()
     rmtree('dask-worker-space', ignore_errors=True)
     locks = None
     del(locks)

@@ -17,6 +17,8 @@ dependencies:
   - xarray
   - dask
   - distributed
+  - mpi4py
+  - dask-mpi
   - bottleneck
   - matplotlib
   - nc-time-axis
