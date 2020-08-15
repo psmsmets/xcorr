@@ -151,6 +151,7 @@ def correlate_spectrograms(obj, **kwargs):
                     obj['cc'].loc[item] = cc.isel({dim1: amax1, dim2: amax2})
                     obj[dim1].loc[item] = cc[dim1][amax1]
                     obj[dim2].loc[item] = cc[dim2][amax2]
+    # store temporaray object?
     return obj
 
 
