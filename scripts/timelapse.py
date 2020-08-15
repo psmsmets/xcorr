@@ -268,7 +268,7 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
     mask_upper_triangle(ds)
 
     # piecewise chunk dataset
-    ds = ds.chunk({'time1': 3, 'time2': 3})
+    ds = ds.chunk({'time1': 5, 'time2': 5})
 
     return ds
 
@@ -417,13 +417,13 @@ def main(argv):
     if verb:
         print('.. map blocks')
     mapped = xr.map_blocks(
-        correlate_spectrograms, ds, kwargs={'root': os.path.join(root, 'cc')}
+        correlate_spectrograms, ds, kwargs={'root': os.path.join(root, 'cc')},
     )
 
     # load results
     if verb:
-        print('.. load blocks (Dask)')
-    result = mapped.load()
+        print('.. compute blocks (Dask)')
+    result = mapped.compute()
 
     # fill upper triangle
     if verb:
