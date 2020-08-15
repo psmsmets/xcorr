@@ -25,7 +25,7 @@ import xcorr
 
 dask.config.set({'scheduler.work-stealing': True})
 dask.config.set({'scheduler.allowed-failures': 5})
-dask.config.set({'scheduler.timeouts': {'connect': '60s', 'tcp': '120s'}})
+dask.config.set({'scheduler.timeouts': {'connect': '10s', 'tcp': '30s'}})
 
 
 ###############################################################################
