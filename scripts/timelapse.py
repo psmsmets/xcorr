@@ -328,7 +328,7 @@ def main(argv):
             argv,
             'hvp:s:e:f:r:n:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'scheduler']
+             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'scheduler=']
         )
     except getopt.GetoptError as e:
         help(e)
