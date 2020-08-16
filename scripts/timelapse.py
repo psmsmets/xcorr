@@ -17,6 +17,10 @@ import os
 import sys
 import getopt
 import xcorr
+try:
+    import dask_mpi
+except ModuleNotFoundError:
+    dask_mpi = False
 
 
 ###############################################################################
@@ -25,7 +29,7 @@ import xcorr
 
 dask.config.set({'scheduler.work-stealing': True})
 dask.config.set({'scheduler.allowed-failures': 5})
-dask.config.set({'scheduler.timeouts': {'connect': '10s', 'tcp': '30s'}})
+dask.config.set({'scheduler.timeouts': {'connect': '20s', 'tcp': '60s'}})
 
 
 ###############################################################################
@@ -328,7 +332,8 @@ def main(argv):
             argv,
             'hvp:s:e:f:r:n:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'scheduler=']
+             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'scheduler=',
+             'mpirun']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -361,6 +366,9 @@ def main(argv):
             debug = True
         elif opt in ('--scheduler'):
             scheduler = arg
+        elif opt in ('--mpirun'):
+            scheduler = False
+            mpirun = True
 
     pair = pair or ''
     freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
@@ -370,7 +378,13 @@ def main(argv):
     n_workers = n_workers or 1
 
     # dask client
-    if scheduler:
+    if mpirun:
+        print('mpi-dask')
+        if dask_mpi is False:
+            raise RuntimeError('dask_mpi module is required.')
+        dask_mpi.initialize()
+        dclient = distributed.Client()
+    elif scheduler:
         print('mpi-dask scheduler:', scheduler)
         dclient = distributed.Client(scheduler_file=scheduler)
     else:
