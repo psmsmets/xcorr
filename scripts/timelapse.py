@@ -326,6 +326,7 @@ def main(argv):
     verb = False
     debug = False
     scheduler = None
+    mpirun = False
 
     try:
         opts, args = getopt.getopt(
@@ -367,7 +368,7 @@ def main(argv):
         elif opt in ('--scheduler'):
             scheduler = arg
         elif opt in ('--mpirun'):
-            scheduler = False
+            scheduler = None
             mpirun = True
 
     pair = pair or ''
@@ -384,7 +385,7 @@ def main(argv):
             raise RuntimeError('dask_mpi module is required.')
         dask_mpi.initialize()
         dclient = distributed.Client()
-    elif scheduler:
+    elif scheduler is not None:
         print('mpi-dask scheduler:', scheduler)
         dclient = distributed.Client(scheduler_file=scheduler)
     else:
