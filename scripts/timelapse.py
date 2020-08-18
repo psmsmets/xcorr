@@ -326,15 +326,16 @@ def main(argv):
     verb = False
     debug = False
     scheduler = None
-    mpirun = False
+    mpi = None
+    local_directory = None
 
     try:
         opts, args = getopt.getopt(
             argv,
             'hvp:s:e:f:r:n:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'scheduler=',
-             'mpirun']
+             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'mpi=',
+             'local-directory=']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -365,11 +366,11 @@ def main(argv):
         elif opt in ('--debug'):
             verb = True
             debug = True
-        elif opt in ('--scheduler'):
+        elif opt in ('--mpi'):
             scheduler = arg
-        elif opt in ('--mpirun'):
-            scheduler = None
-            mpirun = True
+            mpi = 'scheduler' if os.path.exists(arg) else 'initialize'
+        elif opt in ('--local-directory'):
+            local_directory = arg
 
     pair = pair or ''
     freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
@@ -379,21 +380,21 @@ def main(argv):
     n_workers = n_workers or 1
 
     # dask client
-    if mpirun:
-        print('mpi-dask')
+    if mpi == 'initialize':
+        print('dask-mpi initialize()')
         if dask_mpi is False:
             raise RuntimeError('dask_mpi module is required.')
         dask_mpi.initialize()
-        dclient = distributed.Client()
-    elif scheduler is not None:
-        print('mpi-dask scheduler:', scheduler)
+        dclient = distributed.Client(local_directory=local_directory)
+    elif mpi == 'scheduler':
+        print('dask-mpi scheduler:', scheduler)
         dclient = distributed.Client(scheduler_file=scheduler)
     else:
-        print('Local cluster:', dclient)
+        print('LocalCluster:', dclient)
         dcluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
         )
-        dclient = distributed.Client(dcluster)
+        dclient = distributed.Client(dcluster, local_directory=local_directory)
 
     if verb:
         print('Dask client:', dclient)
@@ -455,7 +456,7 @@ def main(argv):
 
     # load results
     if verb:
-        print('.. compute blocks (Dask)')
+        print('.. compute blocks')
     result = mapped.compute()
 
     # fill upper triangle
@@ -496,10 +497,13 @@ def main(argv):
         plt.show()
 
     # cleanup
+    if verb:
+        print('.. cleanup')
     dclient.close()
     if scheduler is None:
         dcluster.close()
-    rmtree('dask-worker-space', ignore_errors=True)
+    if local_directory is None:
+        rmtree('dask-worker-space', ignore_errors=True)
     locks = None
     del(locks)
 
