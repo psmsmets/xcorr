@@ -15,7 +15,6 @@ from glob import glob
 import os
 import sys
 import getopt
-import re
 import xcorr
 try:
     import dask_mpi
@@ -445,8 +444,9 @@ def main(argv):
         print('.. init timelapse dataset', end=', ')
     ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root)
     if verb:
-        dims = re.findall(r"\{(.*?)\}", repr(ds.dims))[0]
-        print(f'dims = {dims}')
+        print('dims: pair={pair}, freq={freq}, time={time1}'.format(
+            pair=ds.pair.size, freq=ds.freq.size, time1=ds.time1.size,
+        ))
     if debug:
         print(ds)
 
