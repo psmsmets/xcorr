@@ -425,12 +425,12 @@ def main(argv):
 
     # get confindence triggers
     if verb:
-        print('.. coincidence trigger', end='. ')
+        print('.. coincidence trigger', end=', ')
     ct = xcorr.signal.coincidence_trigger(
         snr, thr_on=10., extend=0, thr_coincidence_sum=None,
     )
     if verb:
-        print(f'periods: {ct.attrs["nperiods"]}.')
+        print(f'periods = {ct.attrs["nperiods"]}')
     if debug:
         print(ct)
     if plot:
@@ -442,11 +442,11 @@ def main(argv):
 
     # init timelapse
     if verb:
-        print('.. init timelapse dataset', end='. ')
+        print('.. init timelapse dataset', end=', ')
     ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root)
     if verb:
         dims = re.findall(r"\{(.*?)\}", repr(ds.dims))[0]
-        print(f'dims: {dims}.')
+        print(f'dims = {dims}')
     if debug:
         print(ds)
 
