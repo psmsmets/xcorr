@@ -11,7 +11,6 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import dask
 import distributed
-from shutil import rmtree
 from glob import glob
 import os
 import sys
@@ -21,7 +20,10 @@ try:
     import dask_mpi
 except ModuleNotFoundError:
     dask_mpi = False
-
+try:
+    import dask_jobqueue
+except ModuleNotFoundError:
+    dask_jobqueue = False
 
 ###############################################################################
 # Dask settings
@@ -282,7 +284,7 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
     mask_upper_triangle(ds)
 
     # piecewise chunk dataset
-    ds = ds.chunk({'time1': 3, 'time2': 3})
+    ds = ds.chunk({'time1': 6, 'time2': 6})
 
     return ds
 
@@ -325,17 +327,16 @@ def main(argv):
     plot = False
     verb = False
     debug = False
-    scheduler = None
-    mpi = None
-    local_directory = None
+    mpi_scheduler = None
+    slurm_jobs = None
 
     try:
         opts, args = getopt.getopt(
             argv,
             'hvp:s:e:f:r:n:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'mpi=',
-             'local-directory=']
+             'nworkers=', 'help', 'plot', 'verbose', 'debug',
+             'mpi-scheduler=', 'slurm-jobs=']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -366,11 +367,10 @@ def main(argv):
         elif opt in ('--debug'):
             verb = True
             debug = True
-        elif opt in ('--mpi'):
-            scheduler = arg
-            mpi = 'scheduler' if os.path.exists(arg) else 'initialize'
-        elif opt in ('--local-directory'):
-            local_directory = arg
+        elif opt in ('--mpi-scheduler'):
+            mpi_scheduler = arg
+        elif opt in ('--slurm-jobs'):
+            slurm_jobs = int(arg or 1)
 
     pair = pair or ''
     freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
@@ -380,21 +380,23 @@ def main(argv):
     n_workers = n_workers or 1
 
     # dask client
-    if mpi == 'initialize':
-        print('dask-mpi initialize()')
-        if dask_mpi is False:
-            raise RuntimeError('dask_mpi module is required.')
-        dask_mpi.initialize()
-        dclient = distributed.Client(local_directory=local_directory)
-    elif mpi == 'scheduler':
-        print('dask-mpi scheduler:', scheduler)
-        dclient = distributed.Client(scheduler_file=scheduler)
+    if slurm_jobs > 0:
+        print(f'dask-jobqueue slurm (jobs = {slurm_jobs})')
+        if dask_jobqueue is False:
+            raise RuntimeError('dask_jobqueue module is required.')
+        dcluster = dask_jobqueue.SLURMCluster(name='timelapse')
+        dcluster.scale(jobs=slurm_jobs)
+        dclient = distributed.Client(dcluster)
+    elif mpi_scheduler:
+        print('dask-mpi scheduler:', mpi_scheduler)
+        dcluster = None
+        dclient = distributed.Client(scheduler_file=mpi_scheduler)
     else:
-        print('LocalCluster:', dclient)
         dcluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
         )
-        dclient = distributed.Client(dcluster, local_directory=local_directory)
+        print('LocalCluster:', dclient)
+        dclient = distributed.Client(dcluster)
 
     if verb:
         print('Dask client:', dclient)
@@ -500,10 +502,8 @@ def main(argv):
     if verb:
         print('.. cleanup')
     dclient.close()
-    if scheduler is None:
+    if dcluster is not None:
         dcluster.close()
-    if local_directory is None:
-        rmtree('dask-worker-space', ignore_errors=True)
     locks = None
     del(locks)
 
