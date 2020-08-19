@@ -440,9 +440,11 @@ def main(argv):
 
     # init timelapse
     if verb:
-        print('.. init timelapse dataset with dims:')
-        print('     {re.findall(r"\{(.*?)\}", repr(mapped.dims))[0]}')
+        print('.. init timelapse dataset')
     ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root)
+    if verb:
+        dims = re.findall(r"\{(.*?)\}", repr(ds.dims))[0]
+        print(f'  dims: {dims}')
     if debug:
         print(ds)
 
