@@ -462,7 +462,7 @@ def main(argv):
 
     # map nodes
     if verb:
-        print(f'.. map blocks, chunks={ds.chunks}')
+        print('.. map blocks')
     mapped = xr.map_blocks(
         correlate_spectrograms, ds, kwargs={'root': os.path.join(root, 'cc')},
     )
