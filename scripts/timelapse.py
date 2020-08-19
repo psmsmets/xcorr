@@ -196,7 +196,8 @@ def fill_upper_triangle(ds):
         ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
 
 
-def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
+def init_timelapse(snr, ct, pair, starttime, endtime, freq,
+                   root: str, chunk: int = None):
     """Init a timelapse dataset.
     """
     # extract times with activity
@@ -284,7 +285,8 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
     mask_upper_triangle(ds)
 
     # piecewise chunk dataset
-    ds = ds.chunk({'time1': 6, 'time2': 6})
+    chunk = chunk or 6
+    ds = ds.chunk({'time1': chunk, 'time2': chunk})
 
     return ds
 
@@ -327,15 +329,16 @@ def main(argv):
     plot = False
     verb = False
     debug = False
+    chunk = None
     mpi_scheduler = None
     slurm_jobs = None
 
     try:
         opts, args = getopt.getopt(
             argv,
-            'hvp:s:e:f:r:n:',
+            'hvp:s:e:f:r:n:c:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'verbose', 'debug',
+             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'chunk=',
              'mpi-scheduler=', 'slurm-jobs=']
         )
     except getopt.GetoptError as e:
@@ -367,6 +370,8 @@ def main(argv):
         elif opt in ('--debug'):
             verb = True
             debug = True
+        elif opt in ('-c', '--chunk='):
+            chunk = int(arg)
         elif opt in ('--mpi-scheduler'):
             mpi_scheduler = arg
         elif opt in ('--slurm-jobs'):
@@ -442,7 +447,7 @@ def main(argv):
     # init timelapse
     if verb:
         print('.. init timelapse dataset', end=', ')
-    ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root)
+    ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root, chunk)
     if verb:
         print('dims: pair={pair}, freq={freq}, time={time1}'.format(
             pair=ds.pair.size, freq=ds.freq.size, time1=ds.time1.size,
@@ -457,7 +462,7 @@ def main(argv):
 
     # map nodes
     if verb:
-        print('.. map blocks')
+        print(f'.. map blocks, chunks={ds.chunks}')
     mapped = xr.map_blocks(
         correlate_spectrograms, ds, kwargs={'root': os.path.join(root, 'cc')},
     )
