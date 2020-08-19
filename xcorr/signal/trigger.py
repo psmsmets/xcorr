@@ -218,7 +218,7 @@ def trigger_periods(trigs: xr.DataArray):
 
     per = []
 
-    for i in range(trigs.nperiods):
+    for i in range(trigs.attrs['nperiods']):
         trig = trigs.time.where(trigs == i, drop=True)
         per.append(
             pd.DataFrame(
