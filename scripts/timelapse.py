@@ -397,7 +397,7 @@ def main(argv):
         cluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
         )
-        print('LocalCluster:', cluster)
+        print('dask LocalCluster:', cluster)
         client = distributed.Client(cluster)
 
     calc_exec_options = dict(
