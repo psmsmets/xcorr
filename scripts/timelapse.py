@@ -4,30 +4,25 @@ TIMELAPSE
 
 Crosscorrelation of crosscorrelation spectrograms.
 
+
+Check distributed.scheduler.KilledWorker for a long time series #236
+https://github.com/spencerahill/aospy/issues/236
+
 """
 import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
-import dask
 import distributed
 from glob import glob
 import os
 import sys
 import getopt
 import xcorr
-try:
-    import dask_jobqueue
-except ModuleNotFoundError:
-    dask_jobqueue = False
-
-###############################################################################
-# Dask settings
-# ---------------
-
-dask.config.set({'scheduler.work-stealing': True})
-dask.config.set({'scheduler.allowed-failures': 5})
-dask.config.set({'scheduler.timeouts': {'connect': '20s', 'tcp': '60s'}})
+# try:
+#     import dask_jobqueue
+# except ModuleNotFoundError:
+#     dask_jobqueue = False
 
 
 ###############################################################################
@@ -508,9 +503,8 @@ def main(argv):
     if cluster is not None:
         cluster.close()
     locks = None
-    del(locks)
 
-    print('.. done')
+    print('.. done', locks)
 
 
 if __name__ == "__main__":
