@@ -253,9 +253,6 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq,
         },
     )
 
-    ds['snr'] = snr
-    ds['ct'] = ct
-
     ds['cc'] = ds.status.astype(np.float64) * 0
     ds['cc'].attrs = {
         'long_name': 'Crosscorrelation Estimate',
@@ -286,9 +283,17 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq,
 
     # piecewise chunk dataset
     chunk = chunk or 6
-    ds = ds.chunk({'time1': chunk, 'time2': chunk})
+    ds = ds.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
 
     return ds
+
+
+def update_timelapse(ds, snr, ct):
+    """Update metadata and fill upper triangle
+    """
+    ds['snr'] = snr
+    ds['ct'] = ct
+    fill_upper_triangle(ds)
 
 
 def create_locks(ds, root):
@@ -472,10 +477,10 @@ def main(argv):
         print('.. compute blocks')
     result = mapped.compute()
 
-    # fill upper triangle
+    # update metadata
     if verb:
-        print('.. fill upper triangle from lower')
-    fill_upper_triangle(result)
+        print('.. update metadata')
+    update_timelapse(result, snr, ct)
     if debug:
         print(result)
 
