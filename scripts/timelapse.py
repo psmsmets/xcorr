@@ -17,10 +17,6 @@ import sys
 import getopt
 import xcorr
 try:
-    import dask_mpi
-except ModuleNotFoundError:
-    dask_mpi = False
-try:
     import dask_jobqueue
 except ModuleNotFoundError:
     dask_jobqueue = False
@@ -332,19 +328,19 @@ def main(argv):
     freq = None
     n_workers = None
     plot = False
-    verb = False
     debug = False
     chunk = None
-    mpi_scheduler = None
-    slurm_jobs = None
+    scheduler = None
+    cluster = None
+    # slurm_jobs = None
 
     try:
         opts, args = getopt.getopt(
             argv,
             'hvp:s:e:f:r:n:c:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'verbose', 'debug', 'chunk=',
-             'mpi-scheduler=', 'slurm-jobs=']
+             'nworkers=', 'help', 'plot', 'debug', 'chunk=',
+             'scheduler=', 'slurm-jobs=']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -352,8 +348,6 @@ def main(argv):
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             help()
-        elif opt in ('-v', '--verbose'):
-            verb = True
         elif opt in ('-p', '--pair'):
             pair = arg
         elif opt in ('-s', '--starttime'):
@@ -373,14 +367,13 @@ def main(argv):
         elif opt in ('--plot'):
             plot = True
         elif opt in ('--debug'):
-            verb = True
             debug = True
         elif opt in ('-c', '--chunk='):
             chunk = int(arg)
-        elif opt in ('--mpi-scheduler'):
-            mpi_scheduler = arg
-        elif opt in ('--slurm-jobs'):
-            slurm_jobs = int(arg or 1)
+        elif opt in ('--scheduler'):
+            scheduler = arg
+        # elif opt in ('--slurm-jobs'):
+        #     slurm_jobs = int(arg or 1)
 
     pair = pair or ''
     freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
@@ -390,35 +383,39 @@ def main(argv):
     n_workers = n_workers or 1
 
     # dask client
-    if slurm_jobs > 0:
-        print(f'dask-jobqueue slurm (jobs = {slurm_jobs})')
-        if dask_jobqueue is False:
-            raise RuntimeError('dask_jobqueue module is required.')
-        dcluster = dask_jobqueue.SLURMCluster(name='timelapse')
-        dcluster.scale(jobs=slurm_jobs)
-        dclient = distributed.Client(dcluster)
-    elif mpi_scheduler:
-        print('dask-mpi scheduler:', mpi_scheduler)
-        dcluster = None
-        dclient = distributed.Client(scheduler_file=mpi_scheduler)
+    # if slurm_jobs > 0:
+    #     print(f'dask-jobqueue slurm (jobs = {slurm_jobs})')
+    #     if dask_jobqueue is False:
+    #         raise RuntimeError('dask_jobqueue module is required.')
+    #     cluster = dask_jobqueue.SLURMCluster(name='timelapse')
+    #     cluster.scale(jobs=slurm_jobs)
+    #     client = distributed.Client(cluster)
+    if scheduler:
+        print('dask scheduler:', scheduler)
+        client = distributed.Client(scheduler_file=scheduler)
     else:
-        dcluster = distributed.LocalCluster(
+        cluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
         )
-        print('LocalCluster:', dclient)
-        dclient = distributed.Client(dcluster)
+        print('LocalCluster:', client)
+        client = distributed.Client(cluster)
 
-    if verb:
-        print('Dask client:', dclient)
-        print('Dask dashboard:', dclient.dashboard_link)
-        print('{:>25} : {}'.format('root', root))
-        print('{:>25} : {}'.format('pair', pair))
-        print('{:>25} : {}'.format('starttime', starttime))
-        print('{:>25} : {}'.format('endtime', endtime))
+    calc_exec_options = dict(
+        prompt_verify=True,
+        parallelize=True,
+        client=client,
+        write_to_tar=True,
+    )
+
+    print('Dask client:', client)
+    print('Dask dashboard:', client.dashboard_link)
+    print('{:>25} : {}'.format('root', root))
+    print('{:>25} : {}'.format('pair', pair))
+    print('{:>25} : {}'.format('starttime', starttime))
+    print('{:>25} : {}'.format('endtime', endtime))
 
     # snr
-    if verb:
-        print('.. signal-to-noise ratio')
+    print('.. signal-to-noise ratio')
     snr = xr.merge([xr.open_dataarray(f) for f in
                     glob(os.path.join(root, 'snr', 'snr_20??.nc'))]).snr
     snr = snr.where(
@@ -433,13 +430,11 @@ def main(argv):
         print(snr)
 
     # get confindence triggers
-    if verb:
-        print('.. coincidence trigger', end=', ')
+    print('.. coincidence trigger', end=', ')
     ct = xcorr.signal.coincidence_trigger(
         snr, thr_on=10., extend=0, thr_coincidence_sum=None,
     )
-    if verb:
-        print(f'periods = {ct.attrs["nperiods"]}')
+    print(f'periods = {ct.attrs["nperiods"]}')
     if debug:
         print(ct)
     if plot:
@@ -450,36 +445,30 @@ def main(argv):
         plt.show()
 
     # init timelapse
-    if verb:
-        print('.. init timelapse dataset', end=', ')
+    print('.. init timelapse dataset', end=', ')
     ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root, chunk)
-    if verb:
-        print('dims: pair={pair}, freq={freq}, time={time1}'.format(
-            pair=ds.pair.size, freq=ds.freq.size, time1=ds.time1.size,
-        ))
+    print('dims: pair={pair}, freq={freq}, time={time1}'.format(
+        pair=ds.pair.size, freq=ds.freq.size, time1=ds.time1.size,
+    ))
     if debug:
         print(ds)
 
     # create all locks
-    if verb:
-        print('.. init locks')
+    print('.. init locks')
     locks = create_locks(ds, os.path.join(root, 'cc'))
 
     # map nodes
-    if verb:
-        print('.. map blocks')
+    print('.. map blocks')
     mapped = xr.map_blocks(
         correlate_spectrograms, ds, kwargs={'root': os.path.join(root, 'cc')},
     )
 
     # load results
-    if verb:
-        print('.. compute blocks')
-    result = mapped.compute()
+    print('.. compute blocks')
+    result = mapped.compute(**calc_exec_options)
 
     # update metadata
-    if verb:
-        print('.. update metadata')
+    print('.. update metadata')
     update_timelapse(result, snr, ct)
     if debug:
         print(result)
@@ -490,8 +479,7 @@ def main(argv):
         str(result.time[0].dt.strftime('%Y%j').values),
         str(result.time[-1].dt.strftime('%Y%j').values),
     ))
-    if verb:
-        print(f'.. write to "{nc}"')
+    print(f'.. write to "{nc}"')
     xcorr.write(result, nc, verb=1 if debug else 0)
 
     # plot?
@@ -515,16 +503,14 @@ def main(argv):
         plt.show()
 
     # cleanup
-    if verb:
-        print('.. cleanup')
-    dclient.close()
-    if dcluster is not None:
-        dcluster.close()
+    print('.. cleanup')
+    client.close()
+    if cluster is not None:
+        cluster.close()
     locks = None
     del(locks)
 
-    if verb:
-        print('.. done')
+    print('.. done')
 
 
 if __name__ == "__main__":
