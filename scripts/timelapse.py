@@ -390,21 +390,21 @@ def main(argv):
     #     cluster = dask_jobqueue.SLURMCluster(name='timelapse')
     #     cluster.scale(jobs=slurm_jobs)
     #     client = distributed.Client(cluster)
-    if scheduler:
+    if scheduler is not None:
         print('dask scheduler:', scheduler)
         client = distributed.Client(scheduler_file=scheduler)
     else:
         cluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
         )
-        print('LocalCluster:', client)
+        print('LocalCluster:', cluster)
         client = distributed.Client(cluster)
 
     calc_exec_options = dict(
-        prompt_verify=True,
-        parallelize=True,
+        # prompt_verify=True,
+        # parallelize=True,
         client=client,
-        write_to_tar=True,
+        # write_to_tar=True,
     )
 
     print('Dask client:', client)
