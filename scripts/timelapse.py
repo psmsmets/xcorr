@@ -96,9 +96,9 @@ def correlate_spectrograms(obj, **kwargs):
     if obj.status.all():
         return obj
 
-    # test if object is loaded
-    if not (obj.freq.any() and obj.pair.any()):
-        return obj
+    # # test if object is loaded
+    # if not (obj.freq.any() and obj.pair.any()):
+    #     return obj
 
     # process per item
     for pair in obj.pair:
@@ -455,7 +455,10 @@ def main(argv):
     # map nodes
     print('.. map blocks')
     mapped = xr.map_blocks(
-        correlate_spectrograms, ds, kwargs={'root': os.path.join(root, 'cc')},
+        func=correlate_spectrograms,
+        obj=ds,
+        kwargs={'root': os.path.join(root, 'cc')},
+        template=ds,
     )
 
     # load results
