@@ -96,9 +96,9 @@ def correlate_spectrograms(obj, **kwargs):
     if obj.status.all():
         return obj
 
-    # # test if object is loaded
-    # if not (obj.freq.any() and obj.pair.any()):
-    #     return obj
+    # test if object is loaded
+    if not (obj.freq.any() and obj.pair.any()):
+        return obj
 
     # process per item
     for pair in obj.pair:
@@ -113,52 +113,57 @@ def correlate_spectrograms(obj, **kwargs):
                 }].all():
                     continue
 
-                # load cc and compute psd on-the-fly
-                psd1 = get_spectrogram(pair, time1, **kwargs)
-                psd2 = get_spectrogram(pair, time2, **kwargs)
+                try:
+                    # load cc and compute psd on-the-fly
+                    psd1 = get_spectrogram(pair, time1, **kwargs)
+                    psd2 = get_spectrogram(pair, time2, **kwargs)
 
-                if psd1 is None or psd2 is None:
+                    if psd1 is None or psd2 is None:
+                        continue
+
+                    # correlate per freq range
+                    for freq in obj.freq:
+
+                        # set (min, max) frequency
+                        bw = obj.freq_bw.loc[{'freq': freq}]
+                        fmin = (obj.freq - bw/2).values[0]
+                        fmax = (obj.freq + bw/2).values[0]
+
+                        # extract freq
+                        in1 = psd1.where(
+                            (psd1.freq >= fmin) & (psd1.freq < fmax),
+                            drop=True,
+                        )
+                        in2 = psd2.where(
+                            (psd2.freq >= fmin) & (psd2.freq < fmax),
+                            drop=True,
+                        )
+
+                        # correlate psd's
+                        cc = xcorr.signal.correlate2d(in1, in2)
+
+                        # split dims
+                        dim1, dim2 = cc.dims[-2:]
+
+                        # get max index
+                        amax1, amax2 = np.unravel_index(cc.argmax(), cc.shape)
+
+                        # store values in object
+                        item = {
+                            'pair': pair,
+                            'freq': freq,
+                            'time1': time1,
+                            'time2': time2,
+                        }
+                        obj['status'].loc[item] = np.byte(1)
+                        obj['cc'].loc[item] = cc.isel({dim1: amax1,
+                                                       dim2: amax2})
+                        obj[dim1].loc[item] = cc[dim1][amax1]
+                        obj[dim2].loc[item] = cc[dim2][amax2]
+
+                except Exception:
                     continue
 
-                # correlate per freq range
-                for freq in obj.freq:
-
-                    # set (min, max) frequency
-                    bw = obj.freq_bw.loc[{'freq': freq}]
-                    fmin = (obj.freq - bw/2).values[0]
-                    fmax = (obj.freq + bw/2).values[0]
-
-                    # extract freq
-                    in1 = psd1.where(
-                        (psd1.freq >= fmin) & (psd1.freq < fmax),
-                        drop=True,
-                    )
-                    in2 = psd2.where(
-                        (psd2.freq >= fmin) & (psd2.freq < fmax),
-                        drop=True,
-                    )
-
-                    # correlate psd's
-                    cc = xcorr.signal.correlate2d(in1, in2)
-
-                    # split dims
-                    dim1, dim2 = cc.dims[-2:]
-
-                    # get max index
-                    amax1, amax2 = np.unravel_index(cc.argmax(), cc.shape)
-
-                    # store values in object
-                    item = {
-                        'pair': pair,
-                        'freq': freq,
-                        'time1': time1,
-                        'time2': time2,
-                    }
-                    obj['status'].loc[item] = np.byte(1)
-                    obj['cc'].loc[item] = cc.isel({dim1: amax1, dim2: amax2})
-                    obj[dim1].loc[item] = cc[dim1][amax1]
-                    obj[dim2].loc[item] = cc[dim2][amax2]
-    # store temporaray object?
     return obj
 
 
