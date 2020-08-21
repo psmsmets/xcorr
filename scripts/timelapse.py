@@ -38,9 +38,9 @@ def get_spectrogram(pair, time, root: str = None):
     # select pair time location
     item = {'pair': pair, 'time': time}
 
-    # set lock
-    lock = distributed.Lock(nc)
-    lock.acquire()
+    # # set lock
+    # lock = distributed.Lock(nc)
+    # lock.acquire()
 
     # get data from disk
     ds = None
@@ -64,8 +64,8 @@ def get_spectrogram(pair, time, root: str = None):
     except Exception:
         ds = None
 
-    # release lock
-    lock.release()
+    # # release lock
+    # lock.release()
 
     # no data?
     if ds is None or not ok:
@@ -457,9 +457,9 @@ def main(argv):
     if debug:
         print(ds)
 
-    # create all locks
-    print('.. init locks')
-    locks = create_locks(ds, os.path.join(root, 'cc'))
+    # # create all locks
+    # print('.. init locks')
+    # locks = create_locks(ds, os.path.join(root, 'cc'))
 
     # map nodes
     print('.. map blocks')
@@ -514,9 +514,9 @@ def main(argv):
     client.close()
     if cluster is not None:
         cluster.close()
-    locks = None
+    # locks = None
 
-    print('.. done', locks)
+    print('.. done')
 
 
 if __name__ == "__main__":
