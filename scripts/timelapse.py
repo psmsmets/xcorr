@@ -283,7 +283,7 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq,
 
     # piecewise chunk dataset
     chunk = chunk or 6
-    ds = ds.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
+    ds = ds.chunk({'time1': chunk, 'time2': chunk})
 
     return ds
 
@@ -291,9 +291,22 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq,
 def update_timelapse(ds, snr, ct):
     """Update metadata and fill upper triangle
     """
+    # fill
+    fill_upper_triangle(ds)
+
+    # add
     ds['snr'] = snr
     ds['ct'] = ct
-    fill_upper_triangle(ds)
+
+    # set encoding
+    encoding = {'zlib': True, 'complevel': 9}
+
+    ds['status'].encoding = encoding
+    ds['cc'].encoding = encoding
+    ds['delta_freq'].encoding = encoding
+    ds['delta_lag'].encoding = encoding
+    ds['snr'].encoding = encoding
+    ds['ct'].encoding = encoding
 
 
 def create_locks(ds, root):
