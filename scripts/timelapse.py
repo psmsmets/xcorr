@@ -282,8 +282,8 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq,
     mask_upper_triangle(ds)
 
     # piecewise chunk dataset
-    chunk = chunk or 6
-    ds = ds.chunk({'time1': chunk, 'time2': chunk})
+    chunk = chunk or 5
+    ds = ds.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
 
     return ds
 
