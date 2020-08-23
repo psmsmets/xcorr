@@ -78,7 +78,7 @@ def _mask_noise(ds):
 def _select_and_trim(ds, valid):
     """
     """
-    cc = ds.cc.where((valid) & (ds.status==1), drop=True)
+    cc = ds.cc.where((valid) & (ds.status == 1), drop=True)
     return cc
 
 

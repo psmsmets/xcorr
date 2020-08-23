@@ -12,7 +12,6 @@ import dask.diagnostics
 import numpy as np
 import pandas as pd
 import xarray as xr
-from glob import glob
 import os
 import xcorr
 
