@@ -279,7 +279,7 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq,
     }
 
     # ignore upper diagonal
-    mask_upper_triangle(ds)
+    # mask_upper_triangle(ds)
 
     # piecewise chunk dataset
     chunk = chunk or 5
@@ -292,7 +292,7 @@ def update_timelapse(ds, snr, ct):
     """Update metadata and fill upper triangle
     """
     # fill
-    fill_upper_triangle(ds)
+    # fill_upper_triangle(ds)
 
     # add
     ds['snr'] = snr
@@ -476,16 +476,15 @@ def main(argv):
 
     # map nodes
     print('.. map blocks')
-    mapped = xr.map_blocks(
+    mapped = ds.map_blocks(
         func=correlate_spectrograms,
-        obj=ds,
         kwargs={'root': os.path.join(root, 'cc')},
         template=ds,
     )
 
     # load results
     print('.. compute blocks')
-    result = mapped.compute(**calc_exec_options)
+    result = compute.compute(**calc_exec_options)
 
     # update metadata
     print('.. update metadata')
