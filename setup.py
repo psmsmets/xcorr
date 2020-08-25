@@ -38,10 +38,10 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     install_requires=[
-        'numpy>=1.16',
+        'numpy>=1.18',
         'scipy>=1.0.0',
         'obspy>=1.2.0',
-        'xarray>=0.15.0',
+        'xarray>=0.16.0',
         'pandas>=1.0.0',
         'pyproj>=2.0.0',
         'tabulate>=0.8',

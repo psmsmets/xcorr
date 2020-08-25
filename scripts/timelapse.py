@@ -29,7 +29,7 @@ import xcorr
 # Local functions
 # ---------------
 
-def get_spectrogram(pair, time, root: str = None):
+def get_spectrogram(pair, time, root: str, client: distributed.Client = None):
     """Load spectrogram for a pair and time.
     """
     # construct abs path and filename
@@ -39,8 +39,8 @@ def get_spectrogram(pair, time, root: str = None):
     item = {'pair': pair, 'time': time}
 
     # # set lock
-    # lock = distributed.Lock(nc)
-    # lock.acquire()
+    lock = distributed.Lock(nc, client=client)
+    lock.acquire()
 
     # get data from disk
     ds = None
@@ -64,8 +64,8 @@ def get_spectrogram(pair, time, root: str = None):
     except Exception:
         ds = None
 
-    # # release lock
-    # lock.release()
+    # release lock
+    lock.release()
 
     # no data?
     if ds is None or not ok:
@@ -93,7 +93,7 @@ def get_spectrogram(pair, time, root: str = None):
     return psd
 
 
-def correlate_spectrograms(obj, **kwargs):
+def correlate_spectrograms(obj, root: str, client: distributed.Client = None):
     """Correlate spectrograms.
     """
     # already set?
@@ -119,8 +119,8 @@ def correlate_spectrograms(obj, **kwargs):
 
                 try:
                     # load cc and compute psd on-the-fly
-                    psd1 = get_spectrogram(pair, time1, **kwargs)
-                    psd2 = get_spectrogram(pair, time2, **kwargs)
+                    psd1 = get_spectrogram(pair, time1, root, client)
+                    psd2 = get_spectrogram(pair, time2, root, client)
 
                     if psd1 is None or psd2 is None:
                         continue
@@ -478,13 +478,13 @@ def main(argv):
     print('.. map blocks')
     mapped = ds.map_blocks(
         func=correlate_spectrograms,
-        kwargs={'root': os.path.join(root, 'cc')},
+        args=[os.path.join(root, 'cc'), client],
         template=ds,
     )
 
     # load results
     print('.. compute blocks')
-    result = compute.compute(**calc_exec_options)
+    result = mapped.compute(**calc_exec_options)
 
     # update metadata
     print('.. update metadata')
