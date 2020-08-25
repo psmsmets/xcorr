@@ -477,8 +477,9 @@ def main(argv):
     # map nodes
     print('.. map blocks')
     mapped = ds.map_blocks(
-        func=correlate_spectrograms,
-        args=[os.path.join(root, 'cc'), client],
+        correlate_spectrograms,
+        args=[os.path.join(root, 'cc')],
+        kwargs={'client': client},
         template=ds,
     )
 
