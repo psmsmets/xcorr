@@ -414,13 +414,6 @@ def main(argv):
         print('dask LocalCluster:', cluster)
         client = distributed.Client(cluster)
 
-    compute_options = dict(
-        # prompt_verify=True,
-        # parallelize=True,
-        client=client,
-        # write_to_tar=True,
-    )
-
     print('Dask client:', client)
     print('Dask dashboard:', client.dashboard_link)
     print('{:>25} : {}'.format('root', root))
@@ -467,22 +460,21 @@ def main(argv):
     if debug:
         print(ds)
 
+    raise SystemExit
+
     # # create all locks
     # print('.. init locks')
     # locks = create_locks(ds, os.path.join(root, 'cc'))
 
     # map nodes
-    print('.. map blocks')
-    ds = ds.map_blocks(
+    print('.. map and compute blocks')
+    ds = xr.map_blocks(
+        obj=ds,
         func=correlate_spectrograms,
         args=[os.path.join(root, 'cc')],
         kwargs={'client': client},
         template=ds,
-    )
-
-    # load dss
-    print('.. compute blocks')
-    ds = ds.compute(**compute_options)
+    ).compute(client=client)
 
     # update metadata
     print('.. update metadata')
