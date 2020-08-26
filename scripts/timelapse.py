@@ -403,7 +403,9 @@ def main(argv):
     if scheduler is not None:
         print('dask scheduler:', scheduler)
         client = distributed.Client(scheduler_file=scheduler)
+        print(f'.. waiting for {n_workers} workers', end=', ')
         client.wait_for_workers(n_workers=n_workers)
+        print('OK.')
     else:
         cluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
