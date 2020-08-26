@@ -29,7 +29,7 @@ import xcorr
 # Local functions
 # ---------------
 
-def get_spectrogram(pair, time, root, client=None):
+def get_spectrogram(pair, time, root):
     """Load spectrogram for a pair and time.
     """
     # construct abs path and filename
@@ -39,7 +39,7 @@ def get_spectrogram(pair, time, root, client=None):
     item = {'pair': pair, 'time': time}
 
     # set lock
-    lock = distributed.Lock(nc, client=client)
+    lock = distributed.Lock(nc)
     lock.acquire()
 
     # get data from disk
@@ -93,7 +93,7 @@ def get_spectrogram(pair, time, root, client=None):
     return psd
 
 
-def correlate_spectrograms(obj, root, client=None, **kwargs):
+def correlate_spectrograms(obj, root):
     """Correlate spectrograms.
     """
     # already set?
@@ -119,8 +119,8 @@ def correlate_spectrograms(obj, root, client=None, **kwargs):
 
                 try:
                     # load cc and compute psd on-the-fly
-                    psd1 = get_spectrogram(pair, time1, root, client)
-                    psd2 = get_spectrogram(pair, time2, root, client)
+                    psd1 = get_spectrogram(pair, time1, root)
+                    psd2 = get_spectrogram(pair, time2, root)
 
                     if psd1 is None or psd2 is None:
                         continue
@@ -196,8 +196,7 @@ def fill_upper_triangle(ds):
         ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
 
 
-def init_timelapse(snr, ct, pair, starttime, endtime, freq,
-                   root: str, chunk: int = None):
+def init_timelapse(snr, ct, pair, starttime, endtime, freq, root, n_workers):
     """Init a timelapse dataset.
     """
     # extract times with activity
@@ -279,10 +278,10 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq,
     }
 
     # ignore upper diagonal
-    # mask_upper_triangle(ds)
+    mask_upper_triangle(ds)
 
     # piecewise chunk dataset
-    chunk = chunk or 5
+    chunk = int(np.floor(ds.time1.size/n_workers))
     ds = ds.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
 
     return ds
@@ -292,7 +291,7 @@ def update_timelapse(ds, snr, ct):
     """Update metadata and fill upper triangle
     """
     # fill
-    # fill_upper_triangle(ds)
+    fill_upper_triangle(ds)
 
     # add
     ds['snr'] = snr
@@ -309,7 +308,7 @@ def update_timelapse(ds, snr, ct):
     ds['ct'].encoding = encoding
 
 
-def create_locks(ds, root):
+def create_locks(ds, root, client=None):
     """Initate distributed cc file access locking.
     """
     locks = []
@@ -318,7 +317,7 @@ def create_locks(ds, root):
             nc = xcorr.util.ncfile(pair, time, root)
             if nc not in locks:
                 locks.append(nc)
-    locks = [distributed.Lock(nc) for nc in locks]
+    locks = [distributed.Lock(nc, client=client) for nc in locks]
     return locks
 
 
@@ -346,7 +345,6 @@ def main(argv):
     n_workers = None
     plot = False
     debug = False
-    chunk = None
     scheduler = None
     cluster = None
 
@@ -355,8 +353,7 @@ def main(argv):
             argv,
             'hvp:s:e:f:r:n:c:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'debug', 'chunk=',
-             'scheduler=']
+             'nworkers=', 'help', 'plot', 'debug', 'scheduler=']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -384,8 +381,6 @@ def main(argv):
             plot = True
         elif opt in ('--debug'):
             debug = True
-        elif opt in ('-c', '--chunk='):
-            chunk = int(arg)
         elif opt in ('--scheduler'):
             scheduler = arg
 
@@ -394,7 +389,8 @@ def main(argv):
     starttime = pd.to_datetime(starttime or '2015-01-15')
     endtime = pd.to_datetime(endtime or '2015-01-18')
     root = os.path.abspath(root) if root is not None else os.getcwd()
-    n_workers = n_workers or 1
+    if n_workers is None or n_workers < 1:
+        raise ValueError('--nworkers should be defined!')
 
     # dask client
     # if slurm_jobs > 0:
@@ -407,6 +403,7 @@ def main(argv):
     if scheduler is not None:
         print('dask scheduler:', scheduler)
         client = distributed.Client(scheduler_file=scheduler)
+        client.wait_for_workers(n_workers=n_workers)
     else:
         cluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
@@ -453,26 +450,23 @@ def main(argv):
 
     # init timelapse
     print('.. init timelapse dataset', end=', ')
-    ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root, chunk)
+    ds = init_timelapse(snr, ct, pair, starttime, endtime, freq,
+                        root, n_workers)
     print('dims: pair={pair}, freq={freq}, time={time1}'.format(
         pair=ds.pair.size, freq=ds.freq.size, time1=ds.time1.size,
     ))
     if debug:
         print(ds)
 
-    raise SystemExit
-
-    # # create all locks
-    # print('.. init locks')
-    # locks = create_locks(ds, os.path.join(root, 'cc'))
+    # create all locks
+    print('.. init locks')
+    locks = create_locks(ds, os.path.join(root, 'cc'), client)
 
     # map nodes
     print('.. map and compute blocks')
-    ds = xr.map_blocks(
-        obj=ds,
+    ds = ds.map_blocks(
         func=correlate_spectrograms,
         args=[os.path.join(root, 'cc')],
-        kwargs={'client': client},
         template=ds,
     ).compute(client=client)
 
@@ -516,7 +510,6 @@ def main(argv):
     client.close()
     if cluster is not None:
         cluster.close()
-    # locks = None
 
     print('.. done')
 
