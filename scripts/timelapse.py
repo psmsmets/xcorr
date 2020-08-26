@@ -93,7 +93,8 @@ def get_spectrogram(pair, time, root: str, client: distributed.Client = None):
     return psd
 
 
-def correlate_spectrograms(obj, root: str, client: distributed.Client = None):
+def correlate_spectrograms(obj, root: str, client: distributed.Client = None,
+                           **kwargs):
     """Correlate spectrograms.
     """
     # already set?
@@ -349,7 +350,6 @@ def main(argv):
     chunk = None
     scheduler = None
     cluster = None
-    # slurm_jobs = None
 
     try:
         opts, args = getopt.getopt(
@@ -357,7 +357,7 @@ def main(argv):
             'hvp:s:e:f:r:n:c:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
              'nworkers=', 'help', 'plot', 'debug', 'chunk=',
-             'scheduler=', 'slurm-jobs=']
+             'scheduler=']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -389,8 +389,6 @@ def main(argv):
             chunk = int(arg)
         elif opt in ('--scheduler'):
             scheduler = arg
-        # elif opt in ('--slurm-jobs'):
-        #     slurm_jobs = int(arg or 1)
 
     pair = pair or ''
     freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
@@ -417,7 +415,7 @@ def main(argv):
         print('dask LocalCluster:', cluster)
         client = distributed.Client(cluster)
 
-    calc_exec_options = dict(
+    compute_options = dict(
         # prompt_verify=True,
         # parallelize=True,
         client=client,
@@ -476,31 +474,31 @@ def main(argv):
 
     # map nodes
     print('.. map blocks')
-    mapped = ds.map_blocks(
-        correlate_spectrograms,
+    ds = ds.map_blocks(
+        func=correlate_spectrograms,
         args=[os.path.join(root, 'cc')],
         kwargs={'client': client},
         template=ds,
     )
 
-    # load results
+    # load dss
     print('.. compute blocks')
-    result = mapped.compute(**calc_exec_options)
+    ds = ds.compute(**compute_options)
 
     # update metadata
     print('.. update metadata')
-    update_timelapse(result, snr, ct)
+    update_timelapse(ds, snr, ct)
     if debug:
-        print(result)
+        print(ds)
 
     # to netcdf (check if all parameters are logged!)
     nc = os.path.join(root, 'timelapse', 'timelapse_{}_{}_{}.nc'.format(
         'all' if pair == '' else pair,
-        str(result.time[0].dt.strftime('%Y%j').values),
-        str(result.time[-1].dt.strftime('%Y%j').values),
+        str(ds.time[0].dt.strftime('%Y%j').values),
+        str(ds.time[-1].dt.strftime('%Y%j').values),
     ))
     print(f'.. write to "{nc}"')
-    xcorr.write(result, nc, verb=1 if debug else 0)
+    xcorr.write(ds, nc, verb=1 if debug else 0)
 
     # plot?
     if plot:
@@ -509,17 +507,17 @@ def main(argv):
 
         # plot cc
         plt.figure()
-        result.cc.isel(pair=-1).plot(vmin=0, **plotset)
+        ds.cc.isel(pair=-1).plot(vmin=0, **plotset)
         plt.show()
 
         # plot delta_lag
         plt.figure()
-        result.delta_lag.isel(pair=-1).plot(robust=True, **plotset)
+        ds.delta_lag.isel(pair=-1).plot(robust=True, **plotset)
         plt.show()
 
         # plot delta_freq
         plt.figure()
-        result.delta_freq.isel(pair=-1).plot(robust=True, **plotset)
+        ds.delta_freq.isel(pair=-1).plot(robust=True, **plotset)
         plt.show()
 
     # cleanup
