@@ -29,7 +29,7 @@ import xcorr
 # Local functions
 # ---------------
 
-def get_spectrogram(pair, time, root: str, client: distributed.Client = None):
+def get_spectrogram(pair, time, root, client=None):
     """Load spectrogram for a pair and time.
     """
     # construct abs path and filename
@@ -38,7 +38,7 @@ def get_spectrogram(pair, time, root: str, client: distributed.Client = None):
     # select pair time location
     item = {'pair': pair, 'time': time}
 
-    # # set lock
+    # set lock
     lock = distributed.Lock(nc, client=client)
     lock.acquire()
 
@@ -93,8 +93,7 @@ def get_spectrogram(pair, time, root: str, client: distributed.Client = None):
     return psd
 
 
-def correlate_spectrograms(obj, root: str, client: distributed.Client = None,
-                           **kwargs):
+def correlate_spectrograms(obj, root, client=None, **kwargs):
     """Correlate spectrograms.
     """
     # already set?
