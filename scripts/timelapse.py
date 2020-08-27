@@ -282,7 +282,7 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root, n_workers):
 
     # piecewise chunk dataset
     chunk = int(np.floor(ds.time1.size/n_workers))
-    ds = ds.chunk({'time1': chunk, 'time2': chunk})
+    ds = ds.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
 
     return ds
 
