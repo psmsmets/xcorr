@@ -168,7 +168,7 @@ def correlate_spectrograms(obj, root):
     return obj
 
 
-def mask_upper_triangle(ds):
+def _mask_upper_triangle(ds):
     """Mark upper triangle (one offset)
     """
     ind1, ind2 = np.triu_indices(ds.time1.size, 1)
@@ -179,7 +179,7 @@ def mask_upper_triangle(ds):
         }] = np.byte(1)
 
 
-def fill_upper_triangle(ds):
+def _fill_upper_triangle(ds):
     """Fill upper triangle (one offset)
     """
     ind1, ind2 = np.triu_indices(ds.time1.size, 1)
@@ -291,11 +291,12 @@ def create_locks(ds, root, client=None):
 
 
 def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
-                                     n_workers: int):
+                                     n_workers: int, sparse: bool = True):
     """Correlate spectrograms on a Dask client
     """
     # ignore upper triangle
-    mask_upper_triangle(ds)
+    if sparse:
+        _mask_upper_triangle(ds)
 
     # chunk
     chunk = int(np.floor(ds.time1.size/n_workers))
@@ -315,7 +316,8 @@ def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
     ds = mapped.load()
 
     # fill upper triangle
-    fill_upper_triangle(ds)
+    if sparse:
+        _fill_upper_triangle(ds)
 
     return ds
 
@@ -344,6 +346,7 @@ def main(argv):
     n_workers = None
     plot = False
     debug = False
+    sparse = True
     scheduler = None
     cluster = None
 
@@ -352,7 +355,7 @@ def main(argv):
             argv,
             'hvp:s:e:f:r:n:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'debug', 'scheduler=']
+             'nworkers=', 'help', 'plot', 'debug', 'redundant', 'scheduler=']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -380,6 +383,8 @@ def main(argv):
             plot = True
         elif opt in ('--debug'):
             debug = True
+        elif opt in ('--redundant'):
+            sparse = False
         elif opt in ('--scheduler'):
             scheduler = arg
 
@@ -457,7 +462,7 @@ def main(argv):
 
     # persist to client
     print('.. map and compute blocks')
-    ds = correlate_spectrograms_on_client(ds, root, n_workers)
+    ds = correlate_spectrograms_on_client(ds, root, n_workers, sparse)
 
     # update metadata
     print('.. extend dataset with snr and triggers')
