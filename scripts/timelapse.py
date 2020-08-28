@@ -140,13 +140,14 @@ def correlate_spectrograms(obj, root):
                         )
 
                         # correlate psd's
-                        cc = xcorr.signal.correlate2d(in1, in2)
+                        cc2 = xcorr.signal.correlate2d(in1, in2)
 
                         # split dims
-                        dim1, dim2 = cc.dims[-2:]
+                        dim1, dim2 = cc2.dims[-2:]
 
                         # get max index
-                        amax1, amax2 = np.unravel_index(cc.argmax(), cc.shape)
+                        amax1, amax2 = np.unravel_index(cc2.argmax(),
+                                                        cc2.shape)
 
                         # store values in object
                         item = {
@@ -156,10 +157,10 @@ def correlate_spectrograms(obj, root):
                             'time2': time2,
                         }
                         obj['status'].loc[item] = np.byte(1)
-                        obj['cc'].loc[item] = cc.isel({dim1: amax1,
-                                                       dim2: amax2})
-                        obj[dim1].loc[item] = cc[dim1][amax1]
-                        obj[dim2].loc[item] = cc[dim2][amax2]
+                        obj['cc2'].loc[item] = cc2.isel({dim1: amax1,
+                                                         dim2: amax2})
+                        obj[dim1].loc[item] = cc2[dim1][amax1]
+                        obj[dim2].loc[item] = cc2[dim2][amax2]
 
                 except Exception:
                     continue
@@ -187,7 +188,7 @@ def fill_upper_triangle(ds):
         time2 = ds.time2[ind2[i]]
         triu = {'time1': time1, 'time2': time2}
         tril = {'time1': time2, 'time2': time1}
-        ds.cc.loc[triu] = ds.cc.loc[tril]
+        ds.cc2.loc[triu] = ds.cc2.loc[tril]
         ds.delta_freq.loc[triu] = -ds.delta_freq.loc[tril]
         ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
 
@@ -218,8 +219,8 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
         dims=('freq'),
         coords=(np.mean(freq, axis=1),),
         attrs={
-            'long_name': 'Frequency',
-            'standard_name': 'frequency',
+            'long_name': 'Center Frequency',
+            'standard_name': 'center_frequency',
             'units': 's-1',
         },
     )
@@ -230,7 +231,7 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
         dims=('freq'),
         coords=(ds.freq,),
         attrs={
-            'long_name': 'Frequency bandwidth',
+            'long_name': 'Frequency Bandwidth',
             'standard_name': 'frequency_bandwidth',
             'units': 's-1',
         },
@@ -248,10 +249,10 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
         },
     )
 
-    ds['cc'] = ds.status.astype(np.float64) * 0
-    ds['cc'].attrs = {
-        'long_name': 'Crosscorrelation Estimate',
-        'standard_name': 'crosscorrelation_estimate',
+    ds['cc2'] = ds.status.astype(np.float64) * 0
+    ds['cc2'].attrs = {
+        'long_name': 'Two-dimensional Crosscorrelation Estimate',
+        'standard_name': '2d_crosscorrelation_estimate',
         'units': '-',
         'add_offset': np.float64(0.),
         'scale_factor': np.float64(1.),
@@ -323,8 +324,8 @@ def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
 def help(e=None):
     """
     """
-    print('timelapse.py -p <pair> -s <starttime>  -e <endtime> -r <root> '
-          '-n <nworkers>')
+    print('timelapse.py -p<pair> -s<starttime>  -e<endtime> -r<root> '
+          '-n <nworkers> --help --plot --debug --scheduler=<scheduler-file>')
     raise SystemExit(e)
 
 
@@ -346,7 +347,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(
             argv,
-            'hvp:s:e:f:r:n:c:',
+            'hvp:s:e:f:r:n:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
              'nworkers=', 'help', 'plot', 'debug', 'scheduler=']
         )
