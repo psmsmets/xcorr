@@ -289,40 +289,32 @@ def create_locks(ds, root, client=None):
     return locks
 
 
-def correlate_spectrograms_on_client(
-    ds: xr.Dataset, client: distributed.Client, root: str,
-    n_workers: int = None
-):
+def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
+                                     n_workers: int):
     """Correlate spectrograms on a Dask client
     """
 
-    # ignore upper triangle 
+    # ignore upper triangle
     mask_upper_triangle(ds)
-
-    # total number of workers
-    n_workers = n_workers or sum(client.ncores().values())
 
     # chunk
     chunk = int(np.floor(ds.time1.size/n_workers))
     ds = ds.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
 
-    # map
+    # map and persists to client
     mapped = ds.map_blocks(
         correlate_spectrograms,
         args=[os.path.join(root, 'cc')],
-        template=ds
-    )
-
-    # persist to client
-    future = client.persist(mapped)
+        template=ds,
+    ).persist()
 
     # load dask to xarray (force await on async)
-    result = future.compute()  # better than .load()?
+    ds = mapped.load()
 
     # fill upper triangle
-    fill_upper_triangle(result)
+    fill_upper_triangle(ds)
 
-    return result
+    return ds
 
 
 ###############################################################################
@@ -395,7 +387,7 @@ def main(argv):
     root = os.path.abspath(root) if root is not None else os.getcwd()
 
     if n_workers is None or n_workers < 1:
-        raise ValueError('--nworkers should be defined!')
+        raise ValueError('--nworkers should be defined and greater than zero!')
 
     if scheduler is not None:
         print('dask scheduler:', scheduler)
@@ -462,7 +454,7 @@ def main(argv):
 
     # persist to client
     print('.. map and compute blocks')
-    ds = correlate_spectrograms_on_client(ds, client, root)
+    ds = correlate_spectrograms_on_client(ds, root, n_workers)
 
     # update metadata
     print('.. extend dataset with snr and triggers')
