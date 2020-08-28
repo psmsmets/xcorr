@@ -293,13 +293,12 @@ def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
                                      n_workers: int):
     """Correlate spectrograms on a Dask client
     """
-
     # ignore upper triangle
     mask_upper_triangle(ds)
 
     # chunk
     chunk = int(np.floor(ds.time1.size/n_workers))
-    ds = ds.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
+    ds = ds.chunk({'time1': chunk, 'time2': chunk})
 
     # map and persists to client
     mapped = ds.map_blocks(
