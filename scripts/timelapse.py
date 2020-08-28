@@ -302,14 +302,14 @@ def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
     ds = ds.chunk({'time1': chunk, 'time2': chunk})
 
     # map and persists to client
-    mapped = ds.map_blocks(
+    ds = ds.map_blocks(
         correlate_spectrograms,
         args=[os.path.join(root, 'cc')],
         template=ds,
     ).persist()
 
-    # load dask to xarray (force await on async)
-    ds = mapped.load()
+    # force await on async
+    distributed.wait(ds)
 
     # fill upper triangle
     fill_upper_triangle(ds)
