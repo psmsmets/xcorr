@@ -196,7 +196,7 @@ def fill_upper_triangle(ds):
         ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
 
 
-def init_timelapse(snr, ct, pair, starttime, endtime, freq, root, n_workers):
+def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
     """Init a timelapse dataset.
     """
     # extract times with activity
@@ -277,35 +277,7 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root, n_workers):
         'units': 's',
     }
 
-    # ignore upper diagonal
-    mask_upper_triangle(ds)
-
-    # piecewise chunk dataset
-    chunk = int(np.floor(ds.time1.size/n_workers))
-    ds = ds.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
-
     return ds
-
-
-def update_timelapse(ds, snr, ct):
-    """Update metadata and fill upper triangle
-    """
-    # fill
-    fill_upper_triangle(ds)
-
-    # add
-    ds['snr'] = snr
-    ds['ct'] = ct
-
-    # set encoding
-    encoding = {'zlib': True, 'complevel': 9}
-
-    ds['status'].encoding = encoding
-    ds['cc'].encoding = encoding
-    ds['delta_freq'].encoding = encoding
-    ds['delta_lag'].encoding = encoding
-    ds['snr'].encoding = encoding
-    ds['ct'].encoding = encoding
 
 
 def create_locks(ds, root, client=None):
@@ -319,6 +291,42 @@ def create_locks(ds, root, client=None):
                 locks.append(nc)
     locks = [distributed.Lock(nc, client=client) for nc in locks]
     return locks
+
+
+def correlate_spectrograms_on_client(
+    ds: xr.Dataset, client: distributed.Client, root: str,
+    n_workers: int = None
+):
+    """Correlate spectrograms on a Dask client
+    """
+
+    # ignore upper diagonal
+    mask_upper_triangle(ds)
+
+    # total number of workers
+    n_workers = n_workers or sum(client.ncores().values())
+
+    # chunk
+    chunk = int(np.floor(ds.time1.size/n_workers))
+    ds = ds.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
+
+    # map
+    mapped = ds.map_blocks(
+        correlate_spectrograms,
+        args=[os.path.join(root, 'cc')],
+        template=ds
+    )
+
+    # persist to client
+    future = client.persist(mapped)
+
+    # load dask to xarray (force await on async)
+    result = future.load()
+
+    # fill upper triangle
+    fill_upper_triangle(result)
+
+    return result
 
 
 ###############################################################################
@@ -389,17 +397,10 @@ def main(argv):
     starttime = pd.to_datetime(starttime or '2015-01-15')
     endtime = pd.to_datetime(endtime or '2015-01-18')
     root = os.path.abspath(root) if root is not None else os.getcwd()
+
     if n_workers is None or n_workers < 1:
         raise ValueError('--nworkers should be defined!')
 
-    # dask client
-    # if slurm_jobs > 0:
-    #     print(f'dask-jobqueue slurm (jobs = {slurm_jobs})')
-    #     if dask_jobqueue is False:
-    #         raise RuntimeError('dask_jobqueue module is required.')
-    #     cluster = dask_jobqueue.SLURMCluster(name='timelapse')
-    #     cluster.scale(jobs=slurm_jobs)
-    #     client = distributed.Client(cluster)
     if scheduler is not None:
         print('dask scheduler:', scheduler)
         client = distributed.Client(scheduler_file=scheduler)
@@ -421,7 +422,7 @@ def main(argv):
     print('{:>25} : {}'.format('endtime', endtime))
 
     # snr
-    print('.. signal-to-noise ratio')
+    print('.. load signal-to-noise ratio')
     snr = xr.merge([xr.open_dataarray(f) for f in
                     glob(os.path.join(root, 'snr', 'snr_20??.nc'))]).snr
     snr = snr.where(
@@ -436,7 +437,7 @@ def main(argv):
         print(snr)
 
     # get confindence triggers
-    print('.. coincidence trigger', end=', ')
+    print('.. get coincidence triggers', end=', ')
     ct = xcorr.signal.coincidence_trigger(
         snr, thr_on=10., extend=0, thr_coincidence_sum=None,
     )
@@ -464,28 +465,30 @@ def main(argv):
     print('.. init locks')
     locks = create_locks(ds, os.path.join(root, 'cc'), client)
 
-    # map nodes
+    # persist to client
     print('.. map and compute blocks')
-    ds = ds.map_blocks(
-        func=correlate_spectrograms,
-        args=[os.path.join(root, 'cc')],
-        template=ds,
-    ).compute(client=client)
+    ds = correlate_spectrograms_on_client(ds, client, root)
 
     # update metadata
-    print('.. update metadata')
-    update_timelapse(ds, snr, ct)
+    print('.. extend dataset with snr and triggers')
+    ds['snr'] = snr
+    ds['ct'] = ct
     if debug:
         print(ds)
 
-    # to netcdf (check if all parameters are logged!)
+    # to netcdf
     nc = os.path.join(root, 'timelapse', 'timelapse_{}_{}_{}.nc'.format(
         'all' if pair == '' else pair,
         str(ds.time[0].dt.strftime('%Y%j').values),
         str(ds.time[-1].dt.strftime('%Y%j').values),
     ))
     print(f'.. write to "{nc}"')
-    xcorr.write(ds, nc, verb=1 if debug else 0)
+    xcorr.write(
+        data=ds,
+        path=nc,
+        variable_encoding=dict(zlib=True, complevel=9),
+        verb=1 if debug else 0,
+    )
 
     # plot?
     if plot:

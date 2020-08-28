@@ -335,7 +335,7 @@ def init(
             'bias_correct': np.byte(unbiased_cc),
             'unbiased': np.byte(0),
         },
-        encoding
+        encoding,
     )
 
     if unbiased_cc:
@@ -837,6 +837,7 @@ def validate_list(
 def write(
     data, path: str, close: bool = True,
     force_write: bool = False, engine: str = None,
+    variable_encoding: dict = None,
     hash_data: bool = True, verb: int = 1, **kwargs
 ):
     """
@@ -866,6 +867,9 @@ def write(
         Set the xarray engine to read the file. Defaults to h5netcdf if the
         module is found instead of netcdf4.
 
+    variable_encoding : `dict`, optional
+        Set the same encoding for all non-coordinate variables.
+
     hash_data : `bool`, optional
         Hash the data of each variable in the dataset or dataarray.
         Defaults to `True`.
@@ -877,6 +881,7 @@ def write(
     :func:`xarray.to_netcdf`.
 
     """
+    # check
     isdataset = isinstance(data, xr.Dataset)
 
     if not (isdataset or isinstance(data, xr.DataArray)):
@@ -948,6 +953,16 @@ def write(
 
     if 'pair' in data.dims:
         preprocess_operations_to_json(data.pair)
+
+    # update encoding on all variables
+    if isinstance(variable_encoding, dict):
+        if isinstance(data, xr.Dataset):
+            for var in data.variables:
+                if var in data.dims:
+                    continue
+                data[var].encoding = variable_encoding
+        else:
+            data.encoding = variable_encoding
 
     # write to temporary file
     if verb > 0:
