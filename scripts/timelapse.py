@@ -317,7 +317,7 @@ def correlate_spectrograms_on_client(
     future = client.persist(mapped)
 
     # load dask to xarray (force await on async)
-    result = future.load()
+    result = future.compute()  # better than .load()?
 
     # fill upper triangle
     fill_upper_triangle(result)
