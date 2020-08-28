@@ -19,10 +19,6 @@ import os
 import sys
 import getopt
 import xcorr
-# try:
-#     import dask_jobqueue
-# except ModuleNotFoundError:
-#     dask_jobqueue = False
 
 
 ###############################################################################
@@ -300,7 +296,7 @@ def correlate_spectrograms_on_client(
     """Correlate spectrograms on a Dask client
     """
 
-    # ignore upper diagonal
+    # ignore upper triangle 
     mask_upper_triangle(ds)
 
     # total number of workers
@@ -453,8 +449,7 @@ def main(argv):
 
     # init timelapse
     print('.. init timelapse dataset', end=', ')
-    ds = init_timelapse(snr, ct, pair, starttime, endtime, freq,
-                        root, n_workers)
+    ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root)
     print('dims: pair={pair}, freq={freq}, time={time1}'.format(
         pair=ds.pair.size, freq=ds.freq.size, time1=ds.time1.size,
     ))
