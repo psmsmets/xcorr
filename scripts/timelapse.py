@@ -15,6 +15,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import distributed
 from glob import glob
+from time import sleep
 import os
 import sys
 import getopt
@@ -94,10 +95,13 @@ def correlate_spectrograms(obj, root):
     """
     # already set?
     if obj.status.all():
+        sleep(.2)  # give scheduler and worker some time
         return obj
 
     # test if object is loaded
+        return obj
     if not (obj.freq.any() and obj.pair.any()):
+        sleep(.2)  # give scheduler and worker some time
         return obj
 
     # process per item
