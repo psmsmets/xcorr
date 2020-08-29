@@ -291,7 +291,7 @@ def create_locks(ds, root, client=None):
 
 
 def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
-                                     n_workers: int, sparse: bool = True):
+                                     n_workers: int, sparse: bool = False):
     """Correlate spectrograms on a Dask client
     """
     # ignore upper triangle
@@ -346,7 +346,7 @@ def main(argv):
     n_workers = None
     plot = False
     debug = False
-    sparse = True
+    sparse = False
     scheduler = None
     cluster = None
 
@@ -355,7 +355,7 @@ def main(argv):
             argv,
             'hvp:s:e:f:r:n:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'debug', 'redundant', 'scheduler=']
+             'nworkers=', 'help', 'plot', 'debug', 'sparse', 'scheduler=']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -383,8 +383,8 @@ def main(argv):
             plot = True
         elif opt in ('--debug'):
             debug = True
-        elif opt in ('--redundant'):
-            sparse = False
+        elif opt in ('--sparse'):
+            sparse = True
         elif opt in ('--scheduler'):
             scheduler = arg
 
