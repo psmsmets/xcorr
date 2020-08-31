@@ -34,7 +34,7 @@ def get_spectrogram(pair, time, root):
 
     # set lock
     lock = distributed.Lock(nc)
-    lock.acquire(timeout='20s')
+    lock.acquire(timeout='15s')
 
     # get data from disk
     ds, ok = False, False
@@ -80,6 +80,9 @@ def get_spectrogram(pair, time, root):
 
     # spectrogram
     psd = xcorr.signal.spectrogram(cc, duration=2., padding_factor=4)
+
+    # clear
+    cc, ds = None, None
 
     return psd
 
