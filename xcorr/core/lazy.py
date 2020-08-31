@@ -48,16 +48,11 @@ def single_threaded_process(
     # filename
     nc = util.ncfile(pair, time, root)
 
+    # open and update
     if not force_fresh:
-
-        # open
         data = core.read(nc, fast=True)
-
-        # update
         if data and np.all(data.status.values == 1):
-
             data.close()
-
             return True
 
     # create
@@ -81,11 +76,9 @@ def single_threaded_process(
         **kwargs
     )
 
-    # Save
+    # save
     if data and np.any(data.status.values == 1):
-
         core.write(data, nc, verb=verb)
-
         return True
 
     return False
@@ -134,7 +127,7 @@ def lazy_processes(
         List with :class:`dask.delayed` function calls.
 
     """
-    results = []
+    tasks = []
 
     for pair in pairs:
 
@@ -145,7 +138,6 @@ def lazy_processes(
             'time': preprocessing.time[0],
         }] == 1
         preprocessing_passed = np.all(pair_preprocessing.values == 1)
-        preprocessing_status = 'passed' if preprocessing_passed else 'failed'
 
         # substituted receivers
         receivers = util.receiver.split_pair(pair, substitute=True,
@@ -153,14 +145,14 @@ def lazy_processes(
 
         for time in times:
 
+            # pair time
             if verb > 0:
-
-                print('    Check {} {}'.format(pair, time), end='. ')
+                print('    {} {}'.format(pair, time), end='. ')
 
             # preprocessing status
             if verb > 2:
-
-                print('Preprocessing', preprocessing_status)
+                print('Preprocessing:',
+                      'ok' if preprocessing_passed else 'failed', end='. ')
 
             # check availability
             start = time - pd.offsets.DateOffset(
@@ -180,28 +172,28 @@ def lazy_processes(
 
             # availability status
             if verb > 2:
-
-                print('Availability',
-                      'passed' if availability_passed else 'failed', end='. ')
+                print('Availability:',
+                      'ok' if availability_passed else 'failed', end='. ')
 
             # preprocessing and availability passed
             if preprocessing_passed and availability_passed:
 
                 if verb > 0:
-
-                    print('Add lazy process.')
-                result = single_threaded_process(
+                    print('Add.')
+                task = single_threaded_process(
                     pair, time, init_args, verb=verb, **kwargs
                 )
-                results.append(result)
+                tasks.append(task)
 
             else:
 
                 if verb > 0:
-
                     print('Skip.')
+    
+    if len(tasks) == 0:
+        raise RuntimeError('No lazy processes added.')
 
-    return results
+    return tasks
 
 
 def lazy_process(
@@ -246,7 +238,7 @@ def lazy_process(
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 1.
 
-    dask_client : `str`, optional
+    dask_client : :class:`distributed.Client`, optional
         Specify a Dask client. If `None` (default), the currently active client
         will be used.
 
@@ -321,7 +313,7 @@ def lazy_process(
         substitute=True,
         parallel=True,
         download=download,
-        verb=verb-1,
+        verb=verb,
     )
 
     # -------------------------------------------------------------------------
@@ -334,12 +326,9 @@ def lazy_process(
     nofrec = len(availability.receiver)
 
     for time in availability.time[extend_days:-extend_days]:
-
         if np.sum(availability.loc[{'time': time}].values == 1) == nofrec:
             break
-
     else:
-
         raise RuntimeError(
             'Your pairs contain a receiver without data availability...'
         )
@@ -355,7 +344,7 @@ def lazy_process(
         sampling_rate=init_args['sampling_rate'],
         download=False,
         parallel=True,
-        verb=verb-1,
+        verb=verb,
     )
 
     # -------------------------------------------------------------------------
@@ -364,19 +353,18 @@ def lazy_process(
     if verb > 0:
         print('-'*79)
         print('Process')
-    print(dask_client)
-    return
-    futures = dask_client.persist(
+    results = dask_client.compute(
         lazy_processes(
             pairs, times, availability, preprocessing, init_args,
             client=xcorr_client, inventory=inventory, root=root,
-            force_fresh=force_fresh, verb=verb, **kwargs
-        )
+            force_fresh=force_fresh, verb=verb-1, **kwargs
+        ),
+        allow_other_workers=True,
     )
-    results = dask_client.gather(futures)
-    print(results)  # test, remove !!!
-    results = results[0]  # unpack tuple (only one variable returned)
-    completed = sum(results)
+    distributed.wait(results)
+    results = dask_client.gather(results)
+
+    completed = sum(results) if len(results) > 0 else 0
     pcnt = 100 * completed / len(results) if len(results) > 0 else 0.
     if verb > 0:
         print('    Completed : {} of {} ({:.1f}%)'

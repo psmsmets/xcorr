@@ -10,6 +10,8 @@ xcorr lazy client data availability and preprocessing evaluation.
 from pandas import date_range
 from obspy import read_inventory
 from xcorr import lazy_process
+from shutil import rmtree
+import distributed
 
 
 ##############################################################################
@@ -130,15 +132,15 @@ xcorr_client_args = {
 # -----------------------------------------------------------------------------
 pairs = [
     'IM.H10N1..EDH-IU.RAR.10.BHZ',
-    'IM.H10N2..EDH-IU.RAR.10.BHZ',
-    'IM.H10N3..EDH-IU.RAR.10.BHZ',
-    'IM.H03S1..EDH-IU.RAR.10.BHZ',
-    'IM.H03S2..EDH-IU.RAR.10.BHZ',
-    'IM.H03S3..EDH-IU.RAR.10.BHZ',
-    'IM.H10N1..EDH-IU.RAR.10.BHR',
+    # 'IM.H10N2..EDH-IU.RAR.10.BHZ',
+    # 'IM.H10N3..EDH-IU.RAR.10.BHZ',
+    # 'IM.H03S1..EDH-IU.RAR.10.BHZ',
+    # 'IM.H03S2..EDH-IU.RAR.10.BHZ',
+    # 'IM.H03S3..EDH-IU.RAR.10.BHZ',
+    # 'IM.H10N1..EDH-IU.RAR.10.BHR',
     # 'IM.H10N2..EDH-IU.RAR.10.BHR',
     # 'IM.H10N3..EDH-IU.RAR.10.BHR',
-    'IM.H03S1..EDH-IU.RAR.10.BHR',
+    # 'IM.H03S1..EDH-IU.RAR.10.BHR',
     # 'IM.H03S2..EDH-IU.RAR.10.BHR',
     # 'IM.H03S3..EDH-IU.RAR.10.BHR',
 ]
@@ -147,7 +149,7 @@ pairs = [
 # times : `pandas.data_range`
 #     Date range from start to end with ``freq``='D'.
 # -----------------------------------------------------------------------------
-times = date_range(start='2015-01-15', end='2015-01-20', freq='1D')
+times = date_range(start='2015-01-15', end='2015-01-16', freq='1D')
 
 # -----------------------------------------------------------------------------
 # inventory : :class:`obspy.Inventory`, optional
@@ -171,5 +173,19 @@ root = '../../data/cc'
 #
 ##############################################################################
 
+# start a local cluster
+cluster = distributed.LocalCluster(
+    processes=False, n_workers=2, threads_per_worker=1,
+)
+
+# start a client
+client = distributed.Client(cluster)
+
+# lazy process on client
 lazy_process(pairs, times, xcorr_init_args, xcorr_client_args, inventory, root,
-             threads=1)
+             dask_client=client)
+
+# clean-up
+client.close()
+cluster.close()
+rmtree('dask-worker-space', ignore_errors=True)
