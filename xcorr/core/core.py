@@ -907,8 +907,7 @@ def write(
     # check status?
     if isdataset and 'status' in data.variables:
         if (
-            np.sum(data.status.data == 1) == 0 or
-            (np.sum(data.status.values == -1) == 0 and force_write)
+            not force_write and not np.any(data.status.data == 1)
         ):
             warnings.warn(
                 'Dataset contains no data. No need to save it.',

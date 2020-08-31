@@ -11,11 +11,9 @@ Lazy processing using `xcorr`.
 import numpy as np
 import pandas as pd
 import xarray as xr
-import re
 from obspy import Inventory
-from shutil import rmtree
 import dask
-from dask import distributed
+import distributed
 
 # Relative imports
 from ..version import version
@@ -208,9 +206,9 @@ def lazy_processes(
 
 def lazy_process(
     pairs: list, times: pd.DatetimeIndex, init_args: dict, client_args: dict,
-    inventory: Inventory, root: str, threads: int = None,
-    force_fresh: bool = False, download: bool = True,
-    debug: bool = False, cluster_args: dict = None, **kwargs
+    inventory: Inventory, root: str, force_fresh: bool = False,
+    download: bool = True, verb: int = 1,
+    dask_client: distributed.Client = None, **kwargs
 ):
     """
     Lazy process a lot of data with xcorr and dask.
@@ -234,15 +232,8 @@ def lazy_process(
         Inventory object, including the instrument response.
 
     root : `str`
-        Path to output base directory. A folder will be created for each pair.
-
-    threads : `int`, optional
-        Set the number of threads (if ``debug`` is `False`). Defaults to the
-        maximum processors/threads available.
-
-    progressbar : `bool`, optional
-        If `True` (default), show a progressbar for each evaluation of lazy
-        processes. If ``debug`` is enabled the progressbar is disabled.
+        Path to output base directory. A separate directory will be created
+        for each receiver pair.
 
     force_fresh : `bool`, optional
         If `True`, for a to iniate and process an xcorr data array each step.
@@ -252,9 +243,12 @@ def lazy_process(
         If `True` (default), download missing data on-the-fly during
         the data availability analysis.
 
-    debug : `bool`, optional
-        If `True`, process single threaded with some extra verbosity. Default
-        is `False`.
+    verb : {0, 1, 2, 3, 4}, optional
+        Level of verbosity. Defaults to 1.
+
+    dask_client : `str`, optional
+        Specify a Dask client. If `None` (default), the currently active client
+        will be used.
 
     **kwargs :
         Parameters passed to :func:`lazy_processes`.
@@ -262,67 +256,23 @@ def lazy_process(
     """
 
     # -------------------------------------------------------------------------
-    # Print main config parameters
-    # -------------------------------------------------------------------------
-    print('-'*79)
-    print('Config')
-    print('    results root   :', root)
-    print('    threads        :', 1 if debug else (threads or -1))
-    print('    force_fresh    :', force_fresh)
-    print('    download       :', download)
-    print('    debug          :', debug)
-    print('    xcorr version  :', version)
-
-    # -------------------------------------------------------------------------
     # Dask
     # -------------------------------------------------------------------------
 
-    cluster_args = cluster_args or dict()
+    dask_client = dask_client or distributed.Client()
+    n_workers = sum(dask_client.ncores().values())
 
-    if not isinstance(cluster_args, dict):
-        raise TypeError('cluster_args should be of type dict!')
-
-    # dask compute arguments
-    if debug:
-
-        # allow verbose
-        verb = kwargs['verb'] if 'verb' in kwargs else 1
-
-        # single-threaded
-        cluster_args = dict(processes=False, scheduler='single-threaded')
-
-    else:
-
-        # disable verbose globally
-        verb = 0
-
-        # local cluster expects no processes
-        cluster_args['processes'] = False
-
-        if threads:
-            cluster_args['n_workers'] = threads
-            cluster_args['threads_per_worker'] = 1
-
-    # make sure there is no verb in kwargs
-    if 'verb' in kwargs:
-        kwargs.pop('verb')
-
-    # dask client from cluster
-    dcluster = distributed.LocalCluster(**cluster_args)
-    dclient = distributed.Client(dcluster)
-
-    protocol, workers, threads, memory = re.search(
-        r'\((.*)\)', repr(dcluster)
-    )[1].replace("'", '').split(', ')
-
-    print('-'*79)
-    print('Dask')
-    print('    protocol  :', protocol)
-    print('    workers   :', workers.split('=')[1])
-    print('    threads   :', threads.split('=')[1])
-    print('    memory    :', memory.split('=')[1])
-    print('    dashboard : http://localhost{}'.format(
-          dcluster.scheduler_spec['options']['dashboard_address']))
+    # -------------------------------------------------------------------------
+    # Print main config parameters
+    # -------------------------------------------------------------------------
+    if verb > 0:
+        print('-'*79)
+        print('Config')
+        print('    root           :', root)
+        print('    n_workers      :', n_workers)
+        print('    force_fresh    :', force_fresh)
+        print('    download       :', download)
+        print('    xcorr version  :', version)
 
     # -------------------------------------------------------------------------
     # various inits
@@ -332,11 +282,12 @@ def lazy_process(
     client_args['parallel'] = True
 
     # init the waveform client
-    xclient = Client(**client_args)
+    xcorr_client = Client(**client_args)
 
-    print('-'*79)
-    print('Client')
-    print(xclient)
+    if verb > 0:
+        print('-'*79)
+        print('Client')
+        print(xcorr_client)
 
     # Read and filter inventory
     inventory = util.receiver.get_pair_inventory(pairs, inventory, times)
@@ -344,37 +295,40 @@ def lazy_process(
     # -------------------------------------------------------------------------
     # Print main data parameters
     # -------------------------------------------------------------------------
-    print('-'*79)
-    print('Data')
-    print('    pairs : {}'.format(len(pairs)))
-
     extend_days = 1
 
-    for p in pairs:
-        print('        {}'.format(p))
+    if verb > 0:
+        print('-'*79)
+        print('Data')
+        print('    pairs : {}'.format(len(pairs)))
 
-    print('    times : {}'.format(len(times)))
-    print('        start  : {}'.format(times[0]))
-    print('        end    : {}'.format(times[-1]))
-    print('        extend : {} day(s)'.format(extend_days))
+        for p in pairs:
+            print('        {}'.format(p))
+
+        print('    times : {}'.format(len(times)))
+        print('        start  : {}'.format(times[0]))
+        print('        end    : {}'.format(times[-1]))
+        print('        extend : {} day(s)'.format(extend_days))
 
     # -------------------------------------------------------------------------
     # Evaluate data availability (parallel), and try to download missing data
     # -------------------------------------------------------------------------
-    print('-'*79)
+    if verb > 0:
+        print('-'*79)
 
-    availability = xclient.data_availability(
+    availability = xcorr_client.data_availability(
         pairs, times, extend_days=extend_days,
         substitute=True,
         parallel=True,
         download=download,
-        verb=verb or 1,
+        verb=verb-1,
     )
 
     # -------------------------------------------------------------------------
     # Data preprocessing (parallel)
     # -------------------------------------------------------------------------
-    print('-'*79)
+    if verb > 0:
+        print('-'*79)
 
     # init waveform preprocessing status for a day with max availability
     nofrec = len(availability.receiver)
@@ -392,7 +346,7 @@ def lazy_process(
 
     time = pd.to_datetime(time.values)
 
-    preprocessing = xclient.data_preprocessing(
+    preprocessing = xcorr_client.data_preprocessing(
         pairs, time,
         preprocess=init_args['preprocess'],
         inventory=inventory,
@@ -401,32 +355,31 @@ def lazy_process(
         sampling_rate=init_args['sampling_rate'],
         download=False,
         parallel=True,
-        verb=verb or 1,
+        verb=verb-1,
     )
 
     # -------------------------------------------------------------------------
     # Evaluate lazy process list
     # -------------------------------------------------------------------------
-    print('-'*79)
-    print('Process')
-    results = dask.compute(
+    if verb > 0:
+        print('-'*79)
+        print('Process')
+    print(dask_client)
+    return
+    futures = dask_client.persist(
         lazy_processes(
             pairs, times, availability, preprocessing, init_args,
-            client=xclient, inventory=inventory, root=root,
+            client=xcorr_client, inventory=inventory, root=root,
             force_fresh=force_fresh, verb=verb, **kwargs
         )
     )
+    results = dask_client.gather(futures)
+    print(results)  # test, remove !!!
     results = results[0]  # unpack tuple (only one variable returned)
     completed = sum(results)
     pcnt = 100 * completed / len(results) if len(results) > 0 else 0.
-    print('    Completed : {} of {} ({:.1f}%)'
-          .format(completed, len(results), pcnt))
+    if verb > 0:
+        print('    Completed : {} of {} ({:.1f}%)'
+              .format(completed, len(results), pcnt))
 
-    # -------------------------------------------------------------------------
-    # Dask profiler
-    # -------------------------------------------------------------------------
-    if not debug:
-
-        dclient.close()
-        dcluster.close()
-        rmtree('dask-worker-space', ignore_errors=True)
+    return pcnt == 100.
