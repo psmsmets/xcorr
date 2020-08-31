@@ -396,20 +396,19 @@ def main(argv):
         raise ValueError('--nworkers should be defined and greater than zero!')
 
     if scheduler is not None:
-        print('dask scheduler:', scheduler)
+        print('Dask Scheduler:', scheduler)
         client = distributed.Client(scheduler_file=scheduler)
-        print(f'.. waiting for {n_workers} workers', end=', ')
+        print(f'.. waiting for {n_workers} workers', end=' ')
         client.wait_for_workers(n_workers=n_workers)
         print('OK.')
     else:
         cluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
         )
-        print('dask LocalCluster:', cluster)
+        print('Dask LocalCluster:', cluster)
         client = distributed.Client(cluster)
+        print('Dask Client:', client)
 
-    print('Dask client:', client)
-    print('Dask dashboard:', client.dashboard_link)
     print('{:>25} : {}'.format('root', root))
     print('{:>25} : {}'.format('pair', pair))
     print('{:>25} : {}'.format('starttime', starttime))
