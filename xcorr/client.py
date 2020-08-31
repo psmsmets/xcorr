@@ -318,7 +318,7 @@ class Client(object):
         # get sds write lock
         if locked:
             lock = distributed.Lock(stream[0].id)
-            lock.acquire()
+            lock.acquire(timeout='10s')
 
         # add to archive
         try:
@@ -594,7 +594,7 @@ class Client(object):
         # get sds write lock
         if locked:
             lock = distributed.Lock(receiver)
-            lock.acquire()
+            lock.acquire(timeout='10s')
 
         # feedback
         if verb > 0:

@@ -34,7 +34,7 @@ def get_spectrogram(pair, time, root):
 
     # set lock
     lock = distributed.Lock(nc)
-    lock.acquire(timeout='15s')
+    lock.acquire(timeout='10s')
 
     # get data from disk
     ds, ok = False, False
