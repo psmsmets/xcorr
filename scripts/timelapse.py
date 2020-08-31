@@ -32,32 +32,19 @@ def get_spectrogram(pair, time, root):
     # construct abs path and filename
     nc = xcorr.util.ncfile(pair, time, root)
 
-    # select pair time location
-    item = {'pair': pair, 'time': time}
-
     # set lock
     lock = distributed.Lock(nc)
-    lock.acquire()
+    lock.acquire(timeout='20s')
 
     # get data from disk
-    ds = None
-    ok = False
+    ds, ok = False, False
     try:
-        # read file
         ds = xcorr.read(nc, fast=True, engine='h5netcdf')
-
-        # success?
-        if ds is not None:
-            # status okay?
-            ok = ds.status.loc[item] == 1
-            # extract data
-            if ok:
-                cc = ds.cc.loc[item].load()
-                lag = ds.lag.load()
-                d_km = ds.distance.loc[{'pair': pair}].values
-                delay = ds.pair_offset.loc[item] + ds.time_offset.loc[item]
-            # close
-            ds.close()
+        ds = ds.loc[{'pair': pair, 'time': time}]
+        ok = ds.status.values.any()
+        if ok:
+            ds.load()
+        ds.close()
     except Exception:
         ds = None
 
@@ -68,19 +55,26 @@ def get_spectrogram(pair, time, root):
     if ds is None or not ok:
         return
 
+    # extract cc
+    cc = ds.cc.where(
+        (ds.lag >= ds.distance/1.495) & (ds.lag <= ds.distance/1.465),
+        drop=True,
+    )
+
     # no valid data?
     if xr.ufuncs.isnan(cc).any():
         return
 
     # process cc
-    cc = cc.where((lag >= d_km/1.495) & (lag <= d_km/1.465), drop=True)
     cc = xcorr.signal.unbias(cc)
     cc = xcorr.signal.detrend(cc)
     cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
     cc = xcorr.signal.taper(cc, max_length=2/3.)
 
     # solve time_offset and pair_offset
-    delay = xcorr.util.time.to_seconds(delay.values)
+    delay = xcorr.util.time.to_seconds(
+        ds.pair_offset.item() + ds.time_offset.item()
+    )
     if delay != 0.:
         cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', pad=True)
 
@@ -95,13 +89,13 @@ def correlate_spectrograms(obj, root):
     """
     # already set?
     if obj.status.all():
-        sleep(.2)  # give scheduler and worker some time
+        sleep(.5)  # give scheduler and worker some time
         return obj
 
     # test if object is loaded
         return obj
     if not (obj.freq.any() and obj.pair.any()):
-        sleep(.2)  # give scheduler and worker some time
+        sleep(.5)  # give scheduler and worker some time
         return obj
 
     # process per item
