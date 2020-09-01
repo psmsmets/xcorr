@@ -292,7 +292,7 @@ def create_locks(ds, root, client=None):
 
 
 def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
-                                     n_workers: int, sparse: bool = False):
+                                     chunk: int, sparse: bool = False):
     """Correlate spectrograms on a Dask client
     """
     # ignore upper triangle
@@ -300,7 +300,7 @@ def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
         _mask_upper_triangle(ds)
 
     # chunk
-    chunk = int(np.floor(ds.time1.size/n_workers))
+    chunk = chunk or 10
     ds = ds.chunk({'time1': chunk, 'time2': chunk})
 
     # map and persists to client
@@ -347,6 +347,7 @@ def main(argv):
     n_workers = None
     plot = False
     debug = False
+    chunk = None
     sparse = False
     scheduler = None
     cluster = None
@@ -354,9 +355,10 @@ def main(argv):
     try:
         opts, args = getopt.getopt(
             argv,
-            'hvp:s:e:f:r:n:',
+            'hvp:s:e:f:r:n:c:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'debug', 'sparse', 'scheduler=']
+             'nworkers=', 'help', 'plot', 'debug', 'chunk=', 'sparse',
+             'scheduler=']
         )
     except getopt.GetoptError as e:
         help(e)
@@ -386,6 +388,8 @@ def main(argv):
             debug = True
         elif opt in ('--sparse'):
             sparse = True
+        elif opt in ('-c', '--chunk='):
+            chunk = int(arg)
         elif opt in ('--scheduler'):
             scheduler = arg
 
@@ -395,18 +399,16 @@ def main(argv):
     endtime = pd.to_datetime(endtime or '2015-01-18')
     root = os.path.abspath(root) if root is not None else os.getcwd()
 
-    if n_workers is None or n_workers < 1:
-        raise ValueError('--nworkers should be defined and greater than zero!')
-
     if scheduler is not None:
         print('Dask Scheduler:', scheduler)
         client = distributed.Client(scheduler_file=scheduler)
-        print(f'.. waiting for {n_workers} workers', end=' ')
-        client.wait_for_workers(n_workers=n_workers)
-        print('OK.')
+        if n_workers:
+            print(f'.. waiting for {n_workers} workers', end=' ')
+            client.wait_for_workers(n_workers=n_workers)
+            print('OK.')
     else:
         cluster = distributed.LocalCluster(
-            processes=False, threads_per_worker=1, n_workers=n_workers,
+            processes=False, threads_per_worker=1, n_workers=n_workers or 4,
         )
         print('Dask LocalCluster:', cluster)
         client = distributed.Client(cluster)
@@ -462,7 +464,7 @@ def main(argv):
 
     # persist to client
     print('.. map and compute blocks')
-    ds = correlate_spectrograms_on_client(ds, root, n_workers, sparse)
+    ds = correlate_spectrograms_on_client(ds, root, chunk, sparse)
 
     # update metadata
     print('.. extend dataset with snr and triggers')
