@@ -27,7 +27,8 @@ __all__ = ['lombscargle']
 
 def lombscargle(
     x: xr.DataArray, f: xr.DataArray, dim: str = None, invert: bool = False,
-    normalize: bool = False, rescale: bool = False, precenter: bool = False,
+    nmin: int = None, normalize: bool = False, rescale: bool = False,
+    precenter: bool = False,
 ):
     """
     Computes the Lomb-Scargle periodogram of an N-D labelled array of data.
@@ -50,6 +51,10 @@ def lombscargle(
 
     invert : `bool`, optional
         Compute the periodogram given the reciprocal ``1/f``, e.g., period.
+
+    nmin : `int`, optional
+        Minimal number of measurements N (excluding NaN) to compute the
+        periodogram. Defaults to `None`.
 
     normalize : `bool`, optional
         Compute normalized periodogram.
@@ -88,19 +93,26 @@ def lombscargle(
     # dim
     dim = dim or x.dims[-1]
     if not isinstance(dim, str):
-        raise TypeError('dim should be a string')
+        raise TypeError('dim should be a string.')
     if dim not in x.dims:
-        raise ValueError(f'x has no dimensions "{dim}"')
+        raise ValueError(f'x has no dimensions "{dim}".')
+
+    # min measurements
+    if nmin is not None and not isinstance(nmin, int):
+        raise TypeError('nmin should be an integer or None.')
 
     # rescale
     rescale = False if normalize else rescale
 
     # lombscargle wrapper to simplify ufunc input
     def _lombscargle(t, x, f, **kwargs):
-        def _pgram_axis(x, t, w, rescale=False, **kwargs):
+        def _pgram_axis(x, t, w, nmin=None, rescale=False, **kwargs):
             valid = ~np.isnan(x)
+            n = sum(valid)
+            if nmin and n < nmin:
+                return np.full_like(w, np.nan)
             pgram = signal.lombscargle(t[valid], x[valid], w, **kwargs)
-            return np.sqrt(pgram*4/sum(valid)) if rescale else pgram
+            return np.sqrt(pgram*4/n) if rescale else pgram
         pgram = np.apply_along_axis(_pgram_axis, -1, x, t, 2*np.pi*f, **kwargs)
         return pgram
 
@@ -114,6 +126,7 @@ def lombscargle(
                            input_core_dims=[[dim], [dim], [f.name]],
                            output_core_dims=[[f.name]],
                            kwargs={
+                               'nmin': nmin,
                                'normalize': normalize,
                                'rescale': rescale,
                                'precenter': precenter
@@ -123,13 +136,8 @@ def lombscargle(
                            **dargs)
 
     # set coordinate and attributes
-    pgram.name = 'pgram'
-    pgram.attrs = {
-        'units': x.attrs['units'],
-        'long_name': 'Lomb-Scargle periodogram',
-        'standard_name': 'periodogram',
-        'from_variable': x.name,
-    }
+    pgram.name = x.name
+    pgram.attrs = x.attrs
     pgram = pgram.assign_coords({f.name: 1./f if invert else f})
 
     # log workflow
@@ -137,6 +145,7 @@ def lombscargle(
         'x': x.name,
         'f': f.name,
         'dim': dim,
+        'nmin': nmin,
         'invert': invert,
         'normalize': normalize,
         'rescale': rescale,
