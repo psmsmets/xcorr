@@ -114,57 +114,61 @@ def correlate_spectrograms(obj, root):
                 }].all():
                     continue
 
+                # reset
+                psd1, psd2 = None, None
+
+                # load cc and compute psd on-the-fly
                 try:
-                    # load cc and compute psd on-the-fly
                     psd1 = get_spectrogram(pair, time1, root)
                     psd2 = get_spectrogram(pair, time2, root)
-
-                    if psd1 is None or psd2 is None:
-                        continue
-
-                    # correlate per freq range
-                    for freq in obj.freq:
-
-                        # set (min, max) frequency
-                        bw = obj.freq_bw.loc[{'freq': freq}]
-                        fmin = (obj.freq - bw/2).values[0]
-                        fmax = (obj.freq + bw/2).values[0]
-
-                        # extract freq
-                        in1 = psd1.where(
-                            (psd1.freq >= fmin) & (psd1.freq < fmax),
-                            drop=True,
-                        )
-                        in2 = psd2.where(
-                            (psd2.freq >= fmin) & (psd2.freq < fmax),
-                            drop=True,
-                        )
-
-                        # correlate psd's
-                        cc2 = xcorr.signal.correlate2d(in1, in2)
-
-                        # split dims
-                        dim1, dim2 = cc2.dims[-2:]
-
-                        # get max index
-                        amax1, amax2 = np.unravel_index(cc2.argmax(),
-                                                        cc2.shape)
-
-                        # store values in object
-                        item = {
-                            'pair': pair,
-                            'freq': freq,
-                            'time1': time1,
-                            'time2': time2,
-                        }
-                        obj['status'].loc[item] = np.byte(1)
-                        obj['cc2'].loc[item] = cc2.isel({dim1: amax1,
-                                                         dim2: amax2})
-                        obj[dim1].loc[item] = cc2[dim1][amax1]
-                        obj[dim2].loc[item] = cc2[dim2][amax2]
-
+                except (KeyboardInterrupt, SystemExit):
+                    raise
                 except Exception:
                     continue
+
+                if psd1 is None or psd2 is None:
+                    continue
+
+                # correlate per freq range
+                for freq in obj.freq:
+
+                    # set (min, max) frequency
+                    bw = obj.freq_bw.loc[{'freq': freq}]
+                    fmin = (obj.freq - bw/2).values[0]
+                    fmax = (obj.freq + bw/2).values[0]
+
+                    # extract freq
+                    in1 = psd1.where(
+                        (psd1.freq >= fmin) & (psd1.freq < fmax),
+                        drop=True,
+                    )
+                    in2 = psd2.where(
+                        (psd2.freq >= fmin) & (psd2.freq < fmax),
+                        drop=True,
+                    )
+
+                    # correlate psd's
+                    cc2 = xcorr.signal.correlate2d(in1, in2)
+
+                    # split dims
+                    dim1, dim2 = cc2.dims[-2:]
+
+                    # get max index
+                    amax1, amax2 = np.unravel_index(cc2.argmax(),
+                                                    cc2.shape)
+
+                    # store values in object
+                    item = {
+                        'pair': pair,
+                        'freq': freq,
+                        'time1': time1,
+                        'time2': time2,
+                    }
+                    obj['status'].loc[item] = np.byte(1)
+                    obj['cc2'].loc[item] = cc2.isel({dim1: amax1,
+                                                     dim2: amax2})
+                    obj[dim1].loc[item] = cc2[dim1][amax1]
+                    obj[dim2].loc[item] = cc2[dim2][amax2]
 
     return obj
 
