@@ -388,7 +388,7 @@ def main(argv):
             debug = True
         elif opt in ('--sparse'):
             sparse = True
-        elif opt in ('-c', '--chunk='):
+        elif opt in ('-c', '--chunk'):
             chunk = int(arg)
         elif opt in ('--scheduler'):
             scheduler = arg
