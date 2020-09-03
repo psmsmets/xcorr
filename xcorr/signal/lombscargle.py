@@ -49,7 +49,7 @@ def lombscargle(
         Defaults to the last dimension of ``x``.
 
     invert : `bool`, optional
-        Invert ``f`` to compute the periodogram, e.g., given period.
+        Compute the periodogram given the reciprocal ``1/f``, e.g., period.
 
     normalize : `bool`, optional
         Compute normalized periodogram.
