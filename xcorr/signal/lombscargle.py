@@ -81,12 +81,9 @@ def lombscargle(
     if f.name is None:
         raise ValueError('f.name cannot be empty.')
 
-    print(f)
     # invert
     if invert:
         f = 1./f
-
-    print(f)
 
     # dim
     dim = dim or x.dims[-1]
