@@ -292,7 +292,7 @@ def create_locks(ds, root, client=None):
 
 
 def correlate_spectrograms_on_client(ds: xr.Dataset, root: str,
-                                     chunk: int, sparse: bool = False):
+                                     chunk: int = None, sparse: bool = False):
     """Correlate spectrograms on a Dask client
     """
     # ignore upper triangle
@@ -463,7 +463,7 @@ def main(argv):
     locks = create_locks(ds, os.path.join(root, 'cc'), client)
 
     # persist to client
-    print('.. map and compute blocks')
+    print(f'.. map and compute blocks: chunk={chunk}, sparse={sparse}')
     ds = correlate_spectrograms_on_client(ds, root, chunk, sparse)
 
     # update metadata
