@@ -34,7 +34,7 @@ def get_spectrogram(pair, time, root):
 
     # set lock
     lock = distributed.Lock(nc)
-    lock.acquire(timeout='10s')
+    lock.acquire(timeout='15s')
 
     # get data from disk
     ds, ok = False, False
@@ -132,43 +132,48 @@ def correlate_spectrograms(obj, root):
                 # correlate per freq range
                 for freq in obj.freq:
 
-                    # set (min, max) frequency
-                    bw = obj.freq_bw.loc[{'freq': freq}]
-                    fmin = (obj.freq - bw/2).values[0]
-                    fmax = (obj.freq + bw/2).values[0]
+                    try:
+                        # set (min, max) frequency
+                        bw = obj.freq_bw.loc[{'freq': freq}]
+                        fmin = (obj.freq - bw/2).values[0]
+                        fmax = (obj.freq + bw/2).values[0]
 
-                    # extract freq
-                    in1 = psd1.where(
-                        (psd1.freq >= fmin) & (psd1.freq < fmax),
-                        drop=True,
-                    )
-                    in2 = psd2.where(
-                        (psd2.freq >= fmin) & (psd2.freq < fmax),
-                        drop=True,
-                    )
+                        # extract freq
+                        in1 = psd1.where(
+                            (psd1.freq >= fmin) & (psd1.freq < fmax),
+                            drop=True,
+                        )
+                        in2 = psd2.where(
+                            (psd2.freq >= fmin) & (psd2.freq < fmax),
+                            drop=True,
+                        )
 
-                    # correlate psd's
-                    cc2 = xcorr.signal.correlate2d(in1, in2)
+                        # correlate psd's
+                        cc2 = xcorr.signal.correlate2d(in1, in2)
 
-                    # split dims
-                    dim1, dim2 = cc2.dims[-2:]
+                        # split dims
+                        dim1, dim2 = cc2.dims[-2:]
 
-                    # get max index
-                    amax1, amax2 = np.unravel_index(cc2.argmax(),
-                                                    cc2.shape)
+                        # get max index
+                        amax1, amax2 = np.unravel_index(cc2.argmax(),
+                                                        cc2.shape)
 
-                    # store values in object
-                    item = {
-                        'pair': pair,
-                        'freq': freq,
-                        'time1': time1,
-                        'time2': time2,
-                    }
-                    obj['status'].loc[item] = np.byte(1)
-                    obj['cc2'].loc[item] = cc2.isel({dim1: amax1,
-                                                     dim2: amax2})
-                    obj[dim1].loc[item] = cc2[dim1][amax1]
-                    obj[dim2].loc[item] = cc2[dim2][amax2]
+                        # store values in object
+                        item = {
+                            'pair': pair,
+                            'freq': freq,
+                            'time1': time1,
+                            'time2': time2,
+                        }
+                        obj['status'].loc[item] = np.byte(1)
+                        obj['cc2'].loc[item] = cc2.isel({dim1: amax1,
+                                                         dim2: amax2})
+                        obj[dim1].loc[item] = cc2[dim1][amax1]
+                        obj[dim2].loc[item] = cc2[dim2][amax2]
+                    except (KeyboardInterrupt, SystemExit):
+                        raise
+                    except Exception:
+                        continue
 
     return obj
 
