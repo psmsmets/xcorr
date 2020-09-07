@@ -26,9 +26,9 @@ __all__ = ['lombscargle']
 
 
 def lombscargle(
-    x: xr.DataArray, f: xr.DataArray, dim: str = None, invert: bool = False,
-    nmin: int = None, normalize: bool = False, rescale: bool = False,
-    precenter: bool = False,
+    x: xr.DataArray, f: xr.DataArray, ordinary: bool = True, dim: str = None,
+    invert: bool = False, nmin: int = None, normalize: bool = False,
+    rescale: bool = False, precenter: bool = False,
 ):
     """
     Computes the Lomb-Scargle periodogram of an N-D labelled array of data.
@@ -41,8 +41,12 @@ def lombscargle(
         The data array with measurement values.
 
     f : :class:`xarray.DataArray`
-        Frequencies of oscillation, i.e., number of cycles per unit time,
-        to compute the periodogram (NOT angular frequencies).
+        Frequencies of oscillation to compute the periodogram.
+
+    ordinary : `bool`
+        If `True` (default) ``f`` are ordinary frequencies, i.e., number of
+        cycles per unit time. Otherwise ``f`` are angular frequencies (default
+        for :func:`scipy.signal.lombscargle`).
 
     dim : `str`, optional
         The coordinate name of ``x`` specifying the sample times to compute
@@ -50,7 +54,7 @@ def lombscargle(
         Defaults to the last dimension of ``x``.
 
     invert : `bool`, optional
-        Compute the periodogram given the reciprocal ``1/f``, e.g., period.
+        Compute the periodogram given the reciprocal ``1/f=T``, e.g., period.
 
     nmin : `int`, optional
         Minimal number of measurements N (excluding NaN) to compute the
@@ -113,7 +117,9 @@ def lombscargle(
                 return np.full_like(w, np.nan)
             pgram = signal.lombscargle(t[valid], x[valid], w, **kwargs)
             return np.sqrt(pgram*4/n) if rescale else pgram
-        pgram = np.apply_along_axis(_pgram_axis, -1, x, t, 2*np.pi*f, **kwargs)
+        pgram = np.apply_along_axis(
+            _pgram_axis, -1, x, t, 2*np.pi*f if ordinary else f, **kwargs
+        )
         return pgram
 
     # dask collection?
