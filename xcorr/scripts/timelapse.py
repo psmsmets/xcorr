@@ -5,6 +5,8 @@ TIMELAPSE
 Two-dimensional crosscorrelation of crosscorrelation spectrograms.
 
 """
+
+# Mandatory imports
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -15,7 +17,13 @@ from time import sleep
 import os
 import sys
 import getopt
+
+# relative imports
 import xcorr
+
+
+__all__ = []
+__name__ = 'xcorr-timelapse'
 
 
 ###############################################################################
@@ -349,7 +357,7 @@ def help(e=None):
     raise SystemExit(e)
 
 
-def main(argv):
+def main():
     """
     """
     # init args
@@ -361,7 +369,7 @@ def main(argv):
     # get args
     try:
         opts, args = getopt.getopt(
-            argv,
+            sys.argv[1:],
             'hvp:s:e:f:r:n:c:',
             ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
              'nworkers=', 'help', 'plot', 'debug', 'chunk=',
@@ -370,10 +378,11 @@ def main(argv):
     except getopt.GetoptError as e:
         help(e)
 
+    # evaluate args
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             help()
-        elif opt in ('v', '--version'):
+        elif opt in ('-v', '--version'):
             print(xcorr.__version__)
             raise SystemExit()
         elif opt in ('-p', '--pair'):
@@ -537,4 +546,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

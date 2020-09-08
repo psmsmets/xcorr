@@ -5,6 +5,8 @@ PSD
 Spectrograms of triggered datasets by snr using dask.
 
 """
+
+# Mandatory imports
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -15,10 +17,13 @@ from glob import glob
 import os
 import sys
 import getopt
+
+# Relative imports
 import xcorr
 
 
 __all__ = []
+__name__ = 'xcorr-snr'
 
 
 ###############################################################################
@@ -187,7 +192,7 @@ def help(e=None):
     raise SystemExit(e)
 
 
-def main(argv):
+def main():
     """
     """
     # init args
@@ -198,7 +203,7 @@ def main(argv):
     # get args
     try:
         opts, args = getopt.getopt(
-            argv,
+            sys.argv[1:],
             'hvp:s:e:f:r:n:c:',
             ['pair=', 'starttime=', 'endtime=', 'root=',
              'nworkers=', 'help', 'plot', 'debug', 'scheduler=']
@@ -310,4 +315,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

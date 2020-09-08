@@ -9,8 +9,10 @@ README = re.sub('----.*marker', '----', README, flags=re.DOTALL)
 
 DESCRIPTION = 'Correlate timeseries in a self-describing N-D labelled dataset'
 
+NAME = 'xcorr'
+
 setup(
-    name='xcorr',
+    name=NAME,
     python_requires='>3.5.0',
     description=DESCRIPTION,
     long_description=README,
@@ -24,7 +26,14 @@ setup(
         'xcorr', 'correlation', 'signal-processing', 'timeseries',
         'stacking', 'obspy', 'xarray'
     ],
-    entry_points={},
+    entry_points={
+        'console_scripts': [
+           # f'{NAME}-cc=xcorr.scripts.cc:main',
+           f'{NAME}-snr=xcorr.scripts.snr:main',
+           f'{NAME}-psd=xcorr.scripts.psd:main',
+           f'{NAME}-timelapse=xcorr.scripts.timelapse:main',
+        ],
+    },
     scripts=[],
     classifiers=[
         'Development Status :: 4 - Beta',
