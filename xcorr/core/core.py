@@ -657,32 +657,33 @@ def validate(
             dataset.close()
             return None
 
-    # compare metadata_hash with template
-    if metadata_hash and dataset.sha256_hash_metadata != metadata_hash:
-        if verb > 0:
-            warnings.warn('Dataset metadata hash does not match.',
-                          UserWarning)
-        dataset.close()
-        return None
+    if not quick_and_dirty:
+        # compare metadata_hash with template
+        if metadata_hash and dataset.sha256_hash_metadata != metadata_hash:
+            if verb > 0:
+                warnings.warn('Dataset metadata hash does not match.',
+                              UserWarning)
+            dataset.close()
+            return None
 
-    # compare preprocess_hash with template
-    if (
-        preprocess_hash and
-        dataset.pair.attrs['preprocess']['sha256_hash'] != preprocess_hash
-    ):
-        if verb > 0:
-            warnings.warn('Dataset preprocess hash does not match.',
-                          UserWarning)
-        dataset.close()
-        return None
+        # compare preprocess_hash with template
+        if (
+            preprocess_hash and
+            dataset.pair.attrs['preprocess']['sha256_hash'] != preprocess_hash
+        ):
+            if verb > 0:
+                warnings.warn('Dataset preprocess hash does not match.',
+                              UserWarning)
+            dataset.close()
+            return None
 
-    # compare xcorr_version with template
-    if xcorr_version and dataset.xcorr_version != xcorr_version:
-        if verb > 0:
-            warnings.warn('Dataset xcorr version does not match.',
-                          UserWarning)
-        dataset.close()
-        return None
+        # compare xcorr_version with template
+        if xcorr_version and dataset.xcorr_version != xcorr_version:
+            if verb > 0:
+                warnings.warn('Dataset xcorr version does not match.',
+                              UserWarning)
+            dataset.close()
+            return None
 
     return dataset
 
@@ -745,9 +746,8 @@ def validate_list(
     if isinstance(datasets, str):
         datasets = [datasets]
 
-    assert isinstance(datasets, list), (
-        'datasets should be either a string or a list.'
-    )
+    if not isinstance(datasets, list):
+        raise TypeError('datasets should be either a string or a list.')
 
     parallel = dask and parallel
 
@@ -814,6 +814,8 @@ def validate_list(
         'preprocess_hash': ds.pair.attrs['preprocess']['sha256_hash'],
         'xcorr_version': ds.attrs['xcorr_version'] if strict else None,
     }
+    if verb > 3:
+        print('validate_args', validate_args)
 
     # evaluate
     if parallel:
@@ -827,7 +829,7 @@ def validate_list(
     else:
         for source in sources[i+1:]:
             ds = get_dataset(source)
-            ds = validate(ds, **validate_args, **kwargs)
+            ds = validate(ds, verb=verb-1, **validate_args, **kwargs)
             if ds is not None:
                 validated.append(get_output(ds))
 
@@ -1023,7 +1025,12 @@ def merge(
                           parallel=False, **kwargs)
 
     # merge
-    ds = xr.combine_by_coords(dsets, data_vars='minimal', join='outer')
+    ds = xr.combine_by_coords(
+        dsets,
+        data_vars='minimal',
+        join='outer',
+        combine_attrs='override',
+    )
 
     # update global attrs
     ds.attrs = dsets[0].attrs
@@ -1097,12 +1104,10 @@ def process(
     )
     # extract and validate preprocess operations
     if isinstance(dataset.pair.preprocess, dict):
-
         o = dataset.pair.preprocess
         check_operations_hash(o, raise_error=True)
 
     else:
-
         o = operations_to_dict(dataset.pair.preprocess)
 
     # check lag indices and update if necessary
