@@ -84,7 +84,7 @@ def timeshift(
     X = fft(x)
 
     # ifft with phase shift
-    y = ifft(X * np.exp(2j * np.pi * np.real(delay) * X.freq))
+    y = ifft(X * np.exp(-2j * np.pi * np.real(delay) * X.freq))
 
     # log workflow
     historicize(y, f='timeshift', a={
