@@ -25,7 +25,8 @@ _pair_type_error = ('``pair`` should be a string or tuple with the '
                     'receiver couple SEED-ids.')
 
 
-def ncfile(pair, time: pd.Timestamp, root: str = None):
+def ncfile(pair, time: pd.Timestamp, root: str = None,
+           verify_receiver: bool=True, **kwargs):
     r"""Return the netCDF filename and path.
 
     Parameters
@@ -39,6 +40,10 @@ def ncfile(pair, time: pd.Timestamp, root: str = None):
 
     root : `str`, optional
 
+    verify_receiver : `bool`, optional
+        If `True` (default), verify each receiver for valid SEED-id naming
+        without wildcards. 
+
     Returns
     -------
     path : `str`
@@ -51,20 +56,21 @@ def ncfile(pair, time: pd.Timestamp, root: str = None):
             pair = str(pair.values)
         else:
             raise ValueError('pair should be a single element')
-    if isinstance(pair, str):
-        pair = split_pair(pair, to_dict=False)
-    elif isinstance(pair, tuple) and len(pair) == 2:
-        pair = list(pair)
-    else:
-        raise TypeError(_pair_type_error)
-
-    for i, rec in enumerate(pair):
-        if isinstance(rec, dict):
-            pair[i] = receiver_to_str(rec)
-        elif not isinstance(rec, str):
+    if verify_receiver:
+        if isinstance(pair, str):
+            pair = split_pair(pair, to_dict=False)
+        elif isinstance(pair, tuple) and len(pair) == 2:
+            pair = list(pair)
+        else:
             raise TypeError(_pair_type_error)
-        if not check_receiver(pair[i], allow_wildcards=False):
-            raise TypeError(_pair_type_error)
+        for i, rec in enumerate(pair):
+            if isinstance(rec, dict):
+                pair[i] = receiver_to_str(rec)
+            elif not isinstance(rec, str):
+                raise TypeError(_pair_type_error)
+            if not check_receiver(pair[i], allow_wildcards=False):
+                raise TypeError(_pair_type_error)
+        pair = '-'.join(pair)
 
     # check time
     if isinstance(time, xr.DataArray):
@@ -80,7 +86,6 @@ def ncfile(pair, time: pd.Timestamp, root: str = None):
         raise TypeError('``root`` should be of type `str`!')
 
     # join
-    pair = '-'.join(pair)
     year = f'{time.year:04d}'
     root = os.path.join(root, year, pair) if root else os.path.join(year, pair)
 
