@@ -108,7 +108,7 @@ def correlate1d(
         in1 = norm1d(in1, dim)
         in2 = norm1d(in2, dim)
 
-    # correlate2d wrapper to simplify ufunc input
+    # wrapper to simplify ufunc input
     def _correlate1d(f, g):
         _npad = [(0, 0)] * (len(f.shape)-2) + npad
         F = fft.fft(np.pad(f, pad_width=_npad, **pargs), axis=ax)
@@ -122,7 +122,7 @@ def correlate1d(
     if dask and (dask.is_dask_collection(in1) or dask.is_dask_collection(in2)):
         dargs = dict(dask='allowed', output_dtypes=[in1.dtype])
 
-    # apply _correlate2d as ufunc (and optional dask distributed)
+    # apply ufunc (and optional dask distributed)
     cc = xr.apply_ufunc(_correlate1d, in1, in2,
                         input_core_dims=[[dim], [dim]],
                         output_core_dims=[[new_dim]],
@@ -244,7 +244,7 @@ def correlate2d(
         in1 = norm2d(in1, dim)
         in2 = norm2d(in2, dim)
 
-    # correlate2d wrapper to simplify ufunc input
+    # wrapper to simplify ufunc input
     def _correlate2d(f, g):
         _npad = [(0, 0)] * (len(f.shape)-2) + npad
         F = fft.fft2(np.pad(f, pad_width=_npad, **pargs), axes=ax)
@@ -258,7 +258,7 @@ def correlate2d(
     if dask and (dask.is_dask_collection(in1) or dask.is_dask_collection(in2)):
         dargs = dict(dask='allowed', output_dtypes=[in1.dtype])
 
-    # apply _correlate2d as ufunc (and optional dask distributed)
+    # apply ufunc (and optional dask distributed)
     cc = xr.apply_ufunc(_correlate2d, in1, in2,
                         input_core_dims=[dim, dim],
                         output_core_dims=[new_dim],
@@ -305,7 +305,7 @@ def _new_coord(old):
     """Private helper to construct the new dimension.
     """
     n = 2*old.size-1
-    s = old.diff(old.name, 1).values[0]
+    s = (old.max()-old.min()).values/(old.size-1)
 
     new = xr.DataArray(
         data=fft.fftshift(fft.fftfreq(n, 1/n/s)),

@@ -108,7 +108,7 @@ def lombscargle(
     # rescale
     rescale = False if normalize else rescale
 
-    # lombscargle wrapper to simplify ufunc input
+    # wrapper to simplify ufunc input
     def _lombscargle(t, x, f, **kwargs):
         def _pgram_axis(x, t, w, nmin=None, rescale=False, **kwargs):
             valid = ~np.isnan(x)
@@ -127,7 +127,7 @@ def lombscargle(
     if dask and dask.is_dask_collection(x):
         dargs = dict(dask='allowed', output_dtypes=[x.dtype])
 
-    # apply sosfiltfilt as ufunc (and optional dask distributed)
+    # apply ufunc (and optional dask distributed)
     pgram = xr.apply_ufunc(_lombscargle, x[dim], x, f,
                            input_core_dims=[[dim], [dim], [f.name]],
                            output_core_dims=[[f.name]],

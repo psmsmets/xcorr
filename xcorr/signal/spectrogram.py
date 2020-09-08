@@ -120,8 +120,8 @@ def spectrogram(
     # expand x with frequency coordinate
     freq = np.linspace(0., sampling_rate/2, int(nfft/2 + 1))
 
+    # wrapper to simplify ufunc input
     def _spectrogram(lag):
-        # scipy spectrogram
         _f, _t, Sxx = signal.spectrogram(
             x=lag,
             fs=sampling_rate,

@@ -11,25 +11,17 @@ Timeshift an N-D labelled array of data using the FFT.
 # Mandatory imports
 import numpy as np
 import xarray as xr
-try:
-    from pyfftw.interfaces import numpy_fft as fft
-except ModuleNotFoundError:
-    from numpy import fft
-try:
-    import dask
-except ModuleNotFoundError:
-    dask = False
-
 
 # Relative imports
 from ..util.history import historicize
+from ..signal.fft import fft, ifft
 
 
 __all__ = ['timeshift']
 
 
 def timeshift(
-    x: xr.DataArray, delay: float, pad: bool = True,
+    x: xr.DataArray, delay: float,
     dtype: np.dtype = None, dim: str = None, **kwargs
 ):
     """
@@ -40,12 +32,8 @@ def timeshift(
     x : :class:`xarray.DataArray`
         The data array to be timeshifted.
 
-    delay : `float`
-        The delay (seconds) to timeshift ``x``.
-
-    pad : `bool`, optional
-        If `True` (default), ``x`` is zero-padded to 2*n-1 samples to avoid
-        phase wrapping.
+    delay : `float` or :class:`xarray.DataArray`
+        The delay to timeshift ``x``.
 
     dtype : :class:`np.dtype`, optional
         Set the dtype. If `None` (default), the dtype of ``x`` is used.
@@ -72,72 +60,36 @@ def timeshift(
     if dim not in x.dims:
         raise ValueError(f'x has no dimensions "{dim}"')
 
-    if 'sampling_rate' not in x[dim].attrs:
-        raise ValueError('Dimension has no attribute "{sampling_rate}"!')
-
-    if 'delta' not in x[dim].attrs:
-        raise ValueError('Dimension has no attribute "{delta}"!')
-
     # check regular spacing
     if not np.all(np.abs(x[dim].diff(dim, 2)) < 1e-10):
         raise ValueError(f'coordinate "{dim}" should be regularly spaced')
 
+    # delay
+    if isinstance(delay, xr.DataArray):
+        if dim in delay.dims:
+            raise ValueError(f'delay cannot depend on dim "{dim}"')
+        for d in delay.dims:
+            if d not in x.dims:
+                raise ValueError(f'delay dim "{d}" not existing in x')
+    elif not isinstance(delay, float):
+        raise TypeError('delay should be a float or DataArray')
+
     # dtype
-    dtype = dtype or x.dtype
+    dtype = np.dtype(dtype or x.dtype)
     if not isinstance(dtype, np.dtype):
         raise TypeError('dtype should be a numpy.dtype')
     dtype = np.dtype(dtype).type
 
-    # pad
-    if pad:
-        n = 2 * x[dim].size - 1
-        edge = np.int(np.round((x[dim].size - 1)/2))
-        npad = [(edge, x[dim].size - 1 - edge)]
-        pargs = dict(mode='constant', constant_values=0)
-        indices = np.arange(edge, edge + x[dim].size, 1)
-    else:
-        n = x[dim].size
-        npad = [(0, 0)]
-        pargs = {}
+    # fft
+    X = fft(x)
 
-    # phase shifts
-    df = 1/n/x[dim].attrs['sampling_rate']
-    phase_shift = np.exp(2 * np.pi * 1j * fft.fftfreq(n, df))
-
-    # set axis
-    ax = -1
-
-    # correlate2d wrapper to simplify ufunc input
-    def _timeshift(y):
-        if pad:
-            _npad = [(0, 0)] * (len(y.shape)-1) + npad
-            Y = fft.fft(np.pad(y, pad_width=_npad, **pargs), axis=ax)
-        else:
-            Y = fft.fft(y, axis=ax)
-        y = fft.fftshift(np.real(fft.ifft(Y * phase_shift, axis=ax)), axes=ax)
-        if pad:
-            y = np.take(y, indices, axis=ax)
-        return y
-
-    # dask collection?
-    dargs = {}
-    if dask and dask.is_dask_collection(x):
-        dargs = dict(dask='allowed', output_dtypes=[x.dtype])
-
-    # apply _correlate2d as ufunc (and optional dask distributed)
-    y = xr.apply_ufunc(_timeshift, x,
-                       input_core_dims=[[dim]],
-                       output_core_dims=[[dim]],
-                       keep_attrs=True,
-                       vectorize=False,
-                       **dargs,
-                       **kwargs)
+    # ifft with phase shift
+    y = ifft(X * np.exp(-2j * np.pi * np.real(delay) * X.freq))
 
     # log workflow
     historicize(y, f='timeshift', a={
         'x': x.name,
-        'delay': delay,
-        'pad': pad,
+        'delay': delay if isinstance(delay, float) else delay.name,
         'dim': dim,
         '**kwargs': kwargs,
     })

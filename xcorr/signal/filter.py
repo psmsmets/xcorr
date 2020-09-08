@@ -88,7 +88,7 @@ def filter(
         fs=x[dim].attrs['sampling_rate']
     )
 
-    # sosfiltfilt wrapper to simplify ufunc input
+    # wrapper to simplify ufunc input
     def _filter(obj):
         return signal.sosfiltfilt(sos, obj, axis=-1)
 
@@ -97,7 +97,7 @@ def filter(
     if dask and dask.is_dask_collection(x):
         dargs = dict(dask='allowed', output_dtypes=[x.dtype])
 
-    # apply sosfiltfilt as ufunc (and optional dask distributed)
+    # apply ufunc (and optional dask distributed)
     y = xr.apply_ufunc(_filter, x,
                        input_core_dims=[[dim]],
                        output_core_dims=[[dim]],

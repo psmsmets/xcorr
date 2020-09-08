@@ -6,6 +6,7 @@ xcorr.signal init
 # Import all main functions
 from ..signal.correlate import correlate2d
 from ..signal.detrend import detrend, demean
+from ..signal.fft import fft, ifft
 from ..signal.filter import filter
 from ..signal.lombscargle import lombscargle
 from ..signal.mask import mask, multi_mask
@@ -21,6 +22,6 @@ from ..signal.window import window
 
 
 __all__ = ['coincidence_trigger', 'correlate2d', 'detrend', 'demean',
-           'filter', 'lombscargle', 'mask', 'multi_mask', 'norm1d',
-           'norm2d', 'rms', 'snr', 'spectrogram', 'taper', 'timeshift',
-           'unbias', 'window']
+           'fft', 'ifft', 'filter', 'lombscargle', 'mask', 'multi_mask',
+           'norm1d', 'norm2d', 'rms', 'snr', 'spectrogram', 'taper',
+           'timeshift', 'unbias', 'window']

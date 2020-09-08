@@ -80,7 +80,7 @@ def norm1d(x: xr.DataArray, dim: str = None, **kwargs):
     # normalize
     y = x/n
 
-    # propagat attributes
+    # propagate attributes
     y.attrs = x.attrs
 
     # log workflow
@@ -133,7 +133,7 @@ def norm2d(x: xr.DataArray, dim: tuple = None, **kwargs):
     if dask and dask.is_dask_collection(x):
         dargs = dict(dask='allowed', output_dtypes=[x.dtype])
 
-    # apply ufunc to get norms (and optional dask distributed)
+    # apply ufunc (and optional dask distributed)
     n = xr.apply_ufunc(np.linalg.norm, x,
                        input_core_dims=[dim],
                        vectorize=False,
@@ -143,7 +143,7 @@ def norm2d(x: xr.DataArray, dim: tuple = None, **kwargs):
     # normalize
     y = x/n
 
-    # propagat attributes
+    # propagate attributes
     y.attrs = x.attrs
 
     # log workflow

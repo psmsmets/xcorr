@@ -63,7 +63,7 @@ def detrend(x: xr.DataArray, dim: str = None, **kwargs):
     if dask and dask.is_dask_collection(x):
         dargs = dict(dask='allowed', output_dtypes=[x.dtype])
 
-    # apply sosfiltfilt as ufunc (and optional dask distributed)
+    # apply ufunc (and optional dask distributed)
     y = xr.apply_ufunc(signal.detrend, x,
                        input_core_dims=[[dim]],
                        output_core_dims=[[dim]],
