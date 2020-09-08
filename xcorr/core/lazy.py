@@ -252,7 +252,6 @@ def lazy_process(
     # -------------------------------------------------------------------------
 
     dask_client = dask_client or distributed.Client()
-    n_workers = sum(dask_client.ncores().values())
 
     # -------------------------------------------------------------------------
     # Print main config parameters
@@ -261,7 +260,6 @@ def lazy_process(
         print('-'*79)
         print('Config')
         print('    root           :', root)
-        print('    n_workers      :', n_workers)
         print('    force_fresh    :', force_fresh)
         print('    download       :', download)
         print('    xcorr version  :', version)
