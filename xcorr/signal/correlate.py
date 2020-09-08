@@ -94,11 +94,7 @@ def correlate1d(
     new_dim = f'delta_{dim}'
 
     # pad
-    npad = []
-    for d in dim:
-        edge = np.int(np.round((in1[d].size - 1)/2))
-        npad += [(edge, in1[d].size - 1 - edge)]
-    pargs = dict(mode='constant', constant_values=0)
+    npad = 2*in1[dim].size-1
 
     # set axis
     ax = -1
@@ -110,9 +106,8 @@ def correlate1d(
 
     # wrapper to simplify ufunc input
     def _correlate1d(f, g):
-        _npad = [(0, 0)] * (len(f.shape)-2) + npad
-        F = fft.fft(np.pad(f, pad_width=_npad, **pargs), axis=ax)
-        G = fft.fft(np.pad(g, pad_width=_npad, **pargs), axis=ax)
+        F = fft.fft(f, s=npad, axis=ax)
+        G = fft.fft(g, s=npad, axis=ax)
         FG = F * np.conjugate(G)
         cc = fft.fftshift(np.real(fft.ifft(FG, axis=ax)), axes=ax)
         return cc
@@ -230,11 +225,7 @@ def correlate2d(
     new_dim = (f'delta_{dim[0]}',  f'delta_{dim[1]}')
 
     # pad
-    npad = []
-    for d in dim:
-        edge = np.int(np.round((in1[d].size - 1)/2))
-        npad += [(edge, in1[d].size - 1 - edge)]
-    pargs = dict(mode='constant', constant_values=0)
+    npad = [2*in1[d].size-1 for d in dim]
 
     # set axes
     ax = (-2, -1)
@@ -246,9 +237,8 @@ def correlate2d(
 
     # wrapper to simplify ufunc input
     def _correlate2d(f, g):
-        _npad = [(0, 0)] * (len(f.shape)-2) + npad
-        F = fft.fft2(np.pad(f, pad_width=_npad, **pargs), axes=ax)
-        G = fft.fft2(np.pad(g, pad_width=_npad, **pargs), axes=ax)
+        F = fft.fft2(f, s=npad, axes=ax)
+        G = fft.fft2(g, s=npad, axes=ax)
         FG = F * np.conjugate(G)
         cc = fft.fftshift(np.real(fft.ifft2(FG, axes=ax)), axes=ax)
         return cc

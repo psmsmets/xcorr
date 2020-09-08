@@ -97,13 +97,13 @@ def spectrogram(
     if scaling not in ['density', 'spectrum']:
         raise ValueError('Scaling should be either "density" or "spectrum"!')
 
+    units = x.attrs['units'] if 'units' in x.attrs else '-'
     if scaling == 'density':
-        units = f'{x[dim].units}-1'
-        units = f'{x.units}2 {units}' if x.units != '-' else units
+        units = f'{units}2 s' if units != '-' else 's'
         long_name = 'Power Spectral Density'
         standard_name = 'power_spectral_density'
     else:
-        units = f'{x.units}2' if x.units != '-' else '-'
+        units = f'{x.units}2' if units != '-' else '-'
         long_name = 'Power Spectrum'
         standard_name = 'power_spectrum'
 
@@ -170,8 +170,10 @@ def spectrogram(
     y.name = 'psd'
     y.attrs = {
         **x.attrs,
-        'long_name': f'{x.long_name} {long_name}',
-        'standard_name': f'{x.standard_name}_{standard_name}',
+        'long_name': f'{x.long_name} {long_name}'
+                     if 'long_name' in x.attrs else long_name,
+        'standard_name': f'{x.standard_name}_{standard_name}'
+                         if 'standard_name' in x.attrs else standard_name,
         'units': units,
         'scaling': scaling,
         'mode': 'psd',
@@ -310,7 +312,7 @@ def spectrogram_mtc(
         attrs={
             'long_name': 'Power Spectral Density',
             'standard_name': 'power_spectral_density',
-            'units': 'Hz**-1',
+            'units': 'Hz-1',
             'scaling': 'density',
             'mode': 'psd',
             'duration': duration,

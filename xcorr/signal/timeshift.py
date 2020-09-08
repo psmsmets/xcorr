@@ -86,6 +86,13 @@ def timeshift(
     # ifft with phase shift
     y = ifft(X * np.exp(-2j * np.pi * np.real(delay) * X.freq))
 
+    # restore coordinate
+    y = y.assign_coords({dim: x[dim]})
+
+    # restore attributes
+    y.name = x.name
+    y.attrs = x.attrs
+
     # log workflow
     historicize(y, f='timeshift', a={
         'x': x.name,
