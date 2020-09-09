@@ -333,11 +333,15 @@ def help(e=None):
     """
     """
     _help = """
-    xcorr-timelapse [option] ... [arg] ...
+    Two-dimensional crosscorrelation of crosscorrelation spectrograms.
+
+    Usage: xcorr-timelapse <start> <end> [option] ... [arg] ...
+    <start> <end>    : Start and end datetime given format yyyy-mm-dd.
     Options and arguments:
+        --abundant   : Compute the entire timelapse 2d correlation matrix
+                       instead of mirroring along the diagonal.
         --debug      : Maximize verbosity.
     -c, --chunk=     : Set dask time chunks. Defaults to 10.
-    -e, --endtime=   : Set endtime, e.g., yyyy-mm-dd.
     -f, --frequency= : Set psd frequency bands. Frequency should be a list of
                        tuple-pairs with start and end frequencies. Defaults to
                        --frequency="(3., 6.), (6., 12.)".
@@ -347,12 +351,14 @@ def help(e=None):
                        of workers is available.
     -p, --pair=      : Filter pair that contain the given string. If empty all
                        pairs are used.
-    -r, --root=      : Set root. Defaults to current working directory.
-    -s, --starttime= : Set starttime, e.g., yyyy-mm-dd
-        --scheduler= : Connect to a dask scheduler by a scheduler-file.
         --plot       : Generate some plots during processing (stalls).
-    -v, --version    : Print version number and exit.
-    """
+    -r, --root=      : Set root. Defaults to current working directory.
+                       Crosscorrelations should be in "{root}/cc" following
+                       xcorr folder structure. Timelapse results are stored in
+                       "{root}/timelapse".
+        --scheduler= : Connect to a dask scheduler by a scheduler-file.
+    -v, --version    : Print version number and exit."""
+
     print('\n'.join([line[4:] for line in _help.splitlines()]))
     raise SystemExit(e)
 
@@ -360,66 +366,75 @@ def help(e=None):
 def main():
     """
     """
-    # init args
-    pair, starttime, endtime, freq = None, None, None, None
-    root, n_workers, scheduler = None, None, None
+
+    # help?
+    if '-h' in sys.argv[1:] or '--help' in sys.argv[1:]:
+        help()
+
+    # version?
+    if '-v' in sys.argv[1:] or '--version' in sys.argv[1:]:
+        print(xcorr.__version__)
+        raise SystemExit(0)
+
+    # start and end datetime
+    if len(sys.argv) < 3:
+        print('Both start and end datetime should be set!')
+        raise SystemExit(1)
+    starttime = pd.to_datetime(sys.argv[1])
+    endtime = pd.to_datetime(sys.argv[2])
+
+    # optional args
+    freq, pair, root, n_workers, scheduler = None, None, None, None, None
     plot, debug = False, False
     sparse = True
 
-    # get args
     try:
         opts, args = getopt.getopt(
-            sys.argv[1:],
-            'hvp:s:e:f:r:n:c:',
-            ['pair=', 'starttime=', 'endtime=', 'frequency=', 'root=',
-             'nworkers=', 'help', 'plot', 'debug', 'chunk=',
-             'scheduler=', 'version', 'abundant']
+            sys.argv[3:],
+            'c:f:n:p:r:',
+            ['abundant', 'debug', 'chunk=', 'frequency=', 'nworkers=',
+             'pair=', 'plot', 'root=', 'scheduler=']
         )
     except getopt.GetoptError as e:
         help(e)
 
-    # evaluate args
     for opt, arg in opts:
-        if opt in ('-h', '--help'):
-            help()
-        elif opt in ('-v', '--version'):
-            print(xcorr.__version__)
-            raise SystemExit()
-        elif opt in ('-p', '--pair'):
-            pair = arg
-        elif opt in ('-s', '--starttime'):
-            starttime = pd.to_datetime(arg)
-        elif opt in ('-e', '--endtime'):
-            endtime = pd.to_datetime(arg)
+        if opt in ('--abundant'):
+            sparse = False
+        elif opt in ('-c', '--chunk'):
+            chunk = int(arg)
+        elif opt in ('--debug'):
+            debug = True
         elif opt in ('-f', '--frequency'):
             freq = np.array(eval(arg))
             if len(freq.shape) != 2 or freq.shape[-1] != 2:
                 raise ValueError('frequency should be a list of tuple-pairs '
                                  'with start and end frequencies. Example: '
                                  '--frequencies="(3., 6.), (6., 12.)"')
-        elif opt in ('-r', '--root'):
-            root = arg
         elif opt in ('-n', '--nworkers'):
             n_workers = int(arg)
+        elif opt in ('-p', '--pair'):
+            pair = '' if arg == '*' else arg
         elif opt in ('--plot'):
             plot = True
-        elif opt in ('--debug'):
-            debug = True
-        elif opt in ('-c', '--chunk'):
-            chunk = int(arg)
+        elif opt in ('-r', '--root'):
+            root = arg
         elif opt in ('--scheduler'):
             scheduler = arg
-        elif opt in ('--abundant'):
-            sparse = False
 
-    # optional
-    pair = pair or '*'
+    pair = pair or ''
     freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
     root = os.path.abspath(root) if root is not None else os.getcwd()
 
-    # obligatory
-    if starttime is None or endtime is None:
-        raise RuntimeError('Both --startime and --endtime should be set.')
+    # print header and core parameters
+    print(f'xcorr-timelapse v{xcorr.__version__}')
+    print('{:>20} : {}'.format('root', root))
+    print('{:>20} : {}'.format('pair', '*' if pair == '' else pair))
+    print('{:>20} : {}'.format('starttime', starttime))
+    print('{:>20} : {}'.format('endtime', endtime))
+    print('{:>20} : {}'.format(
+        'frequency', ', '.join([f'{f[0]}-{f[1]}' for f in freq])
+    ))
 
     # dask client
     if scheduler is not None:
@@ -437,15 +452,6 @@ def main():
         print('Dask LocalCluster:', cluster)
         client = distributed.Client(cluster)
         print('Dask Client:', client)
-
-    # parameters
-    print('{:>25} : {}'.format('root', root))
-    print('{:>25} : {}'.format('pair', pair))
-    print('{:>25} : {}'.format('starttime', starttime))
-    print('{:>25} : {}'.format('endtime', endtime))
-
-    # pair wildcard
-    pair = '' if pair == '*' else pair
 
     # snr
     print('.. load signal-to-noise ratio')

@@ -2,7 +2,7 @@
 SNR
 ===
 
-Signal-to-noise ratio of a multi-file dataset using dask.
+Signal-to-noise ratio estimation of crosscrorrelations.
 
 """
 
@@ -157,22 +157,26 @@ def help(e=None):
     """
     """
     _help = """
-    xcorr-snr [option] ... [arg] ...
+    Signal-to-noise ratio estimation of crosscrorrelations.
+
+    Usage: xcorr-snr <start> <end> [option] ... [arg] ...
+    <start> <end>    : Start and end datetime given format yyyy-mm-dd.
     Options and arguments:
         --debug      : Maximize verbosity.
-    -e, --endtime=   : Set endtime, e.g., yyyy-mm-dd.
     -h, --help       : Print this help message and exit.
     -n, --nworkers=  : Set number of dask workers for local client. If a
                        a scheduler set the client will wait until the number
                        of workers is available.
-    -p, --pair=      : Filter pairs given a glob string. If empty all pairs
-                       are used.
-    -r, --root=      : Set root. Defaults to current working directory.
-    -s, --starttime= : Set starttime, e.g., yyyy-mm-dd
-        --scheduler= : Connect to a dask scheduler by a scheduler-file.
+    -p, --pair=      : Filter pair that contain the given string. If empty all
+                       pairs are used.
         --plot       : Generate some plots during processing (stalls).
-    -v, --version    : Print version number and exit.
-    """
+    -r, --root=      : Set root. Defaults to current working directory.
+                       Crosscorrelations should be in "{root}/cc" following
+                       xcorr folder structure. SNR results are stored in
+                       "{root}/snr".
+        --scheduler= : Connect to a dask scheduler by a scheduler-file.
+    -v, --version    : Print version number and exit."""
+
     print('\n'.join([line[4:] for line in _help.splitlines()]))
     raise SystemExit(e)
 
@@ -180,52 +184,59 @@ def help(e=None):
 def main():
     """
     """
-    # init args
-    pair, starttime, endtime = None, None, None
-    root, n_workers, scheduler = None, None, None
+
+    # help?
+    if '-h' in sys.argv[1:] or '--help' in sys.argv[1:]:
+        help()
+
+    # version?
+    if '-v' in sys.argv[1:] or '--version' in sys.argv[1:]:
+        print(xcorr.__version__)
+        raise SystemExit(0)
+
+    # start and end datetime
+    if len(sys.argv) < 3:
+        print('Both start and end datetime should be set!')
+        raise SystemExit(1)
+    starttime = pd.to_datetime(sys.argv[1])
+    endtime = pd.to_datetime(sys.argv[2])
+
+    # optional args
+    pair, root, n_workers, scheduler = None, None, None, None
     plot, debug = False, False
 
-    # get args
     try:
         opts, args = getopt.getopt(
-            sys.argv[1:],
-            'hvp:s:e:f:r:n:c:',
-            ['pair=', 'starttime=', 'endtime=', 'root=',
-             'nworkers=', 'help', 'plot', 'debug', 'scheduler=']
+            sys.argv[3:],
+            'c:f:n:p:r:',
+            ['debug', 'nworkers=', 'pair=', 'plot', 'root=', 'scheduler=']
         )
     except getopt.GetoptError as e:
         help(e)
 
     for opt, arg in opts:
-        if opt in ('-h', '--help'):
-            help()
-        elif opt in ('--version'):
-            print(xcorr.__version__)
-            raise SystemExit()
-        elif opt in ('-p', '--pair'):
-            pair = arg
-        elif opt in ('-s', '--starttime'):
-            starttime = pd.to_datetime(arg)
-        elif opt in ('-e', '--endtime'):
-            endtime = pd.to_datetime(arg)
-        elif opt in ('-r', '--root'):
-            root = arg
+        if opt in ('--debug'):
+            debug = True
         elif opt in ('-n', '--nworkers'):
             n_workers = int(arg)
+        elif opt in ('-p', '--pair'):
+            pair = '' if arg == '*' else arg
         elif opt in ('--plot'):
             plot = True
-        elif opt in ('--debug'):
-            debug = True
+        elif opt in ('-r', '--root'):
+            root = arg
         elif opt in ('--scheduler'):
             scheduler = arg
 
-    # optional
     pair = pair or '*'
     root = os.path.abspath(root) if root is not None else os.getcwd()
 
-    # obligatory
-    if starttime is None or endtime is None:
-        raise RuntimeError('Both --startime and --endtime should be set.')
+    # print header and core parameters
+    print(f'xcorr-timelapse v{xcorr.__version__}')
+    print('{:>20} : {}'.format('root', root))
+    print('{:>20} : {}'.format('pair', pair))
+    print('{:>20} : {}'.format('starttime', starttime))
+    print('{:>20} : {}'.format('endtime', endtime))
 
     # dask client
     if scheduler is not None:
@@ -243,12 +254,6 @@ def main():
         print('Dask LocalCluster:', cluster)
         client = distributed.Client(cluster)
         print('Dask Client:', client)
-
-    # parameters
-    print('{:>25} : {}'.format('root', root))
-    print('{:>25} : {}'.format('pair', pair))
-    print('{:>25} : {}'.format('starttime', starttime))
-    print('{:>25} : {}'.format('endtime', endtime))
 
     # list of files using dask
     validated = xcorr.core.validate_list(

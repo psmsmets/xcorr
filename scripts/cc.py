@@ -8,6 +8,7 @@ Crosscorrelation using dask.
 from pandas import date_range
 from obspy import read_inventory
 from xcorr import lazy_process
+import distributed
 
 
 ##############################################################################
@@ -173,7 +174,7 @@ root = '/ribarsko/data/smets/hydro/cc'
 ##############################################################################
 
 # connect to existing client
-client = distributed.client(scheduler-file='~/.scheduler.json')
+client = distributed.client(scheduler_file='~/.scheduler.json')
 
 # lazy processes
 lazy_process(pairs, times, xcorr_init_args, xcorr_client_args, inventory, root,
