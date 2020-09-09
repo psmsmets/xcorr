@@ -522,6 +522,8 @@ def main():
     # load dataset
     print(f'.. load from "{nc}"')
     ds = xr.open_dataset(nc, engine='h5netcdf')
+    if debug:
+        print(ds)
 
     # create all locks
     print('.. init locks', end=', ')
@@ -546,9 +548,9 @@ def main():
         # common plot settings
         plotset = dict(col='freq', yincrease=False, size=4, aspect=1)
 
-        # plot cc
+        # plot cc2
         plt.figure()
-        ds.cc.isel(pair=-1).plot(vmin=0, **plotset)
+        ds.cc2.isel(pair=-1).plot(vmin=0, **plotset)
         plt.show()
 
         # plot delta_lag
