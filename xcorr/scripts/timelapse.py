@@ -82,9 +82,6 @@ def get_spectrogram(pair, time, root):
     # spectrogram
     psd = xcorr.signal.spectrogram(cc, duration=2., padding_factor=8)
 
-    # clear
-    cc, ds, delay = None, None, None
-
     return psd
 
 
@@ -185,6 +182,9 @@ def _mask_upper_triangle(ds):
 def _fill_upper_triangle(ds):
     """Fill upper triangle (one offset)
     """
+    # prevent Dask dataframe issues
+    ds.load()
+    # copy lower to upper triangle
     ind1, ind2 = np.triu_indices(ds.time1.size, 1)
     for i in range(len(ind1)):
         time1 = ds.time1[ind1[i]]
@@ -196,17 +196,14 @@ def _fill_upper_triangle(ds):
         ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
 
 
-def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
+def init_timelapse(pair, time, freq, root):
     """Init a timelapse dataset.
     """
-    # extract times with activity
-    time = ct.time.where(ct >= 0, drop=True)
-
     # new dataset
     ds = xr.Dataset()
 
     # set global attributes
-    nc = xcorr.util.ncfile(snr.pair[0], time[0], os.path.join(root, 'cc'))
+    nc = xcorr.util.ncfile(pair[0], time[0], os.path.join(root, 'cc'))
     cc = xcorr.read(nc, quick_and_dirty=True)
     ds.attrs = cc.attrs
     cc.close()
@@ -214,8 +211,8 @@ def init_timelapse(snr, ct, pair, starttime, endtime, freq, root):
     ds.attrs['dependencies_version'] = xcorr.core.core.dependencies_version()
 
     # set coordinates
-    ds['pair'] = snr.pair
-    ds.pair.attrs = snr.pair.attrs
+    ds['pair'] = pair
+    ds.pair.attrs = pair.attrs
 
     ds['freq'] = xr.DataArray(
         np.mean(freq, axis=1),
@@ -483,11 +480,15 @@ def main():
         plt.tight_layout()
         plt.show()
 
+    # extract pair and time
+    pair = snr.pair
+    time = ct.time.where(ct >= 0, drop=True)
+
     # init timelapse
     print('.. init timelapse dataset', end=', ')
-    ds = init_timelapse(snr, ct, pair, starttime, endtime, freq, root)
-    print('dims: pair={pair}, freq={freq}, time={time1}'.format(
-        pair=ds.pair.size, freq=ds.freq.size, time1=ds.time1.size,
+    ds = init_timelapse(pair, time, freq, root)
+    print('dims: pair={pair}, freq={freq}, time={time}'.format(
+        pair=pair.size, freq=ds.freq.size, time=time.size,
     ))
     if debug:
         print(ds)
@@ -502,11 +503,11 @@ def main():
     ds = correlate_spectrograms_on_client(ds, root, chunk, sparse)
 
     # update metadata
-    print('.. extend dataset with snr and triggers')
-    ds['snr'] = snr
-    ds['ct'] = ct
-    if debug:
-        print(ds)
+    # print('.. extend dataset with snr and triggers')
+    # ds['snr'] = snr
+    # ds['ct'] = ct
+    # if debug:
+    #     print(ds)
 
     # to netcdf
     nc = os.path.join(root, 'timelapse', 'timelapse_{}_{}_{}.nc'.format(
