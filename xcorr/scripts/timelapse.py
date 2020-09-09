@@ -23,7 +23,6 @@ import xcorr
 
 
 __all__ = []
-__name__ = 'xcorr-timelapse'
 
 
 ###############################################################################
@@ -420,7 +419,7 @@ def main():
             scheduler = arg
 
     pair = pair or ''
-    freq = np.array(((3., 6.), (6., 12.), (0., 25.))) if freq is None else freq
+    freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
     root = os.path.abspath(root) if root is not None else os.getcwd()
 
     # print header and core parameters
