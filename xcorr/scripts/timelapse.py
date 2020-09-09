@@ -209,6 +209,11 @@ def init_timelapse(pair, time, freq, root):
     ds.attrs['xcorr_version'] = xcorr.__version__
     ds.attrs['dependencies_version'] = xcorr.core.core.dependencies_version()
 
+    # remove hashes
+    item = ds.attrs.pop('sha256_hash_metadata', None)
+    item = ds.attrs.pop('sha256_hash', None)
+    del item
+
     # set coordinates
     ds['pair'] = pair
     ds.pair.attrs = pair.attrs
@@ -449,6 +454,13 @@ def main():
         client = distributed.Client(cluster)
         print('Dask Client:', client)
 
+    # filename
+    nc = os.path.join(root, 'timelapse', 'timelapse_{}_{}_{}.nc'.format(
+        'all' if pair == '' else pair.translate({ord(c): None for c in '*?'}),
+        starttime.strftime('%Y%j'),
+        endtime.strftime('%Y%j'),
+    ))
+
     # snr
     print('.. load signal-to-noise ratio')
     snr = xr.merge([xr.open_dataarray(f) for f in
@@ -480,17 +492,30 @@ def main():
         plt.show()
 
     # extract pair and time
-    pairs = snr.pair
-    times = ct.time.where(ct >= 0, drop=True)
+    pair = snr.pair
+    time = ct.time.where(ct >= 0, drop=True)
 
     # init timelapse
     print('.. init timelapse dataset', end=', ')
-    ds = init_timelapse(pairs, times, freq, root)
+    ds = init_timelapse(pair, time, freq, root)
     print('dims: pair={pair}, freq={freq}, time={time}'.format(
-        pair=pairs.size, freq=ds.freq.size, time=times.size,
+        pair=pair.size, freq=ds.freq.size, time=time.size,
     ))
     if debug:
         print(ds)
+
+    # to netcdf
+    print(f'.. write to "{nc}"')
+    xcorr.write(
+        data=ds,
+        path=nc,
+        variable_encoding=dict(zlib=True, complevel=9),
+        verb=1 if debug else 0,
+    )
+
+    # load dataset
+    print(f'.. load from "{nc}"')
+    ds = xr.open_dataset(nc, engine='h5netcdf')
 
     # create all locks
     print('.. init locks', end=', ')
@@ -502,11 +527,6 @@ def main():
     ds = correlate_spectrograms_on_client(ds, root, chunk, sparse)
 
     # to netcdf
-    nc = os.path.join(root, 'timelapse', 'timelapse_{}_{}_{}.nc'.format(
-        'all' if pair == '' else pair.translate({ord(c): None for c in '*?'}),
-        starttime.strftime('%Y%j'),
-        endtime.strftime('%Y%j'),
-    ))
     print(f'.. write to "{nc}"')
     xcorr.write(
         data=ds,
