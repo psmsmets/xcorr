@@ -81,6 +81,9 @@ def get_spectrogram(pair, time, root):
     # spectrogram
     psd = xcorr.signal.spectrogram(cc, duration=2., padding_factor=8)
 
+    # clear
+    cc, ds = None, None
+
     return psd
 
 
@@ -93,7 +96,6 @@ def correlate_spectrograms(obj, root):
         return obj
 
     # test if object is loaded
-        return obj
     if not (obj.freq.any() and obj.pair.any()):
         sleep(.5)  # give scheduler and worker some time
         return obj
@@ -117,13 +119,22 @@ def correlate_spectrograms(obj, root):
                 # load cc and compute psd on-the-fly
                 try:
                     psd1 = get_spectrogram(pair, time1, root)
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except Exception:
+                    continue
+
+                if psd1 is None:
+                    continue
+
+                try:
                     psd2 = get_spectrogram(pair, time2, root)
                 except (KeyboardInterrupt, SystemExit):
                     raise
                 except Exception:
                     continue
 
-                if psd1 is None or psd2 is None:
+                if psd2 is None:
                     continue
 
                 # correlate per freq range
@@ -506,12 +517,7 @@ def main():
 
     # to netcdf
     print(f'.. write to "{nc}"')
-    xcorr.write(
-        data=ds,
-        path=nc,
-        variable_encoding=dict(zlib=True, complevel=9),
-        verb=1 if debug else 0,
-    )
+    xcorr.write(data=ds, path=nc, verb=1 if debug else 0)
 
     # load dataset
     print(f'.. load from "{nc}"')
