@@ -11,7 +11,7 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import dask
-from dask import distributed
+import distributed
 import os
 import sys
 import getopt
@@ -28,23 +28,17 @@ __name__ = 'xcorr-snr'
 # Delayed functions
 # -----------------
 
-@ dask.delayed
+@dask.delayed
 def _open(filename):
     """
     """
     ds = xcorr.read(filename, fast=True)
-    return ds
-
-
-@dask.delayed
-def _close(ds):
-    """
-    """
+    ds.load()
     ds.close()
     return ds
 
 
-@ dask.delayed
+@dask.delayed
 def _mask_valid(ds):
     """
     """
@@ -56,7 +50,7 @@ def _mask_valid(ds):
     return mask
 
 
-@ dask.delayed
+@dask.delayed
 def _mask_signal(ds):
     """
     """
@@ -71,7 +65,7 @@ def _mask_signal(ds):
     return mask
 
 
-@ dask.delayed
+@dask.delayed
 def _mask_noise(ds):
     """
     """
@@ -84,7 +78,7 @@ def _mask_noise(ds):
     return mask
 
 
-@ dask.delayed
+@dask.delayed
 def _select_and_trim(ds, valid):
     """
     """
@@ -92,7 +86,7 @@ def _select_and_trim(ds, valid):
     return cc
 
 
-@ dask.delayed
+@dask.delayed
 def _unbias(cc):
     """
     """
@@ -100,7 +94,7 @@ def _unbias(cc):
     return cc
 
 
-@ dask.delayed
+@dask.delayed
 def _filter(cc):
     """
     """
@@ -108,7 +102,7 @@ def _filter(cc):
     return cc
 
 
-@ dask.delayed
+@dask.delayed
 def _demean(cc):
     """
     """
@@ -116,13 +110,13 @@ def _demean(cc):
     return cc
 
 
-@ dask.delayed
+@dask.delayed
 def _taper(cc):
     cc = xcorr.signal.taper(cc, max_length=2/3.)
     return cc
 
 
-@ dask.delayed
+@dask.delayed
 def _snr(cc, signal, noise):
     """
     """
@@ -130,7 +124,7 @@ def _snr(cc, signal, noise):
     return snr
 
 
-def lazy_snr_list(filenames: list):
+def snr_of_filenames(filenames: list):
     """Evaluate snr for a list of filenames
     """
     snr_list = []
@@ -144,7 +138,6 @@ def lazy_snr_list(filenames: list):
         cc = _demean(cc)
         cc = _taper(cc)
         snr = _snr(cc, signal, noise)
-        ds = _close(ds)
         snr_list.append(snr)
     return snr_list
 
@@ -267,8 +260,9 @@ def main():
     assert validated, 'No data found!'
 
     # snr
-    snr = client.map(lazy_snr_list, validated)
-    snr = xr.merge(client.gather(snr)[0])
+    mapped = client.compute(snr_of_filenames(validated))
+    distributed.wait(mapped)
+    snr = xr.merge(client.gather(mapped))
 
     # to netcdf
     nc = os.path.join(root, 'snr', 'snr_{}_{}_{}.nc'.format(
