@@ -357,7 +357,7 @@ def help(e=None):
                        xcorr folder structure. Timelapse results are stored in
                        "{root}/timelapse".
         --scheduler= : Connect to a dask scheduler by a scheduler-file.
-    -v, --version    : Print version number and exit."""
+    -v, --version    : Print xcorr version number and exit."""
 
     print('\n'.join([line[4:] for line in _help.splitlines()]))
     raise SystemExit(e)
