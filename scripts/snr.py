@@ -257,7 +257,8 @@ def main():
 
     # list of files using dask
     validated = xcorr.core.validate_list(
-        [xcorr.util.ncfile(pair, time, root, verify_receiver=False)
+        [xcorr.util.ncfile(pair, time, os.path.join(root, 'cc'),
+                           verify_receiver=False)
          for time in pd.date_range(starttime, endtime)],
         fast=True,
         paths_only=True,
