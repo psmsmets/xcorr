@@ -517,7 +517,7 @@ def main():
 
     # to netcdf
     print(f'.. write to "{nc}"')
-    xcorr.write(data=ds, path=nc, verb=1 if debug else 0)
+    xcorr.write(data=ds, path=nc, force_write=True, verb=1 if debug else 0)
 
     # load dataset
     print(f'.. load from "{nc}"')
