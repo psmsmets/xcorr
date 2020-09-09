@@ -481,14 +481,14 @@ def main():
         plt.show()
 
     # extract pair and time
-    pair = snr.pair
-    time = ct.time.where(ct >= 0, drop=True)
+    pairs = snr.pair
+    times = ct.time.where(ct >= 0, drop=True)
 
     # init timelapse
     print('.. init timelapse dataset', end=', ')
-    ds = init_timelapse(pair, time, freq, root)
+    ds = init_timelapse(pairs, times, freq, root)
     print('dims: pair={pair}, freq={freq}, time={time}'.format(
-        pair=pair.size, freq=ds.freq.size, time=time.size,
+        pair=pairs.size, freq=ds.freq.size, time=times.size,
     ))
     if debug:
         print(ds)
@@ -502,18 +502,11 @@ def main():
     print(f'.. map and compute blocks: chunk={chunk}, sparse={sparse}')
     ds = correlate_spectrograms_on_client(ds, root, chunk, sparse)
 
-    # update metadata
-    # print('.. extend dataset with snr and triggers')
-    # ds['snr'] = snr
-    # ds['ct'] = ct
-    # if debug:
-    #     print(ds)
-
     # to netcdf
     nc = os.path.join(root, 'timelapse', 'timelapse_{}_{}_{}.nc'.format(
         'all' if pair == '' else pair.translate({ord(c): None for c in '*?'}),
-        starttime.strftime('%Y%j'),
-        endtime.strftime('%Y%j'),
+        str(ds.time[0].dt.strftime('%Y%j')),
+        str(ds.time[-1].dt.strftime('%Y%j')),
     ))
     print(f'.. write to "{nc}"')
     xcorr.write(
