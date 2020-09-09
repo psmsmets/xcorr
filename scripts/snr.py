@@ -29,7 +29,7 @@ __name__ = 'xcorr-snr'
 # -----------------
 
 @dask.delayed
-def _open(filename):
+def _load(filename):
     """
     """
     ds = xcorr.read(filename, fast=True)
@@ -129,7 +129,7 @@ def snr_of_filenames(filenames: list):
     """
     snr_list = []
     for filename in filenames:
-        ds = _open(filename)
+        ds = _load(filename)
         valid = _mask_valid(ds)
         signal = _mask_signal(ds)
         noise = _mask_noise(ds)
