@@ -504,8 +504,8 @@ def main():
     # to netcdf
     nc = os.path.join(root, 'timelapse', 'timelapse_{}_{}_{}.nc'.format(
         'all' if pair == '' else pair.translate({ord(c): None for c in '*?'}),
-        str(ds.time[0].dt.strftime('%Y%j')),
-        str(ds.time[-1].dt.strftime('%Y%j')),
+        str(snr.time[0].dt.strftime('%Y%j')),
+        str(snr.time[-1].dt.strftime('%Y%j')),
     ))
     print(f'.. write to "{nc}"')
     xcorr.write(
