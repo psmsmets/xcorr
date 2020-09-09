@@ -249,6 +249,7 @@ def main():
         print('Dask Client:', client)
 
     # list of files using dask
+    print('.. validate cc filelist')
     validated = xcorr.core.validate_list(
         [xcorr.util.ncfile(pair, time, os.path.join(root, 'cc'),
                            verify_receiver=False)
@@ -260,8 +261,11 @@ def main():
     assert validated, 'No data found!'
 
     # snr
+    print('.. compute snr for filelist')
     mapped = client.compute(snr_of_filenames(validated))
     distributed.wait(mapped)
+
+    print('.. merge snr list')
     snr = xr.merge(client.gather(mapped))
 
     # to netcdf
