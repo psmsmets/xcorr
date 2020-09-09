@@ -268,7 +268,7 @@ def main():
 
     # snr
     snr = client.map(lazy_snr_list, validated)
-    snr = xr.merge(client.gather(snr))
+    snr = xr.merge(client.gather(snr)[0])
 
     # to netcdf
     nc = os.path.join(root, 'snr', 'snr_{}_{}_{}.nc'.format(
