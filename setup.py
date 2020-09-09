@@ -28,9 +28,9 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-           f'{NAME}-snr=scripts.snr:main',
-           f'{NAME}-psd=scripts.psd:main',
-           f'{NAME}-timelapse=scripts.timelapse:main',
+           f'{NAME}-snr=xcorr.scripts.snr:main',
+           f'{NAME}-psd=xcorr.scripts.psd:main',
+           f'{NAME}-timelapse=xcorr.scripts.timelapse:main',
         ],
     },
     scripts=[],
