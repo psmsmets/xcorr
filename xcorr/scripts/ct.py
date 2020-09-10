@@ -38,19 +38,19 @@ def main():
         help='Paths to netcdf files with signal-to-noise ratios'
     )
     parser.add_argument(
-        '-s', '--start', metavar='t0', type=str, default=None,
-        help='Set start datetime given format yyyy-mm-dd'
+        '-s', '--start', metavar='..', type=str, default=None,
+        help='Set start datetime (format: yyyy-mm-dd)'
     )
     parser.add_argument(
-        '-e', '--end', metavar='t1', type=str, default=None,
-        help='Set end datetime given format yyyy-mm-dd'
+        '-e', '--end', metavar='..', type=str, default=None,
+        help='Set end datetime (format: yyyy-mm-dd)'
     )
     parser.add_argument(
-        '-p', '--pair', metavar='pair', type=str, default='',
+        '-p', '--pair', metavar='..', type=str, default='',
         help='Filter pairs that contain the given string'
     )
     parser.add_argument(
-        '-t', '--threshold', metavar='threshold', type=float, default=10.,
+        '-t', '--threshold', metavar='..', type=float, default=10.,
         help='Coincidence trigger threshold (default: 10.)'
     )
     parser.add_argument(

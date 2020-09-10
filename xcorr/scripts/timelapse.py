@@ -211,7 +211,7 @@ def init_spectrogram_timelapse(pair, time, freq, root):
     ds = xr.Dataset()
 
     # set global attributes
-    nc = xcorr.util.ncfile(pair[0], time[0], os.path.join(root, 'cc'))
+    nc = xcorr.util.ncfile(pair[0], time[0], root)
     cc = xcorr.read(nc, quick_and_dirty=True)
     ds.attrs = cc.attrs
     cc.close()
@@ -305,7 +305,7 @@ def process_spectrogram_timelapse(ds: xr.Dataset, root: str,
     # map and persists to client
     mapped = ds.map_blocks(
         correlate_spectrograms,
-        args=[os.path.join(root, 'cc')],
+        args=[root],
         template=ds,
     ).persist()
 
@@ -339,26 +339,6 @@ def create_locks(ds, root, client=None):
 # Main function
 # -------------
 
-def help(e=None):
-    """Return the help text.
-    """
-    _help = """
-    Two-dimensional crosscorrelation of crosscorrelation spectrograms.
-
-    Usage: xcorr-timelapse <snr_ct> [option] ... [arg] ...
-    <snr_ct>         : Path to netcdf dataset with signal-to-noise ratio (snr)
-                       and coincidence triggers (ct) indicating the active
-                       periods of interest.
-    Options and arguments:
-    -f, --frequency= : Set psd frequency bands. Frequency should be a list of
-                       tuple-pairs with start and end frequencies. Defaults to
-                       --frequency="(3., 6.), (6., 12.)".
-    """
-
-    print('\n'.join([line[4:] for line in _help.splitlines()]))
-    raise SystemExit(e)
-
-
 def main():
     """Main script function.
     """
@@ -370,36 +350,36 @@ def main():
         epilog='See also xcorr-snr xcorr-ct xcorr-psd',
     )
     parser.add_argument(
-        'snr_ct', metavar='path', type=str,
+        'snr_ct', metavar='snr_ct', type=str,
         help=('Path to netcdf dataset with signal-to-noise ratio (snr) '
               'and coincidence triggers (ct) indicating the active periods '
               'of interest')
     )
     parser.add_argument(
-        '-s', '--start', metavar='start', type=str,
-        help='Start date given format yyyy-mm-dd'
+        '-s', '--start', metavar='..', type=str,
+        help='Start date (format: yyyy-mm-dd)'
     )
     parser.add_argument(
-        '-e', '--end', metavar='end', type=str,
-        help='End date given format yyyy-mm-dd'
+        '-e', '--end', metavar='', type=str,
+        help='End date (format: yyyy-mm-dd)'
     )
     parser.add_argument(
-        '-p', '--pair', metavar='pair', type=str, default='*',
+        '-p', '--pair', metavar='..', type=str, default='*',
         help='Filter pairs that contain the given string'
     )
     parser.add_argument(
-        '-f', '--frequency', metavar='f', type=str, default=None,
+        '-f', '--frequency', metavar='..', type=str, default=None,
         help=('Set psd frequency bands. Frequency should be a list of '
               'tuple-pairs with start and end frequencies (default: '
               '"(3., 6.), (6., 12.)")')
     )
     parser.add_argument(
-        '-r', '--root', metavar='path', type=str, default=os.getcwd(),
+        '-r', '--root', metavar='..', type=str, default=os.getcwd(),
         help=('Set crosscorrelation root directory (default: current '
               'working directory)')
     )
     parser.add_argument(
-        '-n', '--nworkers', metavar='n', type=int, default=None,
+        '-n', '--nworkers', metavar='..', type=int, default=None,
         help=('Set number of dask workers for local client. If a scheduler '
               'is set the client will wait until the number of workers is '
               'available.')
@@ -414,7 +394,7 @@ def main():
               'mirroring along the diagonal')
     )
     parser.add_argument(
-        '--chunk', metavar='c', type=int, default=10,
+        '-c', '--chunk', metavar='..', type=int, default=10,
         help=('Set dask chunks for time dimension (default: 10)')
     )
     parser.add_argument(
@@ -431,26 +411,38 @@ def main():
     )
     args = parser.parse_args()
 
-    # snr and ct files
+    # snr and ct file
     snr_ct = xr.open_dataset(args.snr_ct)
 
-    # extract arguments
-    root = os.path.abspath(args.root)
-    pair = args.pair
-    t0 = pd.to_datetime(args.start or snr_ct.time[0].values)
-    t1 = pd.to_datetime(args.end or snr_ct.time[-1].values)
-    freq = np.array(((3., 6.), (6., 12.)) or args.freq)
+    # update arguments
+    args.root = os.path.abspath(args.root)
+    args.start = pd.to_datetime(args.start or snr_ct.time[0].values)
+    args.end = pd.to_datetime(args.end or snr_ct.time[-1].values)
+    args.freq = np.array(((3., 6.), (6., 12.)) or args.freq)
 
     # print header and core parameters
     print(f'xcorr-timelapse v{xcorr.__version__}')
-    print('{:>20} : {}'.format('root', root))
+    print('{:>20} : {}'.format('root', args.root))
     print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
                                else args.pair))
-    print('{:>20} : {}'.format('start', t0))
-    print('{:>20} : {}'.format('end', t1))
+    print('{:>20} : {}'.format('start', args.start))
+    print('{:>20} : {}'.format('end', args.end))
     print('{:>20} : {}'.format(
-        'frequency', ', '.join([f'{f[0]}-{f[1]}' for f in freq])
+        'frequency', ', '.join([f'{f[0]}-{f[1]}' for f in args.freq])
     ))
+
+    # filter snr and ct
+    print('.. filter snr and ct')
+    snr_ct = snr_ct.where(
+        (
+            (snr_ct.time >= args.start.to_datetime64()) &
+            (snr_ct.time < args.end.to_datetime64()) &
+            (snr_ct.pair.str.contains(args.pair))
+        ),
+        drop=True,
+    )
+    if args.debug:
+        print(snr_ct)
 
     # init dask client
     client, cluster = init_dask(n_workers=args.n_workers,
@@ -461,8 +453,8 @@ def main():
     ds = init_spectrogram_timelapse(
         pair=snr_ct.pair,
         time=snr_ct.time.where(snr_ct.ct >= 0, drop=True),
-        freq=freq,
-        root=root
+        freq=args.freq,
+        root=args.root
     )
     print('dims: pair={pair}, freq={freq}, time={time}'.format(
         pair=ds.pair.size, freq=ds.freq.size, time=ds.time1.size,
@@ -471,7 +463,7 @@ def main():
         print(ds)
 
     # to netcdf
-    nc = ncfile('timelapse', pair, t0, t1)
+    nc = ncfile('timelapse', args.pair, args.start, args.end)
     print(f'.. write to "{nc}"')
     xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
 
@@ -483,13 +475,13 @@ def main():
 
     # create all locks
     print('.. init locks', end=', ')
-    locks = create_locks(ds, os.path.join(root, 'cc'), client)
+    locks = create_locks(ds, args.root, client)
     print(f'files = {len(locks)}')
 
     # persist to client
     print(f'.. map and compute blocks: chunk={args.chunk}, '
           f'sparse={args.sparse}')
-    ds = process_spectrogram_timelapse(ds, root, args.chunk, args.sparse)
+    ds = process_spectrogram_timelapse(ds, args.root, args.chunk, args.sparse)
 
     # to netcdf
     print(f'.. write to "{nc}"')

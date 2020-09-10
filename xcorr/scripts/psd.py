@@ -10,13 +10,10 @@ Spectrograms of triggered datasets by snr using dask.
 import numpy as np
 import pandas as pd
 import xarray as xr
-import matplotlib.pyplot as plt
 import dask
 import distributed
-from glob import glob
 import os
-import sys
-import getopt
+import argparse
 
 # Relative imports
 import xcorr
@@ -144,16 +141,16 @@ def write(ds, period, root):
 # Lazy psd for pairs and periods
 # ------------------------------
 
-def period_spectrograms(snr, trigs, root):
+def period_spectrograms(snr_ct, root, pair_contains=''):
     """Evaluate psds for a pair and a set of periods
     """
-    periods = xcorr.signal.trigger.trigger_periods(trigs)
+    periods = xcorr.signal.trigger.trigger_periods(snr_ct.ct)
     fnames = []
 
     for index, period in periods.iterrows():
-        snr_period = extract_period(snr, period)
+        snr_period = extract_period(snr_ct.snr, period)
 
-        for pair in snr.pair:
+        for pair in snr_ct.pair.where(snr_ct.pair.str.contains(pair_contains)):
             ds = load(pair, period, root)
             cc = preprocess(ds)
             psd = spectrogram(cc)
@@ -164,138 +161,103 @@ def period_spectrograms(snr, trigs, root):
 
 
 ###############################################################################
-# Main functions
-# --------------
-
-def help(e=None):
-    """Return the help text.
-    """
-    _help = """
-    Spectrogram estimation of signal-to-noise ratio triggered periods.
-
-    Usage: xcorr-psd <snr_ct> [option] ... [arg] ...
-    <snr_ct>         : Path to netcdf dataset with signal-to-noise ratio (snr)
-                       and coincidence triggers (ct) indicating the active
-                       periods of interest.
-    Options and arguments:
-        --debug      : Maximize verbosity.
-    -e, --end        : Set end datetime given format yyyy-mm-dd.
-    -h, --help       : Print this help message and exit.
-    -n, --nworkers=  : Set number of dask workers for local client. If a
-                       scheduler set the client will wait until the number
-                       of workers is available.
-    -p, --pair=      : Filter pair that contain the given string. If empty all
-                       pairs are used.
-        --plot       : Generate some plots during processing (stalls).
-    -r, --root=      : Set crosscorrelation root. Defaults to current working
-                       directory. Generated netcdf files are stored in the
-                       current working directory.
-    -s, --start      : Set start datetime given format yyyy-mm-dd.
-        --scheduler= : Connect to a dask scheduler by a scheduler-file.
-    -v, --version    : Print xcorr version number and exit."""
-
-    print('\n'.join([line[4:] for line in _help.splitlines()]))
-    raise SystemExit(e)
-
+# Main function
+# -------------
 
 def main():
     """Main script function.
     """
 
-    # help?
-    if '-h' in sys.argv[1:] or '--help' in sys.argv[1:]:
-        help()
+    parser = argparse.ArgumentParser(
+        prog='xcorr-psd',
+        description=('Spectrogram estimation of signal-to-noise ratio '
+                     'triggered periods.'),
+        epilog='See also xcorr-snr xcorr-ct xcorr-timelapse',
+    )
+    parser.add_argument(
+        'snr_ct', metavar='snr_ct', type=str,
+        help=('Path to netcdf dataset with signal-to-noise ratio (snr) '
+              'and coincidence triggers (ct) indicating the active periods '
+              'of interest')
+    )
+    parser.add_argument(
+        '-s', '--start', metavar='..', type=str,
+        help='Start date (format: yyyy-mm-dd)'
+    )
+    parser.add_argument(
+        '-e', '--end', metavar='', type=str,
+        help='End date (format: yyyy-mm-dd)'
+    )
+    parser.add_argument(
+        '-p', '--pair', metavar='..', type=str, default='*',
+        help='Filter pairs that contain the given string'
+    )
+    parser.add_argument(
+        '-r', '--root', metavar='..', type=str, default=os.getcwd(),
+        help=('Set crosscorrelation root directory (default: current '
+              'working directory)')
+    )
+    parser.add_argument(
+        '-n', '--nworkers', metavar='..', type=int, default=None,
+        help=('Set number of dask workers for local client. If a scheduler '
+              'is set the client will wait until the number of workers is '
+              'available.')
+    )
+    parser.add_argument(
+        '--scheduler', metavar='path', type=str, default=None,
+        help='Connect to a dask scheduler by a scheduler-file.'
+    )
+    parser.add_argument(
+        '--debug', action='store_true',
+        help='Maximize verbosity'
+    )
+    parser.add_argument(
+        '--version', action='version', version=xcorr.__version__,
+        help='Print xcorr version and exit'
+    )
+    args = parser.parse_args()
 
-    # version?
-    if '-v' in sys.argv[1:] or '--version' in sys.argv[1:]:
-        print(xcorr.__version__)
-        raise SystemExit(0)
+    # snr and ct file
+    snr_ct = xr.open_dataset(args.snr_ct)
 
-    # start and end datetime
-    if len(sys.argv) < 3:
-        print('Both start and end datetime should be set!')
-        raise SystemExit(1)
-    starttime = pd.to_datetime(sys.argv[1])
-    endtime = pd.to_datetime(sys.argv[2])
-
-    # optional args
-    pair, root, n_workers, scheduler = None, None, None, None
-    plot, debug = False, False
-
-    try:
-        opts, args = getopt.getopt(
-            sys.argv[3:],
-            'c:f:n:p:r:',
-            ['debug', 'nworkers=', 'pair=', 'plot', 'root=', 'scheduler=']
-        )
-    except getopt.GetoptError as e:
-        help(e)
-
-    for opt, arg in opts:
-        if opt in ('--debug'):
-            debug = True
-        elif opt in ('-n', '--nworkers'):
-            n_workers = int(arg)
-        elif opt in ('-p', '--pair'):
-            pair = '' if arg == '*' else arg
-        elif opt in ('--plot'):
-            plot = True
-        elif opt in ('-r', '--root'):
-            root = arg
-        elif opt in ('--scheduler'):
-            scheduler = arg
-
-    pair = pair or ''
-    root = os.path.abspath(root) if root is not None else os.getcwd()
+    # update arguments
+    args.root = os.path.abspath(args.root)
+    args.start = pd.to_datetime(args.start or snr_ct.time[0].values)
+    args.end = pd.to_datetime(args.end or snr_ct.time[-1].values)
 
     # print header and core parameters
     print(f'xcorr-psd v{xcorr.__version__}')
-    print('{:>20} : {}'.format('root', root))
-    print('{:>20} : {}'.format('pair', '*' if pair == '' else pair))
-    print('{:>20} : {}'.format('starttime', starttime))
-    print('{:>20} : {}'.format('endtime', endtime))
+    print('{:>20} : {}'.format('root', args.root))
+    print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
+                               else args.pair))
+    print('{:>20} : {}'.format('start', args.start))
+    print('{:>20} : {}'.format('end', args.end))
 
-    # init dask client
-    client, cluster = init_dask(n_workers=n_workers, scheduler_file=scheduler)
-
-    # snr
-    print('.. load signal-to-noise ratio')
-    snr = xr.merge([xr.open_dataarray(f) for f in
-                    glob(os.path.join(root, 'snr', 'snr_*.nc'))]).snr
-    snr = snr.where(
+    # filter snr and ct
+    print('.. filter snr and ct')
+    snr_ct = snr_ct.where(
         (
-            (snr.time >= starttime.to_datetime64()) &
-            (snr.time < endtime.to_datetime64()) &
-            (snr.pair.str.contains(pair))
+            (snr_ct.time >= args.start.to_datetime64()) &
+            (snr_ct.time < args.end.to_datetime64()) &
+            (snr_ct.pair.str.contains(args.pair))
         ),
         drop=True,
     )
-    if debug:
-        print(snr)
+    if args.debug:
+        print(snr_ct)
 
-    # get confindence triggers
-    print('.. get coincidence triggers', end=', ')
-    ct = xcorr.signal.coincidence_trigger(
-        snr, thr_on=10., extend=0, thr_coincidence_sum=None,
-    )
-    print(f'periods = {ct.attrs["nperiods"]}')
-    if debug:
-        print(ct)
-    if plot:
-        snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
-                      add_legend=False)
-        xcorr.signal.trigger.plot_trigs(snr, ct)
-        plt.tight_layout()
-        plt.show()
+    # init dask client
+    client, cluster = init_dask(n_workers=args.n_workers,
+                                scheduler_file=args.scheduler)
 
     # construct datasets with preprocessed cc, snr and psd
     print('.. construct files per active period')
 
-    mapped = client.compute(period_spectrograms(snr, ct, root))
+    mapped = client.compute(period_spectrograms(snr_ct, args.root, args.pair))
     distributed.wait(mapped)
 
     files = client.gather(mapped)
-    if debug:
+    if args.debug:
         print(files)
 
     # close dask client and cluster

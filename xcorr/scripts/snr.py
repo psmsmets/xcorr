@@ -97,29 +97,29 @@ def main():
     )
     parser.add_argument(
         'start', metavar='start', type=str,
-        help='Start date given format yyyy-mm-dd'
+        help='Start date (format: yyyy-mm-dd)'
     )
     parser.add_argument(
         'end', metavar='end', type=str,
-        help='End date given format yyyy-mm-dd'
+        help='End date (format: yyyy-mm-dd)'
     )
     parser.add_argument(
-        '-p', '--pair', metavar='pair', type=str, default='*',
+        '-p', '--pair', metavar='..', type=str, default='*',
         help='Filter pairs that contain the given string'
     )
     parser.add_argument(
-        '-r', '--root', metavar='path', type=str, default=os.getcwd(),
+        '-r', '--root', metavar='..', type=str, default=os.getcwd(),
         help=('Set crosscorrelation root directory (default: current '
               'working directory)')
     )
     parser.add_argument(
-        '-n', '--nworkers', metavar='n', type=int, default=None,
+        '-n', '--nworkers', metavar='..', type=int, default=None,
         help=('Set number of dask workers for local client. If a scheduler '
               'is set the client will wait until the number of workers is '
               'available.')
     )
     parser.add_argument(
-        '--scheduler', metavar='path', type=str, default=None,
+        '--scheduler', metavar='..', type=str, default=None,
         help='Connect to a dask scheduler by a scheduler-file'
     )
     parser.add_argument(
@@ -135,19 +135,16 @@ def main():
         help='Print xcorr version and exit'
     )
     args = parser.parse_args()
-
-    # extract arguments
-    root = os.path.abspath(args.root)
-    pair = args.pair
-    t0 = pd.to_datetime(args.start)
-    t1 = pd.to_datetime(args.end)
+    args.root = os.path.abspath(args.root)
+    args.start = pd.to_datetime(args.start)
+    args.end = pd.to_datetime(args.end)
 
     # print header and core parameters
     print(f'xcorr-snr v{xcorr.__version__}')
-    print('{:>20} : {}'.format('root', root))
-    print('{:>20} : {}'.format('pair', pair))
-    print('{:>20} : {}'.format('start', t0.strftime('%Y-%m-%d')))
-    print('{:>20} : {}'.format('end', t1.strftime('%Y-%m-%d')))
+    print('{:>20} : {}'.format('root', args.root))
+    print('{:>20} : {}'.format('pair', args.pair))
+    print('{:>20} : {}'.format('start', args.start.strftime('%Y-%m-%d')))
+    print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
 
     # init dask client
     client, cluster = init_dask(n_workers=args.n_workers,
@@ -156,8 +153,8 @@ def main():
     # list of files using dask
     print('.. validate cc filelist')
     validated = xcorr.core.validate_list(
-        [xcorr.util.ncfile(pair, time, root, verify_receiver=False)
-         for time in pd.date_range(t0, t1)],
+        [xcorr.util.ncfile(args.pair, t, args.root, verify_receiver=False)
+         for t in pd.date_range(args.start, args.end)],
         fast=True,
         paths_only=True,
         keep_opened=False,
@@ -174,7 +171,7 @@ def main():
     snr = xr.merge(client.gather(mapped))
 
     # to netcdf
-    nc = ncfile('snr', pair, t0, t1)
+    nc = ncfile('snr', args.pair, args.start, args.end)
     print(f'.. write to "{nc}"')
     xcorr.write(snr, nc, variable_encoding=dict(zlib=True, complevel=9),
                 verb=1 if args.debug else 0)
