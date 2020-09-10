@@ -213,6 +213,10 @@ def init_spectrogram_timelapse(pair, time, freq, root):
     # set global attributes
     nc = xcorr.util.ncfile(pair[0], time[0], root)
     cc = xcorr.read(nc, quick_and_dirty=True)
+    if cc is None:
+        raise RuntimeError(
+            f'Could not read cc file. Is root "{root}" correct?'
+        )
     ds.attrs = cc.attrs
     cc.close()
     ds.attrs['xcorr_version'] = xcorr.__version__
@@ -495,8 +499,9 @@ def main():
 
     # persist to client
     print(f'.. map and compute blocks: chunk={args.chunk}, '
-          f'sparse={args.sparse}')
-    ds = process_spectrogram_timelapse(ds, args.root, args.chunk, args.sparse)
+          f'sparse={not args.abundant}')
+    ds = process_spectrogram_timelapse(ds, args.root, args.chunk,
+                                       not args.abundant)
 
     # to netcdf
     print(f'.. write to "{nc}"')
