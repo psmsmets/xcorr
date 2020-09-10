@@ -458,14 +458,14 @@ def main():
 
     # to netcdf
     nc = ncfile('timelapse', args.pair, args.start, args.end)
-    print(f'.. write to "{nc}"')
-    xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
+    # print(f'.. write to "{nc}"')
+    # xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
 
     # load dataset
-    print(f'.. load from "{nc}"')
-    ds = xr.open_dataset(nc, engine='h5netcdf')
-    if args.debug:
-        print(ds)
+    # print(f'.. load from "{nc}"')
+    # ds = xr.open_dataset(nc, engine='h5netcdf')
+    # if args.debug:
+    #     print(ds)
 
     # create all locks
     print('.. init locks', end=', ')
