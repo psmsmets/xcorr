@@ -281,18 +281,18 @@ def process_spectrogram_timelapse(ds: xr.Dataset, root: str,
     chunk = chunk or 10
     ds = ds.chunk({'time1': chunk, 'time2': chunk})
 
-    # map and persists to client
+    # map blocks
     mapped = ds.map_blocks(
         correlate_spectrograms,
         args=[root],
         template=ds,
-    ).persist()
+    )
 
     # force await on async
-    distributed.wait(mapped)
+    # distributed.wait(mapped)
 
-    # load dask to xarray
-    ds = mapped.load()
+    # compute blocks
+    ds = mapped.compute()
 
     # fill upper triangle
     if sparse:
@@ -459,11 +459,11 @@ def main():
     # to netcdf
     nc = ncfile('timelapse', args.pair, args.start, args.end)
     print(f'.. write to "{nc}"')
-    # xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
+    xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
 
     # load dataset
     print(f'.. load from "{nc}"')
-    # ds = xr.open_dataset(nc, engine='h5netcdf')
+    ds = xr.open_dataset(nc, engine='h5netcdf')
     if args.debug:
         print(ds)
 
