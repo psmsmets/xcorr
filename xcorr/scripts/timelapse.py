@@ -66,7 +66,7 @@ def get_spectrogram(pair, time, root):
     if xr.ufuncs.isnan(cc).any():
         return
 
-    # solve time_offset and pair_offset
+    # extract time_offset and pair_offset
     delay = -xcorr.util.time.to_seconds(ds.pair_offset + ds.time_offset)
 
     # process cc
@@ -79,25 +79,12 @@ def get_spectrogram(pair, time, root):
     # spectrogram
     psd = xcorr.signal.spectrogram(cc, duration=2., padding_factor=8)
 
-    # clear
-    cc, ds = None, None
-
     return psd
 
 
 def correlate_spectrograms(obj, root):
     """Correlate spectrograms.
     """
-    # already set?
-    if obj.status.all():
-        sleep(.5)  # give scheduler and worker some time
-        return obj
-
-    # test if object is loaded
-    if not (obj.freq.any() and obj.pair.any()):
-        sleep(.5)  # give scheduler and worker some time
-        return obj
-
     # process per item
     for pair in obj.pair:
         for time1 in obj.time1:
@@ -111,28 +98,16 @@ def correlate_spectrograms(obj, root):
                 }].all():
                     continue
 
-                # reset
-                psd1, psd2 = None, None
-
                 # load cc and compute psd on-the-fly
+                psd1, psd2 = None, None
                 try:
                     psd1 = get_spectrogram(pair, time1, root)
-                except (KeyboardInterrupt, SystemExit):
-                    raise
-                except Exception:
-                    continue
-
-                if psd1 is None:
-                    continue
-
-                try:
                     psd2 = get_spectrogram(pair, time2, root)
                 except (KeyboardInterrupt, SystemExit):
                     raise
                 except Exception:
                     continue
-
-                if psd2 is None:
+                if psd1 is None or psd2 is None:
                     continue
 
                 # correlate per freq range
@@ -484,11 +459,11 @@ def main():
     # to netcdf
     nc = ncfile('timelapse', args.pair, args.start, args.end)
     print(f'.. write to "{nc}"')
-    xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
+    # xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
 
     # load dataset
     print(f'.. load from "{nc}"')
-    ds = xr.open_dataset(nc, engine='h5netcdf')
+    # ds = xr.open_dataset(nc, engine='h5netcdf')
     if args.debug:
         print(ds)
 
