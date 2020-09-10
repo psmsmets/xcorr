@@ -161,7 +161,7 @@ def correlate1d(
 
 def correlate2d(
     in1: xr.DataArray, in2: xr.DataArray, normalize: bool = True,
-    dtype: np.dtype = None, dim: tuple = None, **kwargs
+    dtype: np.dtype = None, dims: tuple = None, **kwargs
 ):
     """
     Two-dimensional crosscorrelate two N-D labelled arrays of data.
@@ -181,7 +181,7 @@ def correlate2d(
     dtype : :class:`np.dtype`, optional
         Set the dtype. If `None` (default), the dtype of ``in1`` is used.
 
-    dim : `tuple`, optional
+    dims : `tuple`, optional
         A tuple pair with the coordinates name of ``in1`` and ``in2`` to
         crosscorrelate. Defaults to the last two dimensions of ``in1``.
 
@@ -198,22 +198,22 @@ def correlate2d(
     """
 
     # dim
-    dim = dim or in1.dims[-2:]
-    if not isinstance(dim, tuple) or len(dim) != 2:
-        raise TypeError('dim should be a tuple of length 2')
+    dims = dims or in1.dims[-2:]
+    if not isinstance(dims, tuple) or len(dims) != 2:
+        raise TypeError('dims should be a tuple of length 2')
 
-    if dim[0] not in in1.dims or dim[1] not in in1.dims:
-        raise ValueError(f'in1 has no dimensions "{dim}"')
-
-    if dim[0] not in in2.dims or dim[1] not in in2.dims:
-        raise ValueError(f'in2 has no dimensions "{dim}"')
+    for d in dims:
+        if d not in in1.dims:
+            raise ValueError(f'in1 has no dimensions "{dim}"')
+        if d not in in2.dims:
+            raise ValueError(f'in2 has no dimensions "{dim}"')
 
     if in1.shape != in2.shape:
         raise ValueError('in1 and in2 should have the same shape!')
 
     # check regular spacing
-    _regular_dim(in1[dim[0]])
-    _regular_dim(in1[dim[1]])
+    _regular_dim(in1[dims[0]])
+    _regular_dim(in1[dims[1]])
 
     # dtype
     dtype = dtype or in1.dtype
@@ -221,19 +221,19 @@ def correlate2d(
         raise TypeError('dtype should be a numpy.dtype')
     dtype = np.dtype(dtype).type
 
-    # new dim
-    new_dim = (f'delta_{dim[0]}',  f'delta_{dim[1]}')
+    # new dims
+    new_dims = (f'delta_{dims[0]}',  f'delta_{dims[1]}')
 
     # pad
-    npad = [2*in1[d].size-1 for d in dim]
+    npad = [2*in1[d].size-1 for d in dims]
 
     # set axes
     ax = (-2, -1)
 
     # normalize?
     if normalize:
-        in1 = norm2d(in1, dim)
-        in2 = norm2d(in2, dim)
+        in1 = norm2d(in1, dims)
+        in2 = norm2d(in2, dims)
 
     # wrapper to simplify ufunc input
     def _correlate2d(f, g):
@@ -250,8 +250,8 @@ def correlate2d(
 
     # apply ufunc (and optional dask distributed)
     cc = xr.apply_ufunc(_correlate2d, in1, in2,
-                        input_core_dims=[dim, dim],
-                        output_core_dims=[new_dim],
+                        input_core_dims=[dims, dims],
+                        output_core_dims=[new_dims],
                         keep_attrs=False,
                         vectorize=False,
                         **dargs,
@@ -259,16 +259,16 @@ def correlate2d(
 
     # add new dim
     cc = cc.assign_coords({
-        new_dim[0]: _new_coord(in1[dim[0]]),
-        new_dim[1]: _new_coord(in1[dim[1]]),
+        new_dims[0]: _new_coord(in1[dims[0]]),
+        new_dims[1]: _new_coord(in1[dims[1]]),
     })
 
     # set attributes
-    cc.name = 'cc'
+    cc.name = 'cc2'
     cc.attrs = {
         **cc.attrs,
-        'long_name': 'Crosscorrelation Estimate',
-        'standard_name': 'crosscorrelation_estimate',
+        'long_name': 'Two-dimensional Crosscorrelation Estimate',
+        'standard_name': '2d_crosscorrelation_estimate',
         'units': '-',
         'add_offset': dtype(0.),
         'scale_factor': dtype(1.),
@@ -284,7 +284,7 @@ def correlate2d(
     historicize(cc, f='correlate2d', a={
         'in1': in1.name,
         'in2': in2.name,
-        'dim': dim,
+        'dims': dims,
         '**kwargs': kwargs,
     })
 
@@ -295,7 +295,7 @@ def _new_coord(old):
     """Private helper to construct the new dimension.
     """
     n = 2*old.size-1
-    s = (old.max()-old.min()).values/(old.size-1)
+    s = (old.max()-old.min()).item()/(old.size-1)
 
     new = xr.DataArray(
         data=fft.fftshift(fft.fftfreq(n, 1/n/s)),

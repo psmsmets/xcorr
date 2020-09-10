@@ -31,6 +31,7 @@ __all__ = ['fft', 'ifft']
 
 _recip_name = '__reciprocal_name__'
 _recip_attr = '__reciprocal_attr__'
+_recip_type = '__reciprocal_type__'
 
 
 def fft(
@@ -92,7 +93,9 @@ def fft(
         raise TypeError('new_dim_attrs should be a dictionary')
 
     # dtype
-    dtype = np.dtype(dtype or np.complex_(real=x.dtype.name))
+    old_dtype = x.attrs[_recip_type] if _recip_type in x.attrs else None
+    dtype = np.dtype(dtype or old_dtype or
+                     f'complex{x.dtype.alignment * 16}')
     if not isinstance(dtype, np.dtype):
         raise TypeError('dtype should be a numpy.dtype')
     if 'complex' not in dtype.name:
@@ -140,6 +143,9 @@ def fft(
             },
         ),
     })
+
+    # add old dtype to attrs
+    y.attrs[_recip_type] = x.dtype.name
 
     # log workflow
     historicize(y, f='fft', a={
@@ -212,7 +218,9 @@ def ifft(
         raise TypeError('new_dim_attrs should be a dictionary')
 
     # dtype
-    dtype = np.dtype(dtype or np.float_(x=x.dtype.name))
+    old_dtype = x.attrs[_recip_type] if _recip_type in x.attrs else None
+    dtype = np.dtype(dtype or old_dtype or
+                     f'float{x.dtype.alignment * 8}')
     if not isinstance(dtype, np.dtype):
         raise TypeError('dtype should be a numpy.dtype')
     if 'float' not in dtype.name:
@@ -270,6 +278,9 @@ def ifft(
             },
         ),
     })
+
+    # add old dtype to attrs
+    y.attrs[_recip_type] = x.dtype.name
 
     # log workflow
     historicize(y, f='ifft', a={

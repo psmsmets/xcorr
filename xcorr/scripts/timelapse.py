@@ -77,7 +77,7 @@ def get_spectrogram(pair, time, root):
     cc = xcorr.signal.taper(cc, max_length=2/3.)
 
     # spectrogram
-    psd = xcorr.signal.spectrogram(cc, duration=2., padding_factor=8)
+    psd = xcorr.signal.spectrogram(cc, duration=2.5, padding_factor=4)
 
     return psd
 
@@ -99,14 +99,16 @@ def correlate_spectrograms(obj, root):
                     continue
 
                 # load cc and compute psd on-the-fly
-                psd1, psd2 = None, None
-                try:
-                    psd1 = get_spectrogram(pair, time1, root)
-                    psd2 = get_spectrogram(pair, time2, root)
-                except (KeyboardInterrupt, SystemExit):
-                    raise
-                except Exception:
-                    continue
+                psd1 = get_spectrogram(pair, time1, root)
+                psd2 = get_spectrogram(pair, time2, root)
+                # psd1, psd2 = None, None
+                # try:
+                #     psd1 = get_spectrogram(pair, time1, root)
+                #     psd2 = get_spectrogram(pair, time2, root)
+                # except (KeyboardInterrupt, SystemExit):
+                #     raise
+                # except Exception:
+                #     continue
                 if psd1 is None or psd2 is None:
                     continue
 
@@ -134,6 +136,8 @@ def correlate_spectrograms(obj, root):
 
                     # get max index
                     amax1, amax2 = np.unravel_index(cc2.argmax(), cc2.shape)
+                    # print(dim1, amax1, cc2[dim1][amax1].item(),
+                    #       dim2, amax2, cc2[dim2][amax2].item())
 
                     # store values in object
                     item = {
@@ -281,18 +285,18 @@ def process_spectrogram_timelapse(ds: xr.Dataset, root: str,
     chunk = chunk or 10
     ds = ds.chunk({'time1': chunk, 'time2': chunk})
 
-    # map blocks
+    # map and persist blocks
     mapped = ds.map_blocks(
         correlate_spectrograms,
         args=[root],
         template=ds,
-    )
+    ).persist()
 
     # force await on async
-    # distributed.wait(mapped)
+    distributed.wait(mapped)
 
-    # compute blocks
-    ds = mapped.compute()
+    # load blocks
+    ds = mapped.load()
 
     # fill upper triangle
     if sparse:
