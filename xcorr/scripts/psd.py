@@ -208,6 +208,10 @@ def main():
         help='Connect to a dask scheduler by a scheduler-file.'
     )
     parser.add_argument(
+        '--plot', action='store_true',
+        help='Generate plots during processing (stalls)'
+    )
+    parser.add_argument(
         '--debug', action='store_true',
         help='Maximize verbosity'
     )
@@ -245,6 +249,12 @@ def main():
     )
     if args.debug:
         print(snr_ct)
+    if args.plot:
+        snr_ct.snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
+                             add_legend=False)
+        xcorr.signal.trigger.plot_trigs(snr_ct.snr, snr_ct.ct)
+        plt.tight_layout()
+        plt.show()
 
     # init dask client
     client, cluster = init_dask(n_workers=args.nworkers,

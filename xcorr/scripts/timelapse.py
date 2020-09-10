@@ -443,6 +443,12 @@ def main():
     )
     if args.debug:
         print(snr_ct)
+    if args.plot:
+        snr_ct.snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
+                             add_legend=False)
+        xcorr.signal.trigger.plot_trigs(snr_ct.snr, snr_ct.ct)
+        plt.tight_layout()
+        plt.show()
 
     # init dask client
     client, cluster = init_dask(n_workers=args.nworkers,
