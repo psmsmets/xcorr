@@ -10,6 +10,7 @@ Spectrograms of triggered datasets by snr using dask.
 import numpy as np
 import pandas as pd
 import xarray as xr
+import matplotlib.pyplot as plt
 import dask
 import distributed
 import os
@@ -141,16 +142,16 @@ def write(ds, period, root):
 # Lazy psd for pairs and periods
 # ------------------------------
 
-def period_spectrograms(snr_ct, root, pair_contains=''):
+def period_spectrograms(snr, ct, root):
     """Evaluate psds for a pair and a set of periods
     """
-    periods = xcorr.signal.trigger.trigger_periods(snr_ct.ct)
+    periods = xcorr.signal.trigger.trigger_periods(ct)
     fnames = []
 
     for index, period in periods.iterrows():
-        snr_period = extract_period(snr_ct.snr, period)
+        snr_period = extract_period(snr, period)
 
-        for pair in snr_ct.pair.where(snr_ct.pair.str.contains(pair_contains)):
+        for pair in snr.pair:
             ds = load(pair, period, root)
             cc = preprocess(ds)
             psd = spectrogram(cc)
@@ -239,7 +240,7 @@ def main():
 
     # filter snr and ct
     print('.. filter snr and ct')
-    snr_ct = snr_ct.where(
+    snr = snr_ct.snr.where(
         (
             (snr_ct.time >= args.start.to_datetime64()) &
             (snr_ct.time < args.end.to_datetime64()) &
@@ -248,11 +249,20 @@ def main():
         drop=True,
     )
     if args.debug:
-        print(snr_ct)
+        print(snr)
+    ct = snr_ct.ct.where(
+        (
+            (snr_ct.time >= args.start.to_datetime64()) &
+            (snr_ct.time < args.end.to_datetime64())
+        ),
+        drop=True,
+    )
+    if args.debug:
+        print(ct)
     if args.plot:
-        snr_ct.snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
-                             add_legend=False)
-        xcorr.signal.trigger.plot_trigs(snr_ct.snr, snr_ct.ct)
+        snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
+                      add_legend=False)
+        xcorr.signal.trigger.plot_trigs(snr, ct)
         plt.tight_layout()
         plt.show()
 
@@ -263,7 +273,7 @@ def main():
     # construct datasets with preprocessed cc, snr and psd
     print('.. construct files per active period')
 
-    mapped = client.compute(period_spectrograms(snr_ct, args.root, args.pair))
+    mapped = client.compute(period_spectrograms(snr, ct, args.root))
     distributed.wait(mapped)
 
     files = client.gather(mapped)

@@ -26,7 +26,7 @@ _pair_type_error = ('``pair`` should be a string or tuple with the '
 
 
 def ncfile(pair, time: pd.Timestamp, root: str = None,
-           verify_receiver: bool=True, **kwargs):
+           verify_receiver: bool = True, **kwargs):
     r"""Return the netCDF filename and path.
 
     Parameters
@@ -42,7 +42,7 @@ def ncfile(pair, time: pd.Timestamp, root: str = None,
 
     verify_receiver : `bool`, optional
         If `True` (default), verify each receiver for valid SEED-id naming
-        without wildcards. 
+        without wildcards.
 
     Returns
     -------

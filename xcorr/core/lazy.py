@@ -189,7 +189,7 @@ def lazy_processes(
 
                 if verb > 0:
                     print('Skip.')
-    
+
     if len(tasks) == 0:
         raise RuntimeError('No lazy processes added.')
 
