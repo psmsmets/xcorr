@@ -27,7 +27,7 @@ def init_dask(n_workers: int = None, scheduler_file: str = None):
             print('OK.')
     else:
         cluster = distributed.LocalCluster(
-            processes=False, threads_per_worker=1, n_workers=n_workers or 4,
+            processes=False, threads_per_worker=1, n_workers=n_workers,
         )
         print('... dask local cluster:', repr(cluster))
         client = distributed.Client(cluster)
