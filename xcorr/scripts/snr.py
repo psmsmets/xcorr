@@ -8,6 +8,7 @@ Signal-to-noise ratio estimation of crosscrorrelations.
 
 # Mandatory imports
 import pandas as pd
+from pandas.tseries.offsets import DateOffset
 import xarray as xr
 import matplotlib.pyplot as plt
 import dask
@@ -162,10 +163,9 @@ def help(e=None):
     -p, --pair=      : Filter pair that contain the given string. If empty all
                        pairs are used.
         --plot       : Generate some plots during processing (stalls).
-    -r, --root=      : Set root. Defaults to current working directory.
-                       Crosscorrelations should be in "{root}/cc" following
-                       xcorr folder structure. SNR results are stored in
-                       "{root}/snr".
+    -r, --root=      : Set crosscorrelation root. Defaults to current working
+                       directory. SNR output netcdf file is stored in the
+                       current working directory.
         --scheduler= : Connect to a dask scheduler by a scheduler-file.
     -v, --version    : Print xcorr version number and exit."""
 
@@ -191,7 +191,7 @@ def main():
         print('Both start and end datetime should be set!')
         raise SystemExit(1)
     starttime = pd.to_datetime(sys.argv[1])
-    endtime = pd.to_datetime(sys.argv[2])
+    endtime = pd.to_datetime(sys.argv[2]) - DateOffset(days=1)
 
     # optional args
     pair, root, n_workers, scheduler = None, None, None, None
@@ -250,14 +250,14 @@ def main():
     # list of files using dask
     print('.. validate cc filelist')
     validated = xcorr.core.validate_list(
-        [xcorr.util.ncfile(pair, time, os.path.join(root, 'cc'),
-                           verify_receiver=False)
+        [xcorr.util.ncfile(pair, time, root, verify_receiver=False)
          for time in pd.date_range(starttime, endtime)],
         fast=True,
         paths_only=True,
         keep_opened=False,
     )
-    assert validated, 'No data found!'
+    if len(validated) == 0:
+        raise RuntimeError('No data found!')
 
     # snr
     print('.. compute snr for filelist')
@@ -268,11 +268,11 @@ def main():
     snr = xr.merge(client.gather(mapped))
 
     # to netcdf
-    nc = os.path.join(root, 'snr', 'snr_{}_{}_{}.nc'.format(
+    nc = 'snr_{}_{}_{}.nc'.format(
         'all' if pair == '*' else pair.translate({ord(c): None for c in '*?'}),
         starttime.strftime('%Y%j'),
         endtime.strftime('%Y%j'),
-    ))
+    )
     print(f'.. write to "{nc}"')
     xcorr.write(
         data=snr,
