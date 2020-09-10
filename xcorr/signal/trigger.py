@@ -218,7 +218,7 @@ def trigger_periods(trigs: xr.DataArray):
 
     per = []
 
-    for i in range(trigs.values.max()):
+    for i in range(trigs.max(skipna=True).astype(int).item()):
         trig = trigs.time.where(trigs == i, drop=True)
         per.append(
             pd.DataFrame(
@@ -256,7 +256,7 @@ def trigger_values(x: xr.DataArray, trigs: xr.DataArray):
 
     val = []
 
-    for i in range(trigs.values.max()):
+    for i in range(trigs.max(skipna=True).astype(int).item()):
         trig = trigs.time.where(trigs == i, drop=True)
         tmp = x.sel(time=trig).to_dataframe()
         tmp['period'] = i
@@ -285,9 +285,13 @@ def plot_trigs(x: xr.DataArray, trigs: xr.DataArray, ax: plt.Axes = None):
     """
     ax = ax or plt.gca()
 
-    ymin, ymax = x.min().values, x.max().values
-    for i in range(trigs.values.max()):
-        ax.fill_between(
-            trigs.time.where(trigs == i, drop=True).values, ymin, ymax,
-            alpha=0.2, color='black'
-        )
+    ymin, ymax = 0., x.max(skipna=True).item()
+    imin = trigs.max(skipna=True).astype(int).item()
+    imax = trigs.min(skipna=True).astype(int).item()
+    for i in range(imin, imax+1):
+        sel = trigs == i
+        if sel.any():
+            ax.fill_between(
+                trigs.time.where(sel, drop=True).values, ymin, ymax,
+                alpha=0.2, color='black'
+            )
