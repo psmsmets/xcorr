@@ -445,7 +445,7 @@ def main():
         print(snr_ct)
 
     # init dask client
-    client, cluster = init_dask(n_workers=args.n_workers,
+    client, cluster = init_dask(n_workers=args.nworkers,
                                 scheduler_file=args.scheduler)
 
     # init timelapse

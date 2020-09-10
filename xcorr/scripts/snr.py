@@ -147,7 +147,7 @@ def main():
     print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
 
     # init dask client
-    client, cluster = init_dask(n_workers=args.n_workers,
+    client, cluster = init_dask(n_workers=args.nworkers,
                                 scheduler_file=args.scheduler)
 
     # list of files using dask
