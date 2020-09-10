@@ -12,7 +12,7 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import dask
-from dask import distributed
+import distributed
 from glob import glob
 import os
 import sys
@@ -20,7 +20,7 @@ import getopt
 
 # Relative imports
 import xcorr
-
+from .helpers import init_dask, close_dask
 
 __all__ = []
 
@@ -30,7 +30,7 @@ __all__ = []
 # -----------------
 
 @dask.delayed
-def _load(pair, period, root):
+def load(pair, period, root):
     """Load cc of a single pair for a period.
     """
     t0 = period.start + pd.tseries.offsets.DateOffset(normalize=True)
@@ -73,7 +73,7 @@ def _load(pair, period, root):
 
 
 @dask.delayed
-def _extract_period(ds, period):
+def extract_period(ds, period):
     """Extract time period
     """
     t0, t1 = np.datetime64(period.start), np.datetime64(period.end)
@@ -83,7 +83,7 @@ def _extract_period(ds, period):
 
 
 @dask.delayed
-def _preprocess(ds):
+def preprocess(ds):
     """Preprocess cc
     """
     cc = ds.cc
@@ -100,7 +100,7 @@ def _preprocess(ds):
 
 
 @dask.delayed
-def _spectrogram(cc):
+def spectrogram(cc):
     """Calculate spectrogram
     """
     psd = xcorr.signal.spectrogram(cc, duration=2., padding_factor=4)
@@ -109,7 +109,7 @@ def _spectrogram(cc):
 
 
 @dask.delayed
-def _combine(ds, cc, psd, snr):
+def combine(ds, cc, psd, snr):
     """Combine all into a single dataset
     """
     ds['cc'] = cc
@@ -119,7 +119,7 @@ def _combine(ds, cc, psd, snr):
 
 
 @dask.delayed
-def _write(ds, period, root):
+def write(ds, period, root):
     """Merge spectrogram list
     """
     # parameters
@@ -144,21 +144,21 @@ def _write(ds, period, root):
 # Lazy psd for pairs and periods
 # ------------------------------
 
-def lazy_spectrogram(snr, trigs, root):
+def period_spectrograms(snr, trigs, root):
     """Evaluate psds for a pair and a set of periods
     """
     periods = xcorr.signal.trigger.trigger_periods(trigs)
     fnames = []
 
     for index, period in periods.iterrows():
-        snr_period = _extract_period(snr, period)
+        snr_period = extract_period(snr, period)
 
         for pair in snr.pair:
-            ds = _load(pair, period, root)
-            cc = _preprocess(ds)
-            psd = _spectrogram(cc)
-            ds = _combine(ds, cc, psd, snr_period)
-            fname = _write(ds, period, root)
+            ds = load(pair, period, root)
+            cc = preprocess(ds)
+            psd = spectrogram(cc)
+            ds = combine(ds, cc, psd, snr_period)
+            fname = write(ds, period, root)
             fnames.append(fname)
     return fnames
 
@@ -168,26 +168,29 @@ def lazy_spectrogram(snr, trigs, root):
 # --------------
 
 def help(e=None):
-    """
+    """Return the help text.
     """
     _help = """
     Spectrogram estimation of signal-to-noise ratio triggered periods.
 
-    Usage: xcorr-psd <start> <end> [option] ... [arg] ...
-    <start> <end>    : Start and end datetime given format yyyy-mm-dd.
+    Usage: xcorr-psd <snr_ct> [option] ... [arg] ...
+    <snr_ct>         : Path to netcdf dataset with signal-to-noise ratio (snr)
+                       and coincidence triggers (ct) indicating the active
+                       periods of interest.
     Options and arguments:
         --debug      : Maximize verbosity.
+    -e, --end        : Set end datetime given format yyyy-mm-dd.
     -h, --help       : Print this help message and exit.
     -n, --nworkers=  : Set number of dask workers for local client. If a
-                       a scheduler set the client will wait until the number
+                       scheduler set the client will wait until the number
                        of workers is available.
     -p, --pair=      : Filter pair that contain the given string. If empty all
                        pairs are used.
         --plot       : Generate some plots during processing (stalls).
-    -r, --root=      : Set root. Defaults to current working directory.
-                       Crosscorrelations should be in "{root}/cc" following
-                       xcorr folder structure. SNR results are stored in
-                       "{root}/snr".
+    -r, --root=      : Set crosscorrelation root. Defaults to current working
+                       directory. Generated netcdf files are stored in the
+                       current working directory.
+    -s, --start      : Set start datetime given format yyyy-mm-dd.
         --scheduler= : Connect to a dask scheduler by a scheduler-file.
     -v, --version    : Print xcorr version number and exit."""
 
@@ -196,7 +199,7 @@ def help(e=None):
 
 
 def main():
-    """
+    """Main script function.
     """
 
     # help?
@@ -246,28 +249,14 @@ def main():
     root = os.path.abspath(root) if root is not None else os.getcwd()
 
     # print header and core parameters
-    print(f'xcorr-timelapse v{xcorr.__version__}')
+    print(f'xcorr-psd v{xcorr.__version__}')
     print('{:>20} : {}'.format('root', root))
     print('{:>20} : {}'.format('pair', '*' if pair == '' else pair))
     print('{:>20} : {}'.format('starttime', starttime))
     print('{:>20} : {}'.format('endtime', endtime))
 
-    # dask client
-    if scheduler is not None:
-        print('Dask Scheduler:', scheduler)
-        client = distributed.Client(scheduler_file=scheduler)
-        cluster = None
-        if n_workers:
-            print(f'.. waiting for {n_workers} workers', end=' ')
-            client.wait_for_workers(n_workers=n_workers)
-            print('OK.')
-    else:
-        cluster = distributed.LocalCluster(
-            processes=False, threads_per_worker=1, n_workers=n_workers or 4,
-        )
-        print('Dask LocalCluster:', cluster)
-        client = distributed.Client(cluster)
-        print('Dask Client:', client)
+    # init dask client
+    client, cluster = init_dask(n_workers=n_workers, scheduler_file=scheduler)
 
     # snr
     print('.. load signal-to-noise ratio')
@@ -301,16 +290,16 @@ def main():
 
     # construct datasets with preprocessed cc, snr and psd
     print('.. construct files per active period')
-    files = lazy_spectrogram(snr, ct, root)
-    files = client.compute(files)[0]
+
+    mapped = client.compute(period_spectrograms(snr, ct, root))
+    distributed.wait(mapped)
+
+    files = client.gather(mapped)
     if debug:
         print(files)
 
-    # close
-    print('.. close connections')
-    client.close()
-    if cluster is not None:
-        cluster.close()
+    # close dask client and cluster
+    close_dask(client, cluster)
 
     print('.. done')
 

@@ -12,15 +12,13 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import distributed
-from glob import glob
 from time import sleep
 import os
-import sys
-import getopt
+import argparse
 
 # relative imports
 import xcorr
-
+from .helpers import init_dask, close_dask, ncfile
 
 __all__ = []
 
@@ -73,7 +71,7 @@ def get_spectrogram(pair, time, root):
 
     # process cc
     cc = xcorr.signal.unbias(cc)
-    cc = xcorr.signal.detrend(cc)
+    cc = xcorr.signal.demean(cc)
     cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
     cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag')
     cc = xcorr.signal.taper(cc, max_length=2/3.)
@@ -338,200 +336,149 @@ def create_locks(ds, root, client=None):
 
 
 ###############################################################################
-# Main functions
-# --------------
+# Main function
+# -------------
 
 def help(e=None):
-    """
+    """Return the help text.
     """
     _help = """
     Two-dimensional crosscorrelation of crosscorrelation spectrograms.
 
     Usage: xcorr-timelapse <snr_ct> [option] ... [arg] ...
     <snr_ct>         : Path to netcdf dataset with signal-to-noise ratio (snr)
-                       and coincidence triggered periods (ct).
+                       and coincidence triggers (ct) indicating the active
+                       periods of interest.
     Options and arguments:
-        --abundant   : Compute the entire timelapse 2d correlation matrix
-                       instead of mirroring along the diagonal.
-        --debug      : Maximize verbosity.
-    -c, --chunk=     : Set dask time chunks. Defaults to 10.
-    -e, --end        : Set end datetime given format yyyy-mm-dd.
     -f, --frequency= : Set psd frequency bands. Frequency should be a list of
                        tuple-pairs with start and end frequencies. Defaults to
                        --frequency="(3., 6.), (6., 12.)".
-    -h, --help       : Print this help message and exit.
-    -n, --nworkers=  : Set number of dask workers for local client. If a
-                       a scheduler set the client will wait until the number
-                       of workers is available.
-    -p, --pair=      : Filter pair that contain the given string. If empty all
-                       pairs are used.
-        --plot       : Generate some plots during processing (stalls).
-    -r, --root=      : Set crosscorrelation root. Defaults to current working
-                       directory. Timelapse output netcdf file is stored in the
-                       current working directory.
-    -s, --start      : Set start datetime given format yyyy-mm-dd.
-        --scheduler= : Connect to a dask scheduler by a scheduler-file.
-    -v, --version    : Print xcorr version number and exit."""
+    """
 
     print('\n'.join([line[4:] for line in _help.splitlines()]))
     raise SystemExit(e)
 
 
 def main():
+    """Main script function.
     """
-    """
 
-    # help?
-    if '-h' in sys.argv[1:] or '--help' in sys.argv[1:]:
-        help()
+    parser = argparse.ArgumentParser(
+        prog='xcorr-timelapse',
+        description=('Two-dimensional crosscorrelation of crosscorrelation '
+                     'spectrograms.'),
+        epilog='See also xcorr-snr xcorr-ct xcorr-psd',
+    )
+    parser.add_argument(
+        'snr_ct', metavar='path', type=str,
+        help=('Path to netcdf dataset with signal-to-noise ratio (snr) '
+              'and coincidence triggers (ct) indicating the active periods '
+              'of interest')
+    )
+    parser.add_argument(
+        '-s', '--start', metavar='start', type=str,
+        help='Start date given format yyyy-mm-dd'
+    )
+    parser.add_argument(
+        '-e', '--end', metavar='end', type=str,
+        help='End date given format yyyy-mm-dd'
+    )
+    parser.add_argument(
+        '-p', '--pair', metavar='pair', type=str, default='*',
+        help='Filter pairs that contain the given string'
+    )
+    parser.add_argument(
+        '-f', '--frequency', metavar='f', type=str, default=None,
+        help=('Set psd frequency bands. Frequency should be a list of '
+              'tuple-pairs with start and end frequencies (default: '
+              '"(3., 6.), (6., 12.)")')
+    )
+    parser.add_argument(
+        '-r', '--root', metavar='path', type=str, default=os.getcwd(),
+        help=('Set crosscorrelation root directory (default: current '
+              'working directory)')
+    )
+    parser.add_argument(
+        '-n', '--nworkers', metavar='n', type=int, default=None,
+        help=('Set number of dask workers for local client. If a scheduler '
+              'is set the client will wait until the number of workers is '
+              'available.')
+    )
+    parser.add_argument(
+        '--scheduler', metavar='path', type=str, default=None,
+        help='Connect to a dask scheduler by a scheduler-file.'
+    )
+    parser.add_argument(
+        '--abundant', action='store_true',
+        help=('Compute the entire timelapse 2d correlation matrix instead of '
+              'mirroring along the diagonal')
+    )
+    parser.add_argument(
+        '--chunk', metavar='c', type=int, default=10,
+        help=('Set dask chunks for time dimension (default: 10)')
+    )
+    parser.add_argument(
+        '--plot', action='store_true',
+        help='Generate plots during processing (stalls)'
+    )
+    parser.add_argument(
+        '--debug', action='store_true',
+        help='Maximize verbosity'
+    )
+    parser.add_argument(
+        '--version', action='version', version=xcorr.__version__,
+        help='Print xcorr version and exit'
+    )
+    args = parser.parse_args()
 
-    # version?
-    if '-v' in sys.argv[1:] or '--version' in sys.argv[1:]:
-        print(xcorr.__version__)
-        raise SystemExit(0)
+    # snr and ct files
+    snr_ct = xr.open_dataset(args.snr_ct)
 
-    # get snr and triggered periods
-    if len(sys.argv) < 2:
-        print('Path to <snr_ct> netcdf file should be set!')
-        raise SystemExit(1)
-    snr_ct = xr.open_dataset(sys.argv[1])
-    if 'snr' not in snr_ct.vars or 'ct' not in snr_ct.vars:
-        raise ValueError('<snr_ct> dataset has no variables snr and ct.')
-
-    # optional args
-    starttime = pd.to_datetime(snr_ct.time[0])
-    endtime = pd.to_datetime(snr_ct.time[-1])
-    freq, pair, root, n_workers, scheduler = None, None, None, None, None
-    plot, debug = False, False
-    sparse = True
-
-    try:
-        opts, args = getopt.getopt(
-            sys.argv[3:],
-            'c:f:n:p:r:',
-            ['abundant', 'debug', 'chunk=', 'frequency=', 'nworkers=',
-             'pair=', 'plot', 'root=', 'scheduler=']
-        )
-    except getopt.GetoptError as e:
-        help(e)
-
-    for opt, arg in opts:
-        if opt in ('--abundant'):
-            sparse = False
-        elif opt in ('-c', '--chunk'):
-            chunk = int(arg)
-        elif opt in ('--debug'):
-            debug = True
-        elif opt in ('-e', '--end='):
-            endtime = pd.to_datetime(arg)
-        elif opt in ('-f', '--frequency'):
-            freq = np.array(eval(arg))
-            if len(freq.shape) != 2 or freq.shape[-1] != 2:
-                raise ValueError('frequency should be a list of tuple-pairs '
-                                 'with start and end frequencies. Example: '
-                                 '--frequencies="(3., 6.), (6., 12.)"')
-        elif opt in ('-n', '--nworkers'):
-            n_workers = int(arg)
-        elif opt in ('-p', '--pair'):
-            pair = '' if arg == '*' else arg
-        elif opt in ('--plot'):
-            plot = True
-        elif opt in ('-r', '--root'):
-            root = arg
-        elif opt in ('--scheduler'):
-            scheduler = arg
-        elif opt in ('-s', '--start='):
-            starttime = pd.to_datetime(arg)
-
-    pair = pair or ''
-    freq = np.array(((3., 6.), (6., 12.))) if freq is None else freq
-    root = os.path.abspath(root) if root is not None else os.getcwd()
+    # extract arguments
+    root = os.path.abspath(args.root)
+    pair = args.pair
+    t0 = pd.to_datetime(args.start or snr_ct.time[0].values)
+    t1 = pd.to_datetime(args.end or snr_ct.time[-1].values)
+    freq = np.array(((3., 6.), (6., 12.)) or args.freq)
 
     # print header and core parameters
     print(f'xcorr-timelapse v{xcorr.__version__}')
     print('{:>20} : {}'.format('root', root))
-    print('{:>20} : {}'.format('pair', '*' if pair == '' else pair))
-    print('{:>20} : {}'.format('starttime', starttime))
-    print('{:>20} : {}'.format('endtime', endtime))
+    print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
+                               else args.pair))
+    print('{:>20} : {}'.format('start', t0))
+    print('{:>20} : {}'.format('end', t1))
     print('{:>20} : {}'.format(
         'frequency', ', '.join([f'{f[0]}-{f[1]}' for f in freq])
     ))
 
-    # dask client
-    if scheduler is not None:
-        print('Dask Scheduler:', scheduler)
-        client = distributed.Client(scheduler_file=scheduler)
-        cluster = None
-        if n_workers:
-            print(f'.. waiting for {n_workers} workers', end=' ')
-            client.wait_for_workers(n_workers=n_workers)
-            print('OK.')
-    else:
-        cluster = distributed.LocalCluster(
-            processes=False, threads_per_worker=1, n_workers=n_workers or 4,
-        )
-        print('Dask LocalCluster:', cluster)
-        client = distributed.Client(cluster)
-        print('Dask Client:', client)
-
-    # timelapse filename
-    nc = 'timelapse_{}_{}_{}.nc'.format(
-        'all' if pair == '' else pair.translate({ord(c): None for c in '*?'}),
-        starttime.strftime('%Y%j'),
-        endtime.strftime('%Y%j'),
-    )
-
-    # snr
-    print('.. load signal-to-noise ratio')
-    snr = xr.merge([xr.open_dataarray(f) for f in
-                    glob(os.path.join(root, 'snr', 'snr_*.nc'))]).snr
-    snr = snr.where(
-        (
-            (snr.time >= starttime.to_datetime64()) &
-            (snr.time < endtime.to_datetime64()) &
-            (snr.pair.str.contains(pair))
-        ),
-        drop=True,
-    )
-    if debug:
-        print(snr)
-
-    # get confindence triggers
-    print('.. get coincidence triggers', end=', ')
-    ct = xcorr.signal.coincidence_trigger(
-        snr, thr_on=10., extend=0, thr_coincidence_sum=None,
-    )
-    print(f'periods = {ct.attrs["nperiods"]}')
-    if debug:
-        print(ct)
-    if plot:
-        snr_ct.snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
-                             add_legend=False)
-        xcorr.signal.trigger.plot_trigs(snr_ct.snr, snr_ct.ct)
-        plt.tight_layout()
-        plt.show()
-
-    # extract pair and time
-    pair = snr_ct.pair
-    time = snr_ct.time.where(snr_ct.ct >= 0, drop=True)
+    # init dask client
+    client, cluster = init_dask(n_workers=args.n_workers,
+                                scheduler_file=args.scheduler)
 
     # init timelapse
     print('.. init timelapse dataset', end=', ')
-    ds = init_spectrogram_timelapse(pair, time, freq, root)
+    ds = init_spectrogram_timelapse(
+        pair=snr_ct.pair,
+        time=snr_ct.time.where(snr_ct.ct >= 0, drop=True),
+        freq=freq,
+        root=root
+    )
     print('dims: pair={pair}, freq={freq}, time={time}'.format(
-        pair=pair.size, freq=ds.freq.size, time=time.size,
+        pair=ds.pair.size, freq=ds.freq.size, time=ds.time1.size,
     ))
-    if debug:
+    if args.debug:
         print(ds)
 
     # to netcdf
+    nc = ncfile('timelapse', pair, t0, t1)
     print(f'.. write to "{nc}"')
-    xcorr.write(data=ds, path=nc, force_write=True, verb=1 if debug else 0)
+    xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
 
     # load dataset
     print(f'.. load from "{nc}"')
     ds = xr.open_dataset(nc, engine='h5netcdf')
-    if debug:
+    if args.debug:
         print(ds)
 
     # create all locks
@@ -540,20 +487,16 @@ def main():
     print(f'files = {len(locks)}')
 
     # persist to client
-    print(f'.. map and compute blocks: chunk={chunk}, sparse={sparse}')
-    ds = process_spectrogram_timelapse(ds, root, chunk, sparse)
+    print(f'.. map and compute blocks: chunk={args.chunk}, '
+          f'sparse={args.sparse}')
+    ds = process_spectrogram_timelapse(ds, root, args.chunk, args.sparse)
 
     # to netcdf
     print(f'.. write to "{nc}"')
-    xcorr.write(
-        data=ds,
-        path=nc,
-        variable_encoding=dict(zlib=True, complevel=9),
-        verb=1 if debug else 0,
-    )
+    xcorr.write(ds, nc, variable_encoding=dict(zlib=True, complevel=9))
 
     # plot?
-    if plot:
+    if args.plot:
         # common plot settings
         plotset = dict(col='freq', yincrease=False, size=4, aspect=1)
 
@@ -572,11 +515,8 @@ def main():
         ds.delta_freq.isel(pair=-1).plot(robust=True, **plotset)
         plt.show()
 
-    # close
-    print('.. close connections')
-    client.close()
-    if cluster is not None:
-        cluster.close()
+    # close dask client and cluster
+    close_dask(client, cluster)
 
     print('.. done')
 
