@@ -505,25 +505,13 @@ def main():
 
     # to netcdf
     print(f'.. write to "{nc}"')
-    xcorr.write(ds, nc, variable_encoding=dict(zlib=True, complevel=9))
-
+    xcorr.write(ds, nc, variable_encoding=dict(zlib=True, complevel=9),
+                verb=1 if args.debug else 0)
     # plot?
     if args.plot:
-        # common plot settings
         plotset = dict(col='freq', yincrease=False, size=4, aspect=1)
-
-        # plot cc2
-        plt.figure()
         ds.cc2.isel(pair=-1).plot(vmin=0, **plotset)
-        plt.show()
-
-        # plot delta_lag
-        plt.figure()
         ds.delta_lag.isel(pair=-1).plot(robust=True, **plotset)
-        plt.show()
-
-        # plot delta_freq
-        plt.figure()
         ds.delta_freq.isel(pair=-1).plot(robust=True, **plotset)
         plt.show()
 
