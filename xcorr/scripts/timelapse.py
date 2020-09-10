@@ -41,7 +41,7 @@ def get_spectrogram(pair, time, root):
     ds, ok = False, False
     try:
         ds = xcorr.read(nc, fast=True, engine='h5netcdf')
-        ds = ds.loc[{'pair': pair, 'time': time}]
+        ds = ds.sel(pair=pair, time=time)
         ok = ds.status.all()
         if ok:
             ds.load()
