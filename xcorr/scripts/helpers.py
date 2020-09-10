@@ -18,7 +18,7 @@ def init_dask(n_workers: int = None, scheduler_file: str = None):
     """
     """
     if scheduler_file is not None:
-        print('... dask scheduler:', scheduler_file)
+        print('.. dask scheduler:', scheduler_file)
         client = distributed.Client(scheduler_file=scheduler_file)
         cluster = None
         if n_workers:
@@ -29,9 +29,8 @@ def init_dask(n_workers: int = None, scheduler_file: str = None):
         cluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
         )
-        print('... dask local cluster:', repr(cluster))
         client = distributed.Client(cluster)
-        print('... dask client:', repr(client))
+        print('.. dask client:', repr(client))
     return client, cluster
 
 
