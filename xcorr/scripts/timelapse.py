@@ -433,7 +433,7 @@ def main():
 
     # filter snr and ct
     print('.. filter snr and ct')
-    snr_ct = snr_ct.where(
+    snr = snr_ct.snr.where(
         (
             (snr_ct.time >= args.start.to_datetime64()) &
             (snr_ct.time < args.end.to_datetime64()) &
@@ -442,11 +442,20 @@ def main():
         drop=True,
     )
     if args.debug:
-        print(snr_ct)
+        print(snr)
+    ct = snr_ct.ct.where(
+        (
+            (snr_ct.time >= args.start.to_datetime64()) &
+            (snr_ct.time < args.end.to_datetime64())
+        ),
+        drop=True,
+    )
+    if args.debug:
+        print(ct)
     if args.plot:
-        snr_ct.snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
-                             add_legend=False)
-        xcorr.signal.trigger.plot_trigs(snr_ct.snr, snr_ct.ct)
+        snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
+                      add_legend=False)
+        xcorr.signal.trigger.plot_trigs(snr, ct)
         plt.tight_layout()
         plt.show()
 
@@ -457,8 +466,8 @@ def main():
     # init timelapse
     print('.. init timelapse dataset', end=', ')
     ds = init_spectrogram_timelapse(
-        pair=snr_ct.pair,
-        time=snr_ct.time.where(snr_ct.ct >= 0, drop=True),
+        pair=snr.pair,
+        time=ct.time.where(ct >= 0, drop=True),
         freq=args.freq,
         root=args.root
     )

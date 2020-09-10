@@ -284,10 +284,11 @@ def plot_trigs(x: xr.DataArray, trigs: xr.DataArray, ax: plt.Axes = None):
 
     """
     ax = ax or plt.gca()
-
     ymin, ymax = 0., x.max(skipna=True).item()
-    imin = trigs.max(skipna=True).astype(int).item()
-    imax = trigs.min(skipna=True).astype(int).item()
+
+    imin = trigs.min(skipna=True).astype(int).item()
+    imax = trigs.max(skipna=True).astype(int).item()
+
     for i in range(imin, imax+1):
         sel = trigs == i
         if sel.any():
