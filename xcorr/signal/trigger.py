@@ -218,7 +218,7 @@ def trigger_periods(trigs: xr.DataArray):
 
     per = []
 
-    for i in range(trigs.attrs['nperiods']):
+    for i in range(trigs.values.max()):
         trig = trigs.time.where(trigs == i, drop=True)
         per.append(
             pd.DataFrame(
@@ -256,7 +256,7 @@ def trigger_values(x: xr.DataArray, trigs: xr.DataArray):
 
     val = []
 
-    for i in range(trigs.nperiods):
+    for i in range(trigs.values.max()):
         trig = trigs.time.where(trigs == i, drop=True)
         tmp = x.sel(time=trig).to_dataframe()
         tmp['period'] = i
@@ -283,11 +283,10 @@ def plot_trigs(x: xr.DataArray, trigs: xr.DataArray, ax: plt.Axes = None):
         axes is used.
 
     """
-
     ax = ax or plt.gca()
 
     ymin, ymax = x.min().values, x.max().values
-    for i in range(trigs.nperiods):
+    for i in range(trigs.values.max()):
         ax.fill_between(
             trigs.time.where(trigs == i, drop=True).values, ymin, ymax,
             alpha=0.2, color='black'
