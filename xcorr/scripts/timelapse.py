@@ -480,15 +480,15 @@ def main():
                                 scheduler_file=args.scheduler)
 
     # init timelapse
-    print('.. init timelapse dataset', end=', ')
+    print('.. init timelapse dataset')
     ds = init_spectrogram_timelapse(
         pair=snr.pair,
         time=ct.time.where(ct >= 0, drop=True),
         freq=args.freq,
     )
-    print('dims: pair={pair}, freq={freq}, time={time}'.format(
-        pair=ds.pair.size, freq=ds.freq.size, time=ds.time1.size,
-    ))
+    print('{:>20} : {}'.format('pair', ds.pair.size))
+    print('{:>20} : {}'.format('time', ds.time1.size))
+    print('{:>20} : {}'.format('freq', ds.freq.size))
     if args.debug:
         print(ds)
 
