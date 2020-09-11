@@ -80,7 +80,7 @@ def init(
 
     attrs : `dict`
         Dictionary with global attributes the comply with COARDS and CF
-        conventions. Following keys are required:
+        conventions. Following keys are mandatory:
         ['institution', 'author', 'source']
 
     sampling_rate : `float`
@@ -128,19 +128,19 @@ def init(
         The initiated `xcorr` N-D labelled set of data arrays.
 
     """
-    # check
-    assert 'institution' in attrs, (
-        "attrs['institution'] = 'Institution, department'!"
-    )
-    assert 'author' in attrs, (
-        "attrs['author'] = 'Name - E-mail'!"
-    )
-    assert 'source' in attrs, (
-        "attrs['source'] = 'Data source description'!"
-    )
-    assert isinstance(pair, str), (
-        "pair should be receiver pair string!"
-    )
+    # check attributes
+    if not isinstance(attrs, dict):
+        raise TypeError('attrs should be a dictionary')
+    if 'institution' not in attrs:
+        raise KeyError("attrs['institution'] = 'Institution, department'!")
+    if 'author' not in attrs:
+        raise KeyError("attrs['author'] = 'Name - E-mail'!")
+    if 'source' not in attrs:
+        raise KeyError("attrs['source'] = 'Data source description'!")
+
+    # check pair
+    if not isinstance(pair, str):
+        raise TypeError("pair should be receiver pair string!")
     # config
     delta = 1/sampling_rate
     npts = int(window_length*sampling_rate)
