@@ -484,6 +484,7 @@ def main():
 
     # init timelapse
     print('.. init timelapse dataset')
+    nc = ncfile('timelapse', args.pair, args.start, args.end)
     ds = init_spectrogram_timelapse(
         pair=snr.pair,
         time=ct.time.where(ct >= 0, drop=True),
@@ -496,12 +497,11 @@ def main():
         print(ds)
 
     # to netcdf and lazy load dataset
-    nc = ncfile('timelapse', args.pair, args.start, args.end)
-    print('.. write and lazy reload dataset')
-    xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
-    ds = xr.open_dataset(nc, engine='h5netcdf')
-    if args.debug:
-        print(ds)
+    # print('.. write and lazy reload dataset')
+    # xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
+    # ds = xr.open_dataset(nc, engine='h5netcdf')
+    # if args.debug:
+    #     print(ds)
 
     # persist to client
     ds = process_spectrogram_timelapse(
