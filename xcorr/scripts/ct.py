@@ -90,8 +90,8 @@ def main():
 
     # filter snr
     print('.. filter snr for pair and time range')
-    t0 = pd.to_datetime(args.start or ds.time[0].values)
-    t1 = pd.to_datetime(args.end or ds.time[-1].values)
+    t0 = pd.to_datetime(args.start or ds.time[0].item())
+    t1 = pd.to_datetime(args.end or ds.time[-1].item())
     ds = ds.where(
         (
             (ds.time >= t0.to_datetime64()) &
@@ -113,7 +113,7 @@ def main():
         print(ds.ct)
 
     # timelapse filename
-    nc = ncfile('snr_ct', args.pair, t0, t1)
+    nc = ncfile('snr_ct', args.pair, ds.time[0].item(), ds.time[-1].item())
 
     # to netcdf
     print(f'.. write to "{nc}"')

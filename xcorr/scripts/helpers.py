@@ -8,6 +8,7 @@ Xcorr scripts helper functions.
 """
 
 # Mandatory imports
+from pandas import to_datetime
 import distributed
 
 
@@ -46,6 +47,8 @@ def close_dask(client, cluster):
 def ncfile(prefix, pair, start, end):
     """Construct netcdf filename.
     """
+    start = to_datetime(start)
+    end = to_datetime(end)
     if pair in ('*', ''):
         pair = 'all'
     else:
