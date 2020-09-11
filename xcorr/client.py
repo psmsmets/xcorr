@@ -350,7 +350,8 @@ class Client(object):
 
         # release sds write access
         if locked:
-            lock.release()
+            if lock.locked():
+                lock.release()
 
         if success and verb > 0:
             print(_msg_added_archive)
@@ -616,25 +617,20 @@ class Client(object):
 
                 # get waveforms
                 try:
-
                     st = sds.get_waveforms(**kwargs)
 
                 except Warning as w:
-
                     if verb > 0:
                         print(f'Intercepted warning @ sds request: {w}')
-
                     continue
 
                 if not st:
-
                     continue
 
                 passed = self.check_duration(st, duration=dt,
                                              receiver=receiver, verb=verb-1)
 
                 if passed:
-
                     if verb > 1:
                         print(_msg_loaded_archive.format(kwargs['starttime']))
 
@@ -642,7 +638,8 @@ class Client(object):
 
         # release
         if locked:
-            lock.release()
+            if lock.locked():
+                lock.release()
 
         return st
 
