@@ -85,31 +85,28 @@ def get_spectrogram(pair, time, root):
 def correlate_spectrograms(obj, root):
     """Correlate spectrograms.
     """
+    # complete obj?
+    if (obj.status != 0).all():
+        sleep(.5)
+        return obj
+
     # process per item
     for pair in obj.pair:
         for time1 in obj.time1:
             for time2 in obj.time2:
 
                 # already done?
-                if obj.status.loc[{
-                    'pair': pair,
-                    'time1': time1,
-                    'time2': time2,
-                }].all():
+                if (obj.status.loc[{
+                    'pair': pair, 'time1': time1, 'time2': time2,
+                }] != 0).all():
                     continue
 
                 # load cc and compute psd on-the-fly
                 psd1 = get_spectrogram(pair, time1, root)
+                if psd1 is None:
+                    continue
                 psd2 = get_spectrogram(pair, time2, root)
-                # psd1, psd2 = None, None
-                # try:
-                #     psd1 = get_spectrogram(pair, time1, root)
-                #     psd2 = get_spectrogram(pair, time2, root)
-                # except (KeyboardInterrupt, SystemExit):
-                #     raise
-                # except Exception:
-                #     continue
-                if psd1 is None or psd2 is None:
+                if psd2 is None:
                     continue
 
                 # correlate per freq range
@@ -136,22 +133,15 @@ def correlate_spectrograms(obj, root):
 
                     # get max index
                     amax1, amax2 = np.unravel_index(cc2.argmax(), cc2.shape)
-                    # print(dim1, amax1, cc2[dim1][amax1].item(),
-                    #       dim2, amax2, cc2[dim2][amax2].item())
 
                     # store values in object
-                    item = {
-                        'pair': pair,
-                        'freq': freq,
-                        'time1': time1,
-                        'time2': time2,
-                    }
+                    item = {'pair': pair, 'freq': freq,
+                            'time1': time1, 'time2': time2}
                     obj['status'].loc[item] = np.byte(1)
                     obj['cc2'].loc[item] = cc2.isel({dim1: amax1,
                                                      dim2: amax2})
                     obj[dim1].loc[item] = cc2[dim1][amax1]
                     obj[dim2].loc[item] = cc2[dim2][amax2]
-
     return obj
 
 
@@ -183,28 +173,55 @@ def _fill_upper_triangle(ds):
         ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
 
 
-def init_spectrogram_timelapse(pair, time, freq, root):
+def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
+                               freq: np.ndarray, **kwargs):
     """Init a spectrogram timelapse dataset.
+
+    Parameters
+    ----------
+    pair : :class:`xr.DataArray`
+        One-dimensional array of data with receiver couple SEED-id's separated
+        with a dash ('-').
+
+    time : :class:`xr.DataArray`
+        One-dimensional array of data with selected crosscorrelation times to
+        correlated.
+
+    freq : :class:`np.ndarray`
+        Two-dimensional array of size Nx2 with spectrogram minimum and maximum
+        frequencies.
+
+    Any additional keyword argument will be added to the global attributes of
+    the dataset. Please provide 'institution', 'author' and 'source' to comply
+    with COARDS and CF conventions.
     """
-    # new dataset
+    # create dataset
     ds = xr.Dataset()
 
-    # set global attributes
-    nc = xcorr.util.ncfile(pair[0], time[0], root)
-    cc = xcorr.read(nc, quick_and_dirty=True)
-    if cc is None:
-        raise RuntimeError(
-            f'Could not read cc file. Is root "{root}" correct?'
-        )
-    ds.attrs = cc.attrs
-    cc.close()
-    ds.attrs['xcorr_version'] = xcorr.__version__
-    ds.attrs['dependencies_version'] = xcorr.core.core.dependencies_version()
-
-    # remove hashes
-    item = ds.attrs.pop('sha256_hash_metadata', None)
-    item = ds.attrs.pop('sha256_hash', None)
-    del item
+    # global attributes
+    ds.attrs = {
+        'title': (
+            kwargs.pop('title', '') +
+            'Timelapse Crosscorrelations - {} to {}'
+            .format(
+                time[0].dt.strftime('%Y.%j').item(),
+                time[-1].dt.strftime('%Y.%j').item(),
+            )
+        ).strip(),
+        'institution': kwargs.pop('institution', 'n/a'),
+        'author': kwargs.pop('author', 'n/a'),
+        'source': kwargs.pop('source', 'n/a'),
+        'history': 'Created @ {}'.format(pd.to_datetime('now')),
+        'references': (
+             'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). '
+             'Random data : analysis and measurement procedures. '
+             'New York (N.Y.): Wiley-Interscience.'
+        ),
+        'comment': kwargs.pop('comment', 'n/a'),
+        'Conventions': 'CF-1.9',
+        'xcorr_version': xcorr.__version__,
+        'dependencies_version': xcorr.core.core.dependencies_version(),
+    }
 
     # set coordinates
     ds['pair'] = pair
@@ -273,10 +290,18 @@ def init_spectrogram_timelapse(pair, time, freq, root):
     return ds
 
 
-def process_spectrogram_timelapse(ds: xr.Dataset, root: str,
-                                  chunk: int = None, sparse: bool = True):
+def process_spectrogram_timelapse(
+    ds: xr.Dataset, root: str, client: distributed.Client = None,
+    chunk: int = None, sparse: bool = True
+):
     """2-d correlate spectrograms on a Dask client
     """
+
+    # client
+    client = client or distributed.Client()
+    if not isinstance(client, distributed.Client):
+        raise TypeError('client should be a Dask distributed Client object')
+
     # ignore upper triangle
     if sparse:
         _mask_upper_triangle(ds)
@@ -296,7 +321,7 @@ def process_spectrogram_timelapse(ds: xr.Dataset, root: str,
     distributed.wait(mapped)
 
     # load blocks
-    ds = mapped.load()
+    ds = client.gather(mapped)
 
     # fill upper triangle
     if sparse:
@@ -452,7 +477,6 @@ def main():
         pair=snr.pair,
         time=ct.time.where(ct >= 0, drop=True),
         freq=args.freq,
-        root=args.root
     )
     print('dims: pair={pair}, freq={freq}, time={time}'.format(
         pair=ds.pair.size, freq=ds.freq.size, time=ds.time1.size,
@@ -460,16 +484,13 @@ def main():
     if args.debug:
         print(ds)
 
-    # to netcdf
+    # to netcdf and lazy load dataset
     nc = ncfile('timelapse', args.pair, args.start, args.end)
-    # print(f'.. write to "{nc}"')
-    # xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
-
-    # load dataset
-    # print(f'.. load from "{nc}"')
-    # ds = xr.open_dataset(nc, engine='h5netcdf')
-    # if args.debug:
-    #     print(ds)
+    print(f'.. write and lazy reload dataset')
+    xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
+    ds = xr.open_dataset(nc, engine='h5netcdf')
+    if args.debug:
+        print(ds)
 
     # create all locks
     print('.. init locks', end=', ')
@@ -479,8 +500,8 @@ def main():
     # persist to client
     print(f'.. map and compute blocks: chunk={args.chunk}, '
           f'sparse={not args.abundant}')
-    ds = process_spectrogram_timelapse(ds, args.root, args.chunk,
-                                       not args.abundant)
+    ds = process_spectrogram_timelapse(ds, args.root, client, chunk=args.chunk,
+                                       sparse=not args.abundant)
 
     # to netcdf
     print(f'.. write to "{nc}"')
