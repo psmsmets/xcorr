@@ -345,8 +345,7 @@ def process_spectrogram_timelapse(
     distributed.wait(mapped)
 
     # load blocks
-    ds = client.gather(mapped)
-    ds = ds.load()
+    ds = client.gather(mapped).load()
 
     # fill upper triangle
     if sparse:
