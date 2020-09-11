@@ -144,15 +144,15 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
     return ds
 
 
-def get_spectrogram(pair, time, root):
+def get_spectrogram(pair, time, root, client):
     """Load spectrogram for a pair and time.
     """
     # construct abs path and filename
     nc = xcorr.util.ncfile(pair, time, root)
 
     # set lock
-    lock = distributed.Lock(nc)
-    lock.acquire(timeout='15s')
+    lock = distributed.Lock(name=nc, client=client)
+    lock.acquire(timeout='10s')
 
     # get data from disk
     ds, ok = False, False
@@ -167,10 +167,8 @@ def get_spectrogram(pair, time, root):
         ds = None
 
     # release lock
-    try:
+    if lock.locked():
         lock.release()
-    except ValueError as e:
-        print(e)
 
     # no data?
     if ds is None or not ok:
@@ -202,13 +200,16 @@ def get_spectrogram(pair, time, root):
     return psd
 
 
-def correlate_spectrograms(obj, root):
+def correlate_spectrograms(obj, root, scheduler_addr):
     """Correlate spectrograms.
     """
     # complete obj?
     if (obj.status != 0).all():
         sleep(.5)
         return obj
+
+    # get current client
+    client = distributed.Client(address=scheduler_addr)
 
     # process per item
     for pair in obj.pair:
@@ -222,10 +223,10 @@ def correlate_spectrograms(obj, root):
                     continue
 
                 # load cc and compute psd on-the-fly
-                psd1 = get_spectrogram(pair, time1, root)
+                psd1 = get_spectrogram(pair, time1, root, client)
                 if psd1 is None:
                     continue
-                psd2 = get_spectrogram(pair, time2, root)
+                psd2 = get_spectrogram(pair, time2, root, client)
                 if psd2 is None:
                     continue
 
@@ -305,16 +306,16 @@ def _all_ncfiles(pair, time, root):
 
 def process_spectrogram_timelapse(
     ds: xr.Dataset, root: str, client: distributed.Client = None,
-    chunk: int = None, sparse: bool = True, verb: int = 1
+    chunk: int = 10, sparse: bool = True, verb: int = 1
 ):
     """2-d correlate spectrograms on a Dask client
     """
 
     client = client or distributed.Client()
-    chunk = chunk or 10
 
     if verb > 0:
         print('.. map and compute blocks')
+        print('{:>20} : {}'.format('scheduler', client.scheduler.addr))
         print('{:>20} : {}'.format('chunk', chunk))
         print('{:>20} : {}'.format('sparse', sparse))
 
@@ -334,7 +335,7 @@ def process_spectrogram_timelapse(
     # map and persist blocks
     mapped = ds.map_blocks(
         correlate_spectrograms,
-        args=[root],
+        args=[root, client.scheduler.addr],
         template=ds,
     ).persist()
 
