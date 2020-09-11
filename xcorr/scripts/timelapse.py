@@ -313,8 +313,8 @@ def process_spectrogram_timelapse(
     """2-d correlate spectrograms on a Dask client
     """
 
+    # parameters
     client = client or distributed.Client()
-
     if verb > 0:
         print('.. map and compute blocks')
         print('{:>20} : {}'.format('scheduler', client.scheduler.addr))
