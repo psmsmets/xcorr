@@ -152,14 +152,14 @@ def get_spectrogram(pair, time, root, client):
 
     # set lock
     lock = distributed.Lock(name=nc, client=client)
-    lock.acquire(timeout='10s')
+    lock.acquire(timeout='15s')
 
     # get data from disk
     ds, ok = False, False
     try:
         ds = xcorr.read(nc, fast=True, engine='h5netcdf')
         ds = ds.sel(pair=pair, time=time)
-        ok = ds.status.all()
+        ok = (ds.status == 1).all()
         if ok:
             ds.load()
         ds.close()
@@ -223,11 +223,13 @@ def correlate_spectrograms(obj, root, scheduler_addr):
                     continue
 
                 # load cc and compute psd on-the-fly
-                psd1 = get_spectrogram(pair, time1, root, client)
-                if psd1 is None:
-                    continue
-                psd2 = get_spectrogram(pair, time2, root, client)
-                if psd2 is None:
+                psd1, psd2 = None, None
+                try:
+                    psd1 = get_spectrogram(pair, time1, root, client)
+                    psd2 = get_spectrogram(pair, time2, root, client)
+                except Exception as e:
+                    print(e)
+                if psd1 is None or psd2 is None:
                     continue
 
                 # correlate per freq range
@@ -343,7 +345,8 @@ def process_spectrogram_timelapse(
     distributed.wait(mapped)
 
     # load blocks
-    ds = client.gather(mapped).load()
+    ds = client.gather(mapped)
+    ds = ds.load()
 
     # fill upper triangle
     if sparse:
@@ -503,8 +506,7 @@ def main():
 
     # persist to client
     ds = process_spectrogram_timelapse(
-        ds, args.root, client, chunk=args.chunk,
-        sparse=not args.abundant
+        ds, args.root, client, chunk=args.chunk, sparse=not args.abundant
     )
 
     # to netcdf
