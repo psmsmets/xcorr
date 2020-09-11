@@ -27,152 +27,6 @@ __all__ = []
 # Local functions
 # ---------------
 
-def get_spectrogram(pair, time, root):
-    """Load spectrogram for a pair and time.
-    """
-    # construct abs path and filename
-    nc = xcorr.util.ncfile(pair, time, root)
-
-    # set lock
-    lock = distributed.Lock(nc)
-    lock.acquire(timeout='15s')
-
-    # get data from disk
-    ds, ok = False, False
-    try:
-        ds = xcorr.read(nc, fast=True, engine='h5netcdf')
-        ds = ds.sel(pair=pair, time=time)
-        ok = ds.status.all()
-        if ok:
-            ds.load()
-        ds.close()
-    except Exception:
-        ds = None
-
-    # release lock
-    lock.release()
-
-    # no data?
-    if ds is None or not ok:
-        return
-
-    # extract cc
-    cc = ds.cc.where(
-        (ds.lag >= ds.distance/1.495) & (ds.lag <= ds.distance/1.465),
-        drop=True,
-    )
-
-    # no valid data?
-    if xr.ufuncs.isnan(cc).any():
-        return
-
-    # extract time_offset and pair_offset
-    delay = -xcorr.util.time.to_seconds(ds.pair_offset + ds.time_offset)
-
-    # process cc
-    cc = xcorr.signal.unbias(cc)
-    cc = xcorr.signal.demean(cc)
-    cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
-    cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag')
-    cc = xcorr.signal.taper(cc, max_length=2/3.)
-
-    # spectrogram
-    psd = xcorr.signal.spectrogram(cc, duration=2.5, padding_factor=4)
-
-    return psd
-
-
-def correlate_spectrograms(obj, root):
-    """Correlate spectrograms.
-    """
-    # complete obj?
-    if (obj.status != 0).all():
-        sleep(.5)
-        return obj
-
-    # process per item
-    for pair in obj.pair:
-        for time1 in obj.time1:
-            for time2 in obj.time2:
-
-                # already done?
-                if (obj.status.loc[{
-                    'pair': pair, 'time1': time1, 'time2': time2,
-                }] != 0).all():
-                    continue
-
-                # load cc and compute psd on-the-fly
-                psd1 = get_spectrogram(pair, time1, root)
-                if psd1 is None:
-                    continue
-                psd2 = get_spectrogram(pair, time2, root)
-                if psd2 is None:
-                    continue
-
-                # correlate per freq range
-                for freq in obj.freq:
-
-                    # set (min, max) frequency
-                    bw = obj.freq_bw.loc[{'freq': freq}]
-                    fmin = (obj.freq - bw/2).values[0]
-                    fmax = (obj.freq + bw/2).values[0]
-
-                    # extract freq
-                    in1 = psd1.where(
-                        (psd1.freq >= fmin) & (psd1.freq < fmax), drop=True,
-                    )
-                    in2 = psd2.where(
-                        (psd2.freq >= fmin) & (psd2.freq < fmax), drop=True,
-                    )
-
-                    # correlate psd's
-                    cc2 = xcorr.signal.correlate2d(in1, in2)
-
-                    # split dims
-                    dim1, dim2 = cc2.dims[-2:]
-
-                    # get max index
-                    amax1, amax2 = np.unravel_index(cc2.argmax(), cc2.shape)
-
-                    # store values in object
-                    item = {'pair': pair, 'freq': freq,
-                            'time1': time1, 'time2': time2}
-                    obj['status'].loc[item] = np.byte(1)
-                    obj['cc2'].loc[item] = cc2.isel({dim1: amax1,
-                                                     dim2: amax2})
-                    obj[dim1].loc[item] = cc2[dim1][amax1]
-                    obj[dim2].loc[item] = cc2[dim2][amax2]
-    return obj
-
-
-def _mask_upper_triangle(ds):
-    """Mark upper triangle (one offset)
-    """
-    ind1, ind2 = np.triu_indices(ds.time1.size, 1)
-    for i in range(len(ind1)):
-        ds.status.loc[{
-            'time1': ds.time1[ind1[i]],
-            'time2': ds.time2[ind2[i]],
-        }] = np.byte(1)
-
-
-def _fill_upper_triangle(ds):
-    """Fill upper triangle (one offset)
-    """
-    # prevent Dask dataframe issues
-    ds.load()
-    # copy lower to upper triangle
-    ind1, ind2 = np.triu_indices(ds.time1.size, 1)
-    for i in range(len(ind1)):
-        time1 = ds.time1[ind1[i]]
-        time2 = ds.time2[ind2[i]]
-        triu = {'time1': time1, 'time2': time2}
-        tril = {'time1': time2, 'time2': time1}
-        ds.cc2.loc[triu] = ds.cc2.loc[tril]
-        ds.delta_freq.loc[triu] = -ds.delta_freq.loc[tril]
-        ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
-
-
 def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
                                freq: np.ndarray, **kwargs):
     """Init a spectrogram timelapse dataset.
@@ -290,24 +144,191 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
     return ds
 
 
+def get_spectrogram(pair, time, root):
+    """Load spectrogram for a pair and time.
+    """
+    # construct abs path and filename
+    nc = xcorr.util.ncfile(pair, time, root)
+
+    # set lock
+    lock = distributed.Lock(nc)
+    lock.acquire(timeout='15s')
+
+    # get data from disk
+    ds, ok = False, False
+    try:
+        ds = xcorr.read(nc, fast=True, engine='h5netcdf')
+        ds = ds.sel(pair=pair, time=time)
+        ok = ds.status.all()
+        if ok:
+            ds.load()
+        ds.close()
+    except Exception:
+        ds = None
+
+    # release lock
+    try:
+        lock.release()
+    except ValueError as e:
+        print(e)
+
+    # no data?
+    if ds is None or not ok:
+        return
+
+    # extract cc
+    cc = ds.cc.where(
+        (ds.lag >= ds.distance/1.495) & (ds.lag <= ds.distance/1.465),
+        drop=True,
+    )
+
+    # no valid data?
+    if xr.ufuncs.isnan(cc).any():
+        return
+
+    # extract time_offset and pair_offset
+    delay = -xcorr.util.time.to_seconds(ds.pair_offset + ds.time_offset)
+
+    # process cc
+    cc = xcorr.signal.unbias(cc)
+    cc = xcorr.signal.demean(cc)
+    cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
+    cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag')
+    cc = xcorr.signal.taper(cc, max_length=2/3.)
+
+    # spectrogram
+    psd = xcorr.signal.spectrogram(cc, duration=2.5, padding_factor=4)
+
+    return psd
+
+
+def correlate_spectrograms(obj, root):
+    """Correlate spectrograms.
+    """
+    # complete obj?
+    if (obj.status != 0).all():
+        sleep(.5)
+        return obj
+
+    # process per item
+    for pair in obj.pair:
+        for time1 in obj.time1:
+            for time2 in obj.time2:
+
+                # already done?
+                if (obj.status.loc[{
+                    'pair': pair, 'time1': time1, 'time2': time2,
+                }] != 0).all():
+                    continue
+
+                # load cc and compute psd on-the-fly
+                psd1 = get_spectrogram(pair, time1, root)
+                if psd1 is None:
+                    continue
+                psd2 = get_spectrogram(pair, time2, root)
+                if psd2 is None:
+                    continue
+
+                # correlate per freq range
+                for freq in obj.freq:
+
+                    # set (min, max) frequency
+                    bw = obj.freq_bw.loc[{'freq': freq}]
+                    fmin = (obj.freq - bw/2).values[0]
+                    fmax = (obj.freq + bw/2).values[0]
+
+                    # extract freq
+                    in1 = psd1.where(
+                        (psd1.freq >= fmin) & (psd1.freq < fmax), drop=True,
+                    )
+                    in2 = psd2.where(
+                        (psd2.freq >= fmin) & (psd2.freq < fmax), drop=True,
+                    )
+
+                    # correlate psd's
+                    cc2 = xcorr.signal.correlate2d(in1, in2)
+
+                    # split dims
+                    dim1, dim2 = cc2.dims[-2:]
+
+                    # get max index
+                    amax1, amax2 = np.unravel_index(cc2.argmax(), cc2.shape)
+
+                    # store values in object
+                    item = {'pair': pair, 'freq': freq,
+                            'time1': time1, 'time2': time2}
+                    obj['status'].loc[item] = np.byte(1)
+                    obj['cc2'].loc[item] = cc2.isel({dim1: amax1,
+                                                     dim2: amax2})
+                    obj[dim1].loc[item] = cc2[dim1][amax1]
+                    obj[dim2].loc[item] = cc2[dim2][amax2]
+    return obj
+
+
+def _mask_upper_triangle(ds):
+    """Mark upper triangle (one offset)
+    """
+    ind1, ind2 = np.triu_indices(ds.time1.size, 1)
+    for i in range(len(ind1)):
+        ds.status.loc[{
+            'time1': ds.time1[ind1[i]],
+            'time2': ds.time2[ind2[i]],
+        }] = np.byte(1)
+
+
+def _fill_upper_triangle(ds):
+    """Fill upper triangle (one offset)
+    """
+    # copy lower to upper triangle
+    ind1, ind2 = np.triu_indices(ds.time1.size, 1)
+    for i in range(len(ind1)):
+        time1 = ds.time1[ind1[i]]
+        time2 = ds.time2[ind2[i]]
+        triu = {'time1': time1, 'time2': time2}
+        tril = {'time1': time2, 'time2': time1}
+        ds.cc2.loc[triu] = ds.cc2.loc[tril]
+        ds.delta_freq.loc[triu] = -ds.delta_freq.loc[tril]
+        ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
+
+
+def _all_ncfiles(pair, time, root):
+    """Construct list of unique list of ncfiles
+    """
+    ncfiles = []
+    for p in pair:
+        for t in time:
+            nc = xcorr.util.ncfile(p, t, root)
+            if nc not in ncfiles:
+                ncfiles.append(nc)
+    return ncfiles
+
+
 def process_spectrogram_timelapse(
     ds: xr.Dataset, root: str, client: distributed.Client = None,
-    chunk: int = None, sparse: bool = True
+    chunk: int = None, sparse: bool = True, verb: int = 1
 ):
     """2-d correlate spectrograms on a Dask client
     """
 
-    # client
     client = client or distributed.Client()
-    if not isinstance(client, distributed.Client):
-        raise TypeError('client should be a Dask distributed Client object')
+    chunk = chunk or 10
+
+    if verb > 0:
+        print('.. map and compute blocks')
+        print('{:>20} : {}'.format('chunk', chunk))
+        print('{:>20} : {}'.format('sparse', sparse))
 
     # ignore upper triangle
     if sparse:
         _mask_upper_triangle(ds)
 
+    # create locks
+    locks = [distributed.Lock(nc, client=client)
+             for nc in _all_ncfiles(ds.pair, ds.time1, root)]
+    if verb > 0:
+        print('{:>20} : {}'.format('locks', len(locks)))
+
     # chunk
-    chunk = chunk or 10
     ds = ds.chunk({'time1': chunk, 'time2': chunk})
 
     # map and persist blocks
@@ -321,26 +342,13 @@ def process_spectrogram_timelapse(
     distributed.wait(mapped)
 
     # load blocks
-    ds = client.gather(mapped)
+    ds = client.gather(mapped).load()
 
     # fill upper triangle
     if sparse:
         _fill_upper_triangle(ds)
 
     return ds
-
-
-def create_locks(ds, root, client=None):
-    """Initate distributed cc file access locking.
-    """
-    locks = []
-    for pair in ds.pair:
-        for time in ds.time1:
-            nc = xcorr.util.ncfile(pair, time, root)
-            if nc not in locks:
-                locks.append(nc)
-    locks = [distributed.Lock(nc, client=client) for nc in locks]
-    return locks
 
 
 ###############################################################################
@@ -486,22 +494,17 @@ def main():
 
     # to netcdf and lazy load dataset
     nc = ncfile('timelapse', args.pair, args.start, args.end)
-    print(f'.. write and lazy reload dataset')
+    print('.. write and lazy reload dataset')
     xcorr.write(ds, nc, force_write=True, verb=1 if args.debug else 0)
     ds = xr.open_dataset(nc, engine='h5netcdf')
     if args.debug:
         print(ds)
 
-    # create all locks
-    print('.. init locks', end=', ')
-    locks = create_locks(ds, args.root, client)
-    print(f'files = {len(locks)}')
-
     # persist to client
-    print(f'.. map and compute blocks: chunk={args.chunk}, '
-          f'sparse={not args.abundant}')
-    ds = process_spectrogram_timelapse(ds, args.root, client, chunk=args.chunk,
-                                       sparse=not args.abundant)
+    ds = process_spectrogram_timelapse(
+        ds, args.root, client, chunk=args.chunk,
+        sparse=not args.abundant
+    )
 
     # to netcdf
     print(f'.. write to "{nc}"')
