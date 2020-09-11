@@ -238,6 +238,10 @@ def main():
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
 
+    # init dask client
+    client, cluster = init_dask(n_workers=args.nworkers,
+                                scheduler_file=args.scheduler)
+
     # filter snr and ct
     print('.. filter snr and ct')
     snr = snr_ct.snr.where(
@@ -265,10 +269,6 @@ def main():
         xcorr.signal.trigger.plot_trigs(snr, ct)
         plt.tight_layout()
         plt.show()
-
-    # init dask client
-    client, cluster = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
 
     # construct datasets with preprocessed cc, snr and psd
     print('.. construct files per active period')

@@ -450,6 +450,10 @@ def main():
         'frequency', ', '.join([f'{f[0]}-{f[1]}' for f in args.freq])
     ))
 
+    # init dask client
+    client, cluster = init_dask(n_workers=args.nworkers,
+                                scheduler_file=args.scheduler)
+
     # filter snr and ct
     print('.. filter snr and ct')
     snr = snr_ct.snr.where(
@@ -477,10 +481,6 @@ def main():
         xcorr.signal.trigger.plot_trigs(snr, ct)
         plt.tight_layout()
         plt.show()
-
-    # init dask client
-    client, cluster = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
 
     # init timelapse
     print('.. init timelapse dataset')
