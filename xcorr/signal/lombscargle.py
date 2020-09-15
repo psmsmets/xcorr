@@ -90,10 +90,6 @@ def lombscargle(
     if f.name is None:
         raise ValueError('f.name cannot be empty.')
 
-    # invert
-    if invert:
-        f = 1./f
-
     # dim
     dim = dim or x.dims[-1]
     if not isinstance(dim, str):
@@ -128,7 +124,7 @@ def lombscargle(
         dargs = dict(dask='allowed', output_dtypes=[x.dtype])
 
     # apply ufunc (and optional dask distributed)
-    pgram = xr.apply_ufunc(_lombscargle, x[dim], x, f,
+    pgram = xr.apply_ufunc(_lombscargle, x[dim], x, 1/f if invert else f,
                            input_core_dims=[[dim], [dim], [f.name]],
                            output_core_dims=[[f.name]],
                            kwargs={
@@ -144,7 +140,7 @@ def lombscargle(
     # set coordinate and attributes
     pgram.name = x.name
     pgram.attrs = x.attrs
-    pgram = pgram.assign_coords({f.name: 1./f if invert else f})
+    pgram = pgram.assign_coords({f.name: f})
 
     # log workflow
     historicize(pgram, f='lombscargle', a={
