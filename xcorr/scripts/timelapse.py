@@ -369,18 +369,27 @@ def main():
         epilog='See also xcorr-snr xcorr-ct xcorr-psd',
     )
     parser.add_argument(
-        'snr_ct', metavar='snr_ct', type=str,
-        help=('Path to netcdf dataset with signal-to-noise ratio (snr) '
-              'and coincidence triggers (ct) indicating the active periods '
-              'of interest')
+        'paths', metavar='paths', type=str, nargs='+',
+        help=('Paths to netcdf datasets to "--init" or "--update" timelapse')
+    )
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        '-i', '--init', action="store_true",
+        help=('Paths to datasets with signal-to-noise ratio (snr) and '
+              'coincidence triggers (ct) indicating the active periods of '
+              'interest to initiate a new timelapse dataset')
+    )
+    group.add_argument(
+        '-u', '--update', action="store_true",
+        help=('Paths to timelapse datasets to be merged and updated')
     )
     parser.add_argument(
         '-s', '--start', metavar='..', type=str,
-        help='Start date (format: yyyy-mm-dd)'
+        help='Start date'
     )
     parser.add_argument(
         '-e', '--end', metavar='', type=str,
-        help='End date (format: yyyy-mm-dd)'
+        help='End date'
     )
     parser.add_argument(
         '-p', '--pair', metavar='..', type=str, default='*',
@@ -402,6 +411,13 @@ def main():
         help=('Set number of dask workers for local client. If a scheduler '
               'is set the client will wait until the number of workers is '
               'available.')
+    )
+    parser.add_argument(
+        '--format', metavar='..', type=str, default=None,
+        help=('The strftime to parse start and end (default: "%Y-%m-%d"). '
+              'See strftime documentation for more information on choices: '
+              'https://docs.python.org/3/library/datetime.html#strftime-and-'
+              'strptime-behavior.')
     )
     parser.add_argument(
         '--scheduler', metavar='path', type=str, default=None,
@@ -430,14 +446,29 @@ def main():
     )
     args = parser.parse_args()
 
-    # snr and ct file
-    snr_ct = xr.open_dataset(args.snr_ct)
+    # open and merge paths
+    ds = xr.open_mfdataset(
+        paths=args.paths,
+        combine='by_coords',
+        data_vars='minimal',
+        join='outer',
+    )
+    ds.load()
+    ds.close()
+
+    if args.debug:
+        print(ds)
 
     # update arguments
     args.root = os.path.abspath(args.root)
-    args.start = pd.to_datetime(args.start or snr_ct.time[0].values)
-    args.end = pd.to_datetime(args.end or snr_ct.time[-1].values)
-    args.freq = np.array(((3., 6.), (6., 12.)) or args.freq)
+    if args.start:
+        args.start = pd.to_datetime(args.start, format=args.format)
+    if args.end:
+        args.end = pd.to_datetime(args.end, format=args.format)
+    if args.init:
+        args.freq = np.array(((3., 6.), (6., 12.)) or args.freq)
+    else:
+        args.freq = None
 
     # print header and core parameters
     print(f'xcorr-timelapse v{xcorr.__version__}')
@@ -446,50 +477,69 @@ def main():
                                else args.pair))
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
-    print('{:>20} : {}'.format(
-        'frequency', ', '.join([f'{f[0]}-{f[1]}' for f in args.freq])
-    ))
+    if args.freq:
+        print('{:>20} : {}'.format(
+            'frequency', (', '.join([f'{f[0]}-{f[1]}' for f in args.freq]))
+        ))
 
     # init dask client
     client, cluster = init_dask(n_workers=args.nworkers,
                                 scheduler_file=args.scheduler)
 
     # filter snr and ct
-    print('.. filter snr and ct')
-    snr = snr_ct.snr.where(
-        (
-            (snr_ct.time >= args.start.to_datetime64()) &
-            (snr_ct.time < args.end.to_datetime64()) &
-            (snr_ct.pair.str.contains(args.pair))
-        ),
-        drop=True,
-    )
-    if args.debug:
-        print(snr)
-    ct = snr_ct.ct.where(
-        (
-            (snr_ct.time >= args.start.to_datetime64()) &
-            (snr_ct.time < args.end.to_datetime64())
-        ),
-        drop=True,
-    )
-    if args.debug:
-        print(ct)
-    if args.plot:
-        snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
-                      add_legend=False)
-        xcorr.signal.trigger.plot_trigs(snr, ct)
-        plt.tight_layout()
-        plt.show()
+    if args.init:
+        print('.. filter snr and ct')
+        args.start = args.start or pd.to_datetime(ds.time[0])
+        args.end = args.end or (pd.to_datetime(ds.time[-1])+pd.Timedelta('1s'))
+        snr = ds.snr.where(
+            (
+                (ds.time >= args.start.to_datetime64()) &
+                (ds.time < args.end.to_datetime64()) &
+                (ds.pair.str.contains(args.pair))
+            ),
+            drop=True,
+        )
+        if args.debug:
+            print(snr)
+        ct = ds.ct.where(
+            (
+                (ds.time >= args.start.to_datetime64()) &
+                (ds.time < args.end.to_datetime64())
+            ),
+            drop=True,
+        )
+        if args.debug:
+            print(ct)
+        if args.plot:
+            snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
+                          add_legend=False)
+            xcorr.signal.trigger.plot_trigs(snr, ct)
+            plt.tight_layout()
+            plt.show()
+        args.end = pd.to_datetime(ct.time[-1].item())
 
-    # init timelapse
-    print('.. init timelapse dataset')
-    nc = ncfile('timelapse', args.pair, ct.time[0].item(), ct.time[-1].item())
-    ds = init_spectrogram_timelapse(
-        pair=snr.pair,
-        time=ct.time.where(ct >= 0, drop=True),
-        freq=args.freq,
-    )
+        # init timelapse
+        print('.. init timelapse dataset')
+        ds = init_spectrogram_timelapse(
+            pair=snr.pair,
+            time=ct.time.where(ct >= 0, drop=True),
+            freq=args.freq,
+        )
+    else:
+        print('.. update timelapse dataset')
+        args.start = args.start or pd.to_datetime(ds.time1[0])
+        args.end = args.end or pd.to_datetime(ds.time1[-1])+pd.Timedelta('1s')
+        bw = ds.freq_bw
+        ds = ds.drop_vars('freq_bw').where(
+            (ds.time1 >= args.start.to_datetime64()) &
+            (ds.time2 >= args.start.to_datetime64()) &
+            (ds.time1 < args.end.to_datetime64()) &
+            (ds.time2 < args.end.to_datetime64()),
+            drop=True
+        )
+        ds['freq_bw'] = bw
+
+    nc = ncfile('timelapse', args.pair, args.start, args.end)
     print('{:>20} : {}'.format('pair', ds.pair.size))
     print('{:>20} : {}'.format('time', ds.time1.size))
     print('{:>20} : {}'.format('freq', ds.freq.size))
