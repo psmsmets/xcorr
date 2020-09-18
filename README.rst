@@ -87,10 +87,10 @@ Entry points
 Core scripts to (re)produce the manuscript results are implemented as entry points
 and can be accessed from the command line:
 
-  - ``xcorr-snr``: Signal-to-noise ratio estimation of crosscrorrelations.
-  - ``xcorr-ct``: Coincidence triggers of crosscrorrelation signal-to-noise ratios.
-  - ``xcorr-psd``: Spectrogram estimation of signal-to-noise ratio triggered periods.
-  - ``xcorr-timelapse`` Two-dimensional crosscorrelation of crosscorrelation spectrograms.
+- ``xcorr-snr``: Signal-to-noise ratio estimation of crosscrorrelations.
+- ``xcorr-ct``: Coincidence triggers of crosscrorrelation signal-to-noise ratios.
+- ``xcorr-psd``: Spectrogram estimation of signal-to-noise ratio triggered periods.
+- ``xcorr-timelapse`` Two-dimensional crosscorrelation of crosscorrelation spectrograms.
 
 
 Installation
