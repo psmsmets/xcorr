@@ -527,8 +527,9 @@ def main():
         )
     else:
         print('.. update timelapse dataset')
-        args.start = args.start or pd.to_datetime(ds.time1[0])
-        args.end = args.end or pd.to_datetime(ds.time1[-1])+pd.Timedelta('1s')
+        args.start = args.start or pd.to_datetime(ds.time1[0].item())
+        args.end = args.end or (pd.to_datetime(ds.time1[-1].item())+
+                                pd.Timedelta('1s'))
         bw = ds.freq_bw
         ds = ds.drop_vars('freq_bw').where(
             (ds.time1 >= args.start.to_datetime64()) &
