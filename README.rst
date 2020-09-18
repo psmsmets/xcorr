@@ -48,6 +48,7 @@ Main xcorr features listed per submodule:
 
   - ``correlate``: frequency domain correlation estimator with zero-padding 1d or 2d data.
   - ``detrend``: demean and linear detrend.
+  - ``fft``: apply forward and inverse fourier transform along a single-dimension.
   - ``filter``: time-domain filter using a forward-backward (zero-phase) digital
     butterworth filter by cascaded second-order sections.
   - ``mask``: mask coordinates of interest (one or two-dimensional).
@@ -76,12 +77,20 @@ Main xcorr features listed per submodule:
   - Receiver utilities such as SEED-id name checks, type conversions, receiver
     pair handlers and geodetic operations.
 
+- **scripts**: Core scripts to (re)produce the manuscript results. See entry points.
 
-Scripts
-=======
 
-All core scripts used to generate the results of the manuscript
-`Long-range hydroacoustic observations of the Monowai Volcanic Centre: a proxy for seasonal variations in sound propagation <#>`_.
+
+Entry points
+============
+
+Core scripts to (re)produce the manuscript results are implemented as entry points
+and can be accessed from the command line:
+
+  - ``xcorr-snr``: Signal-to-noise ratio estimation of crosscrorrelations.
+  - ``xcorr-ct``: Coincidence triggers of crosscrorrelation signal-to-noise ratios.
+  - ``xcorr-psd``: Spectrogram estimation of signal-to-noise ratio triggered periods.
+  - ``xcorr-timelapse`` Two-dimensional crosscorrelation of crosscorrelation spectrograms.
 
 
 Installation
