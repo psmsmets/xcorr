@@ -190,6 +190,13 @@ def main():
         help='End date (format: yyyy-mm-dd)'
     )
     parser.add_argument(
+        '--format', metavar='..', type=str, default=None,
+        help=('The strftime to parse start and end (default: "%%Y-%%m-%%d"). '
+              'See strftime documentation for more information on choices: '
+              'https://docs.python.org/3/library/datetime.html#strftime-and-'
+              'strptime-behavior.')
+    )
+    parser.add_argument(
         '-p', '--pair', metavar='..', type=str, default='*',
         help='Filter pairs that contain the given string'
     )
@@ -227,8 +234,10 @@ def main():
 
     # update arguments
     args.root = os.path.abspath(args.root)
-    args.start = pd.to_datetime(args.start or snr_ct.time[0].values)
-    args.end = pd.to_datetime(args.end or snr_ct.time[-1].values)
+    if args.start:
+        args.start = pd.to_datetime(args.start, format=args.format)
+    if args.end:
+        args.end = pd.to_datetime(args.end, format=args.format)
 
     # print header and core parameters
     print(f'xcorr-psd v{xcorr.__version__}')
@@ -237,6 +246,9 @@ def main():
                                else args.pair))
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
+
+    args.start = args.start or pd.to_datetime(snr_ct.time[0].item())
+    args.end = args.end or pd.to_datetime(snr_ct.time[-1].item())
 
     # init dask client
     client, cluster = init_dask(n_workers=args.nworkers,

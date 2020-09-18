@@ -392,6 +392,13 @@ def main():
         help='End date'
     )
     parser.add_argument(
+        '--format', metavar='..', type=str, default=None,
+        help=('The strftime to parse start and end (default: "%%Y-%%m-%%d"). '
+              'See strftime documentation for more information on choices: '
+              'https://docs.python.org/3/library/datetime.html#strftime-and-'
+              'strptime-behavior.')
+    )
+    parser.add_argument(
         '-p', '--pair', metavar='..', type=str, default='*',
         help='Filter pairs that contain the given string'
     )
@@ -411,13 +418,6 @@ def main():
         help=('Set number of dask workers for local client. If a scheduler '
               'is set the client will wait until the number of workers is '
               'available.')
-    )
-    parser.add_argument(
-        '--format', metavar='..', type=str, default=None,
-        help=('The strftime to parse start and end (default: "%Y-%m-%d"). '
-              'See strftime documentation for more information on choices: '
-              'https://docs.python.org/3/library/datetime.html#strftime-and-'
-              'strptime-behavior.')
     )
     parser.add_argument(
         '--scheduler', metavar='path', type=str, default=None,

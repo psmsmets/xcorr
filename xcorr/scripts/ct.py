@@ -39,11 +39,18 @@ def main():
     )
     parser.add_argument(
         '-s', '--start', metavar='..', type=str, default=None,
-        help='Set start datetime (format: yyyy-mm-dd)'
+        help='Set start date time'
     )
     parser.add_argument(
         '-e', '--end', metavar='..', type=str, default=None,
-        help='Set end datetime (format: yyyy-mm-dd)'
+        help='Set end date time'
+    )
+    parser.add_argument(
+        '--format', metavar='..', type=str, default=None,
+        help=('The strftime to parse start and end (default: "%%Y-%%m-%%d"). '
+              'See strftime documentation for more information on choices: '
+              'https://docs.python.org/3/library/datetime.html#strftime-and-'
+              'strptime-behavior.')
     )
     parser.add_argument(
         '-p', '--pair', metavar='..', type=str, default='',
@@ -73,8 +80,10 @@ def main():
     print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
                                else args.pair))
     if args.start:
+        args.start = pd.to_datetime(args.start, format=args.format)
         print('{:>20} : {}'.format('start', args.start))
     if args.end:
+        args.end = pd.to_datetime(args.end, format=args.format)
         print('{:>20} : {}'.format('end', args.end))
     print('{:>20} : {}'.format('threshold', args.threshold))
     print('{:>20} : {}'.format('plot', args.plot))
@@ -90,8 +99,8 @@ def main():
 
     # filter snr
     print('.. filter snr for pair and time range')
-    t0 = pd.to_datetime(args.start or ds.time[0].item())
-    t1 = pd.to_datetime(args.end or ds.time[-1].item())
+    t0 = args.start or pd.to_datetime(ds.time[0].item())
+    t1 = arsgs.end or pd.to_datetime(ds.time[-1].item())
     ds = ds.where(
         (
             (ds.time >= t0.to_datetime64()) &
