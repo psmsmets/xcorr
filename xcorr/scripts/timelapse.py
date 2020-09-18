@@ -472,6 +472,7 @@ def main():
 
     # print header and core parameters
     print(f'xcorr-timelapse v{xcorr.__version__}')
+    print('{:>20} : {}'.format('action', 'update' if args.update else 'init'))
     print('{:>20} : {}'.format('root', args.root))
     print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
                                else args.pair))
