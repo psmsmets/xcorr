@@ -152,7 +152,7 @@ def get_spectrogram(pair, time, root, client):
 
     # set lock
     lock = distributed.Lock(name=nc, client=client)
-    lock.acquire(timeout='15s')
+    lock.acquire(timeout='10s')
 
     # get data from disk
     ds, ok = False, False
@@ -167,8 +167,11 @@ def get_spectrogram(pair, time, root, client):
         ds = None
 
     # release lock
-    if lock.locked():
-        lock.release()
+    try:
+        if lock.locked():
+            lock.release()
+    except Exception as e:
+        print(e)
 
     # no data?
     if ds is None or not ok:
@@ -472,6 +475,7 @@ def main():
 
     # print header and core parameters
     print(f'xcorr-timelapse v{xcorr.__version__}')
+    print('{:>20} : {}'.format('action', 'update' if args.update else 'init'))
     print('{:>20} : {}'.format('root', args.root))
     print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
                                else args.pair))
