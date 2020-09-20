@@ -144,14 +144,14 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
     return ds
 
 
-def get_spectrogram(pair, time, root, client):
+def get_spectrogram(pair, time, root):
     """Load spectrogram for a pair and time.
     """
     # construct abs path and filename
     nc = xcorr.util.ncfile(pair, time, root)
 
     # set lock
-    lock = distributed.Lock(name=nc, client=client)
+    lock = distributed.Lock(name=nc)
     lock.acquire(timeout='10s')
 
     # get data from disk
@@ -203,16 +203,13 @@ def get_spectrogram(pair, time, root, client):
     return psd
 
 
-def correlate_spectrograms(obj, root, scheduler_addr):
+def correlate_spectrograms(obj, root):
     """Correlate spectrograms.
     """
     # complete obj?
     if (obj.status != 0).all():
         sleep(.5)
         return obj
-
-    # get current client
-    client = distributed.Client(address=scheduler_addr)
 
     # process per item
     for pair in obj.pair:
@@ -228,8 +225,8 @@ def correlate_spectrograms(obj, root, scheduler_addr):
                 # load cc and compute psd on-the-fly
                 psd1, psd2 = None, None
                 try:
-                    psd1 = get_spectrogram(pair, time1, root, client)
-                    psd2 = get_spectrogram(pair, time2, root, client)
+                    psd1 = get_spectrogram(pair, time1, root)
+                    psd2 = get_spectrogram(pair, time2, root)
                 except Exception as e:
                     print(e)
                 if psd1 is None or psd2 is None:
@@ -329,7 +326,7 @@ def process_spectrogram_timelapse(
         _mask_upper_triangle(ds)
 
     # create locks
-    locks = [distributed.Lock(nc, client=client)
+    locks = [distributed.Lock(nc)
              for nc in _all_ncfiles(ds.pair, ds.time1, root)]
     if verb > 0:
         print('{:>20} : {}'.format('locks', len(locks)))
@@ -340,15 +337,18 @@ def process_spectrogram_timelapse(
     # map and persist blocks
     mapped = ds.map_blocks(
         correlate_spectrograms,
-        args=[root, client.scheduler.addr],
+        args=[root],
         template=ds,
-    ).persist()
+    )  # .persist()
 
-    # force await on async
-    distributed.wait(mapped)
+    ## force await on async
+    # distributed.wait(mapped)
 
-    # load blocks
-    ds = client.gather(mapped).load()
+    ## load blocks
+    # ds = client.gather(mapped).load()
+
+    # compute blocks
+    ds = mapped.compute()
 
     # fill upper triangle
     if sparse:
@@ -551,7 +551,7 @@ def main():
     if args.debug:
         print(ds)
 
-    # persist to client
+    # process on client
     ds = process_spectrogram_timelapse(
         ds, args.root, client, chunk=args.chunk, sparse=not args.abundant
     )
