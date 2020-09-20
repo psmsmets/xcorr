@@ -307,17 +307,15 @@ def _all_ncfiles(pair, time, root):
 
 
 def process_spectrogram_timelapse(
-    ds: xr.Dataset, root: str, client: distributed.Client = None,
-    chunk: int = 10, sparse: bool = True, verb: int = 1
+    ds: xr.Dataset, root: str, chunk: int = 10, sparse: bool = True,
+    verb: int = 1
 ):
     """2-d correlate spectrograms on a Dask client
     """
 
     # parameters
-    client = client or distributed.Client()
     if verb > 0:
         print('.. map and compute blocks')
-        print('{:>20} : {}'.format('scheduler', client.scheduler.addr))
         print('{:>20} : {}'.format('chunk', chunk))
         print('{:>20} : {}'.format('sparse', sparse))
 
@@ -341,10 +339,10 @@ def process_spectrogram_timelapse(
         template=ds,
     )  # .persist()
 
-    ## force await on async
+    # force await on async
     # distributed.wait(mapped)
 
-    ## load blocks
+    # load blocks
     # ds = client.gather(mapped).load()
 
     # compute blocks
@@ -532,7 +530,7 @@ def main():
     else:
         print('.. update timelapse dataset')
         args.start = args.start or pd.to_datetime(ds.time1[0].item())
-        args.end = args.end or (pd.to_datetime(ds.time1[-1].item())+
+        args.end = args.end or (pd.to_datetime(ds.time1[-1].item()) +
                                 pd.Timedelta('1s'))
         bw = ds.freq_bw
         ds = ds.drop_vars('freq_bw').where(
@@ -553,7 +551,7 @@ def main():
 
     # process on client
     ds = process_spectrogram_timelapse(
-        ds, args.root, client, chunk=args.chunk, sparse=not args.abundant
+        ds, args.root, chunk=args.chunk, sparse=(not args.abundant)
     )
 
     # to netcdf

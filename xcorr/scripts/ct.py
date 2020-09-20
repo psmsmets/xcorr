@@ -100,7 +100,7 @@ def main():
     # filter snr
     print('.. filter snr for pair and time range')
     t0 = args.start or pd.to_datetime(ds.time[0].item())
-    t1 = arsgs.end or pd.to_datetime(ds.time[-1].item())
+    t1 = args.end or pd.to_datetime(ds.time[-1].item())
     ds = ds.where(
         (
             (ds.time >= t0.to_datetime64()) &

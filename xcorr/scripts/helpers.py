@@ -32,6 +32,7 @@ def init_dask(n_workers: int = None, scheduler_file: str = None):
         )
         client = distributed.Client(cluster)
         print('.. dask client:', repr(client))
+    print('{:>20} : {}'.format('scheduler', client.scheduler.addr))
     return client, cluster
 
 
