@@ -541,7 +541,7 @@ def main():
             drop=True
         )
         ds['freq_bw'] = bw
-        ds.status.fillna(0)  # need to process all nan
+        ds['status'] = ds['status'].fillna(0)  # need to process all nan
 
     nc = ncfile('timelapse', args.pair, args.start, args.end)
     print('{:>20} : {}'.format('pair', ds.pair.size))
