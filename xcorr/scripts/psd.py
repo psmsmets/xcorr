@@ -89,11 +89,6 @@ def preprocess(ds):
     cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
     cc = xcorr.signal.taper(cc, max_length=2/3.)
 
-    delay = -xcorr.util.time.to_seconds(ds.pair_offset + ds.time_offset)
-    if (delay != 0.).any():
-        cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag')
-        cc = xcorr.signal.taper(cc, max_length=2/3.)
-
     return cc
 
 

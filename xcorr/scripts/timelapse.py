@@ -179,7 +179,7 @@ def get_spectrogram(pair, time, root):
 
     # extract cc
     cc = ds.cc.where(
-        (ds.lag >= ds.distance/1.495) & (ds.lag <= ds.distance/1.465),
+        (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.45),
         drop=True,
     )
 
@@ -191,11 +191,11 @@ def get_spectrogram(pair, time, root):
     delay = -xcorr.util.time.to_seconds(ds.pair_offset + ds.time_offset)
 
     # process cc
-    cc = xcorr.signal.unbias(cc)
+    cc = xcorr.signal.unbias(ds.cc)
     cc = xcorr.signal.demean(cc)
-    cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
     cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag')
-    cc = xcorr.signal.taper(cc, max_length=2/3.)
+    cc = xcorr.signal.taper(cc, max_length=3.)
+    cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
 
     # spectrogram
     psd = xcorr.signal.spectrogram(cc, duration=2.5, padding_factor=4)

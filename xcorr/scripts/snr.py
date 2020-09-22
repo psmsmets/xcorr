@@ -49,7 +49,7 @@ def process(ds):
     signal = xcorr.signal.multi_mask(
         x=ds.lag,
         y=ds.distance,
-        lower=1.46,
+        lower=1.45,
         upper=1.50,
         invert=True,
     )
