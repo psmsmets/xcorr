@@ -63,9 +63,9 @@ def unbias(
 
     # check x
     if 'unbiased' not in x.attrs:
-        raise ValueError('x has no unbiased flag attribute!')
+        raise ValueError('x has no unbiased attribute flag!')
 
-    if x.unbiased != 0:
+    if x.attrs['unbiased'] != 0:
         warn('No need to bias correct again.')
         return x
 
@@ -125,7 +125,7 @@ def get_weights(
 
     update_lag_indices(lag)
 
-    for attr in ['sampling_rate', 'delta', 'npts', 'index_min', 'index_max']:
+    for attr in ('sampling_rate', 'delta', 'npts', 'index_min', 'index_max'):
         if attr not in lag.attrs:
             raise ValueError(f'Lag has no attribute "{attr}"!')
 

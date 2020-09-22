@@ -72,7 +72,6 @@ def norm1d(x: xr.DataArray, dim: str = None, **kwargs):
     # apply ufunc (and optional dask distributed)
     n = xr.apply_ufunc(np.linalg.norm, x,
                        input_core_dims=[[dim]],
-                       output_core_dims=[[dim]],
                        vectorize=False,
                        **dargs,
                        kwargs={'axis': -1, **kwargs})
@@ -93,7 +92,7 @@ def norm1d(x: xr.DataArray, dim: str = None, **kwargs):
     return y
 
 
-def norm2d(x: xr.DataArray, dim: tuple = None, **kwargs):
+def norm2d(x: xr.DataArray, dims: tuple = None, **kwargs):
     """
     Matrix norm (two-dimensional) of an N-D labelled array of data.
 
@@ -105,7 +104,7 @@ def norm2d(x: xr.DataArray, dim: tuple = None, **kwargs):
     x : :class:`xarray.DataArray`
         The data array to be detrended.
 
-    dim : `tuple`, optional
+    dims : `tuple`, optional
         A tuple pair with the coordinates name of ``x``. Defaults to the last
         two dimensions of ``x``.
 
@@ -121,12 +120,12 @@ def norm2d(x: xr.DataArray, dim: tuple = None, **kwargs):
     """
 
     # dim
-    dim = dim or x.dims[-2:]
-    if not isinstance(dim, tuple) or len(dim) != 2:
-        raise TypeError('dim should be a tuple of length 2')
+    dims = dims or x.dims[-2:]
+    if not isinstance(dims, tuple) or len(dims) != 2:
+        raise TypeError('dims should be a tuple of length 2')
 
-    if dim[0] not in x.dims or dim[1] not in x.dims:
-        raise ValueError(f'x has no dimensions "{dim}"')
+    if dims[0] not in x.dims or dims[1] not in x.dims:
+        raise ValueError(f'x has no dimensions "{dims}"')
 
     # dask collection?
     dargs = {}
@@ -135,7 +134,7 @@ def norm2d(x: xr.DataArray, dim: tuple = None, **kwargs):
 
     # apply ufunc (and optional dask distributed)
     n = xr.apply_ufunc(np.linalg.norm, x,
-                       input_core_dims=[dim],
+                       input_core_dims=[dims],
                        vectorize=False,
                        **dargs,
                        kwargs={'axis': (-2, -1), **kwargs})
@@ -149,7 +148,7 @@ def norm2d(x: xr.DataArray, dim: tuple = None, **kwargs):
     # log workflow
     historicize(y, f='norm2d', a={
         'x': x.name,
-        'dim': dim,
+        'dims': dims,
         '**kwargs': kwargs,
     })
 

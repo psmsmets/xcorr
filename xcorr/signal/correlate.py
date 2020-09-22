@@ -106,8 +106,8 @@ def correlate1d(
 
     # wrapper to simplify ufunc input
     def _correlate1d(f, g):
-        F = fft.fft(f, s=npad, axis=ax)
-        G = fft.fft(g, s=npad, axis=ax)
+        F = fft.fft(f, n=npad, axis=ax)
+        G = fft.fft(g, n=npad, axis=ax)
         FG = F * np.conjugate(G)
         cc = fft.fftshift(np.real(fft.ifft(FG, axis=ax)), axes=ax)
         return cc
@@ -204,9 +204,9 @@ def correlate2d(
 
     for d in dims:
         if d not in in1.dims:
-            raise ValueError(f'in1 has no dimensions "{dim}"')
+            raise ValueError(f'in1 has no dimensions "{dims}"')
         if d not in in2.dims:
-            raise ValueError(f'in2 has no dimensions "{dim}"')
+            raise ValueError(f'in2 has no dimensions "{dims}"')
 
     if in1.shape != in2.shape:
         raise ValueError('in1 and in2 should have the same shape!')

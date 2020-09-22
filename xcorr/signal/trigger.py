@@ -3,7 +3,7 @@ r"""
 :mod:`signal.trigger` -- Trigger
 ================================
 
-Estimate the signal-to-noise ratio of an N-D labeled array of data.
+Estimate the coincidence trigger of an N-D labeled array of data.
 
 """
 

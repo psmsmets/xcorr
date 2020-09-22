@@ -84,7 +84,7 @@ def timeshift(
     X = fft(x)
 
     # ifft with phase shift
-    y = ifft(X * np.exp(-2j * np.pi * np.real(delay) * X.freq), dtype=x.dtype)
+    y = ifft(X * np.exp(-2j * np.pi * delay * X.freq), dtype=x.dtype)
 
     # restore coordinate
     y = y.assign_coords({dim: x[dim]})

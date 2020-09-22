@@ -1,9 +1,9 @@
 r"""
 
-:mod:`signal.taper` -- Taper
-============================
+:mod:`signal.window` -- Window
+==============================
 
-Filter an N-D labeled array of data.
+Create a window for an N-D labeled array of data.
 
 """
 

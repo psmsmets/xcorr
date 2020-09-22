@@ -90,7 +90,7 @@ def filter(
 
     # wrapper to simplify ufunc input
     def _filter(obj):
-        return signal.sosfiltfilt(sos, obj, axis=-1)
+        return signal.sosfiltfilt(sos, obj, axis=-1).astype(x.dtype)
 
     # dask collection?
     dargs = {}

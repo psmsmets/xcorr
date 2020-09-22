@@ -3,7 +3,7 @@ r"""
 :mod:`signal.taper` -- Taper
 ============================
 
-Filter an N-D labeled array of data.
+Taper an N-D labeled array of data.
 
 """
 
@@ -62,7 +62,7 @@ def taper(
     if dim not in x.dims:
         raise ValueError(f'x has no dimensions "{dim}"')
 
-    w = window(x[dim], wtype, max_percentage, max_length, side)
+    w = window(x[dim], wtype, max_percentage, max_length, side).astype(x.dtype)
 
     y = x * w
 
