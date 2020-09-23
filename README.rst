@@ -46,6 +46,7 @@ Main xcorr features listed per submodule:
   with a (lag) time dimension. Each signal routine is **Dask** capable for
   large datasets.
 
+  - ``beamform``: Least-squares plane wave beamforming.
   - ``correlate``: frequency domain correlation estimator with zero-padding 1d or 2d data.
   - ``detrend``: demean and linear detrend.
   - ``fft``: apply forward and inverse fourier transform along a single-dimension.
@@ -91,6 +92,7 @@ and can be accessed from the command line:
 - ``xcorr-ct``: Coincidence triggers of crosscrorrelation signal-to-noise ratios.
 - ``xcorr-psd``: Spectrogram estimation of signal-to-noise ratio triggered periods.
 - ``xcorr-timelapse`` Two-dimensional crosscorrelation of crosscorrelation spectrograms.
+- ``xcorr-beamform`` Plane wave beamforming of crosscorrelation functions.
 
 
 Installation

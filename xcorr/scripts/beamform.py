@@ -99,8 +99,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog='xcorr-beamform',
-        description=('Least-squares beamforming of plane wave traversing '
-                     'the array.'),
+        description='Plane wave beamforming of crosscorrelation functions.',
         epilog='See also xcorr-snr xcorr-ct xcorr-timelapse xcorr-psd',
     )
     parser.add_argument(
