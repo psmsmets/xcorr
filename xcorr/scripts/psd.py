@@ -85,9 +85,11 @@ def preprocess(ds):
     """Preprocess cc
     """
     cc = ds.cc
+    cc = xcorr.signal.unbias(cc)
+    cc = xcorr.signal.demean(cc)
     cc = xcorr.signal.detrend(cc)
     cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
-    cc = xcorr.signal.taper(cc, max_length=2/3.)
+    cc = xcorr.signal.taper(cc, max_length=2/3)
 
     return cc
 
@@ -168,7 +170,7 @@ def main():
         prog='xcorr-psd',
         description=('Spectrogram estimation of signal-to-noise ratio '
                      'triggered periods.'),
-        epilog='See also xcorr-snr xcorr-ct xcorr-timelapse',
+        epilog='See also xcorr-snr xcorr-ct xcorr-timelapse xcorr-beamform',
     )
     parser.add_argument(
         'snr_ct', metavar='snr_ct', type=str,

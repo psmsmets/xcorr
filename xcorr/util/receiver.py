@@ -14,7 +14,7 @@ import pandas as pd
 import xarray as xr
 from re import match
 from obspy import Inventory
-from pyproj import Geod
+from pyproj import Geod, Proj
 
 
 # Relative imports
@@ -136,9 +136,8 @@ def split_pair(
         'an xarray.DataArray'
     )
     three_components = three_components or '12Z'
-    assert three_components == '12Z' or three_components == 'NEZ', (
-        '``three_components`` should be either "12Z" or "NEZ"!'
-    )
+    if three_components not in ('12Z', 'NEZ'):
+        raise ValueError('three_components should be either "12Z" or "NEZ"!')
 
     # list of receivers
     receivers = pair.split(separator)
@@ -154,6 +153,31 @@ def split_pair(
         receivers = tmp
 
     return [receiver_to_dict(r) for r in receivers] if to_dict else receivers
+
+
+def split_pairs(pairs, **kwargs):
+    r"""Split receiver pair strings into receivers SEED-ids.
+
+    Parameters
+    ----------
+    pairs : `list` or :mod:`~xarray.DataArray`
+        List or N-D labeled array of receiver couple strings separated by
+        ``separator``. Each receiver is specified by a SEED-id string:
+        '{network}.{station}.{location}.{channel}'.
+
+    **kwargs :
+        Any additional keyword arguments will be passed to :func:`split_pair`.
+
+    Returns
+    -------
+    receivers : `list`
+        A list of SEED-id strings or dictionaries.
+
+    """
+    receivers = []
+    for pair in pairs:
+        receivers += [split_pair(pair=pair, **kwargs)]
+    return receivers
 
 
 def receiver_to_dict(receiver: str):
@@ -373,3 +397,76 @@ def get_pair_distance(
             c[1]['longitude'], c[1]['latitude']
         )
     return d*1e-3 if km else d
+
+
+def get_pair_xy_coordinates(
+    pair, inventory: Inventory, first: bool = True, ellipsoid: str = 'WGS84',
+    km: bool = False, **kwargs
+):
+    r"""Calculate the receiver pair geodetic distance.
+
+    Parameters
+    ----------
+    pair : :class:`xarray.DataArray`
+        Receiver couples separated by ``separator``. Each receiver is specified
+        by a SEED-id string: '{network}.{station}.{location}.{channel}'.
+
+    inventory : :class:`obspy.Inventory`
+        Inventory object.
+
+    first : `bool`, optional
+        Use the first receiver (default) of each pair to extract the
+        xy-coordinates.
+
+    ellipsoid : `str`, optional
+        Specify the ellipsoid and datum for :class:`pyproj.Proj`.
+        Defaults to 'WGS84'.
+
+    km : `bool`, optional
+        Return the local xy-coorindates in kilometre if `True`.
+        Defaults to metre.
+
+    **kwargs :
+        Any additional keyword arguments will be passed to :func:`split_pair`.
+
+    Returns
+    -------
+    xy : :class:`xarray.DataSet`
+        Local xy-coordinates.
+
+    """
+
+    idx = 0 if first else 1
+    units = 'km' if km else 'm'
+
+    lat, lon = [], []
+    for p in pair:
+        coords = inventory.get_coordinates(split_pair(pair=p, **kwargs)[idx])
+        lat += [coords['latitude']]
+        lon += [coords['longitude']]
+    lat = np.array(lat)
+    lon = np.array(lon)
+
+    proj = Proj(
+        proj='aeqd', lat_0=lat.mean(), lon_0=lon.mean(), lat_ts=lat.mean(),
+        ellps=ellipsoid, datum=ellipsoid, units=units
+    )
+    x, y = np.array(proj(lon, lat))
+
+    xy = xr.Dataset()
+    xy['x'] = xr.DataArray(
+        data=x,
+        dims=pair.dims,
+        coords=pair.coords,
+        attrs={'long_name': 'local x-coordinate', 'units': units},
+        name='x',
+    )
+    xy['y'] = xr.DataArray(
+        data=y,
+        dims=pair.dims,
+        coords=pair.coords,
+        attrs={'long_name': 'local y-coordinate', 'units': units},
+        name='y',
+    )
+
+    return xy

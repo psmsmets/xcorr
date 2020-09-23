@@ -93,7 +93,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog='xcorr-snr',
         description='Signal-to-noise ratio estimation of crosscrorrelations.',
-        epilog='See also xcorr-ct xcorr-timelapse xcorr-psd',
+        epilog='See also xcorr-ct xcorr-timelapse xcorr-psd xcorr-beamform',
     )
     parser.add_argument(
         'start', metavar='start', type=str,

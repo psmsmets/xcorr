@@ -14,15 +14,15 @@ import xarray as xr
 
 # Relative imports
 from ..util.history import historicize
-from ..signal.fft import fft, ifft
+from ..signal.fft import fft, ifft, rfft, irfft
 
 
 __all__ = ['timeshift']
 
 
 def timeshift(
-    x: xr.DataArray, delay: float,
-    dtype: np.dtype = None, dim: str = None, **kwargs
+    x: xr.DataArray, delay: float, dtype: np.dtype = None,
+    dim: str = None, fast: bool = True, **kwargs
 ):
     """
     Timeshift an N-D labelled array of data in the frequency domain.
@@ -41,6 +41,12 @@ def timeshift(
     dim : `str`, optional
         Coordinates name of ``x`` to timeshift.
         Defaults to the last dimension of ``x``.
+
+    fast : `bool`, optional
+        Make use of the faster rfft and irfft (default). Note that if ``dim``
+        has an odd number of samples this will trim one sample.
+        It is recommended to apply a taper to ``x`` to avoid phase-wrapping
+        artefacts.
 
     **kwargs :
         Any additional keyword arguments will be passed to
@@ -80,14 +86,18 @@ def timeshift(
         raise TypeError('dtype should be a numpy.dtype')
     dtype = np.dtype(dtype).type
 
+    # Make use of xarray wrapped fft and ifft to allow delay broadcasting!
     # fft
-    X = fft(x)
+    X = rfft(x) if fast else fft(x)
 
-    # ifft with phase shift
-    y = ifft(X * np.exp(-2j * np.pi * delay * X.freq), dtype=x.dtype)
+    # phase shift
+    X = X * np.exp(-1j * 2 * np.pi * delay * X.freq)
+
+    # ifft
+    y = irfft(X, dtype=x.dtype) if fast else ifft(X, dtype=x.dtype)
 
     # restore coordinate
-    y = y.assign_coords({dim: x[dim]})
+    y = y.assign_coords({dim: x[dim][0:y[dim].size]})
 
     # restore attributes
     y.name = x.name
@@ -98,6 +108,7 @@ def timeshift(
         'x': x.name,
         'delay': delay if isinstance(delay, float) else delay.name,
         'dim': dim,
+        'fast': fast,
         '**kwargs': kwargs,
     })
 

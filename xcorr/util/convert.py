@@ -12,22 +12,24 @@ Utilities for ``xarray`` to ``ObsPy`` conversions.
 from xarray import DataArray
 from obspy import Trace, Stream
 import numpy as np
+import pandas as pd
 
 
 # Relative imports
-from ..util.time import to_UTCDateTime
+from ..util.time import to_datetime, to_UTCDateTime
 
 
 __all__ = ['to_trace', 'to_stream']
 
 
-def to_trace(da: DataArray, **kwargs):
+def to_trace(x: DataArray, dim: str = None, starttime: np.datetime64 = None,
+             name: str = None, **kwargs):
     """
     Convert a one-dimensional dataarray to a trace object
 
     Parameters
     ----------
-    da : :class:`xarray.DataArray`
+    x : :class:`xarray.DataArray`
         One-dimensional N-D labelled data array.
 
     Returns
@@ -36,53 +38,57 @@ def to_trace(da: DataArray, **kwargs):
         Obspy trace object.
 
     """
-    assert isinstance(da, DataArray), 'da should be an xarray.DataArray.'
-    assert len(da.dims) == 1, 'da should be a one-dimensional data array.'
+    if not isinstance(x, DataArray):
+        raise TypeError('x should be an xarray.DataArray.')
 
-    dim = 'time'
-    assert dim in da.dims, f'da has no dimension {dim}'
+    if len(x.dims) != 1:
+        raise ValueError('x should be a one-dimensional data array.')
 
-    assert 'window_length' in da[dim].attrs, (
-        'da time coord has no attribute "window_length"'
-    )
+    dim = dim or x.dims[-1]
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimension {dim}')
 
-    assert 'window_overlap' in da[dim].attrs, (
-        'da time coord has no attribute "window_overlap"'
-    )
+    if x[dim].dtype.type == np.datetime64:
+        starttime = to_datetime(x[dim][0])
+        x[dim] = x[dim] - x[dim][0]
+    else:
+        starttime = to_datetime(starttime or 'now')
+        x[dim] = x[dim]*pd.Timedelta('1s')
 
-    dt = da[dim].attrs['window_length'] * (
-        1 - da[dim].attrs['window_overlap']
-    )
+    delta = (x[dim].diff('lag').mean()/pd.Timedelta('1s')).item()
 
     # trace header
     header = {
         'network': 'xr',
         'station': '',
         'location': '',
-        'channel': da.name,
-        'starttime': to_UTCDateTime(da[dim][0].values),
-        'delta': dt,
+        'channel': name or dim,
+        'starttime': to_UTCDateTime(starttime),
+        'delta': delta,
         **kwargs
     }
 
     # resample to have a continuous time interval
-    da = da.resample(time=f'{dt}S').nearest(tolerance=f'{dt/2}S')
+    x = x.resample({dim: f'{delta}S'}).nearest(tolerance=f'{delta/2}S')
 
     # get masked array
-    data = da.to_masked_array()
+    data = x.to_masked_array()
     np.ma.set_fill_value(data, -1.)
 
     return Trace(data=data, header=header)
 
 
-def to_stream(da: DataArray):
+def to_stream(x: DataArray, dim: str = None, **kwargs):
     """
     Convert a two-dimensional dataarray to a stream object
 
     Parameters
     ----------
-    da : :class:`xarray.DataArray`
+    x : :class:`xarray.DataArray`
         Two-dimensional N-D labelled data array.
+
+    dim : `str`, optional
+        Set the trace time dimension. Defaults to the last dimension.
 
     Returns
     -------
@@ -90,17 +96,24 @@ def to_stream(da: DataArray):
         Obspy stream object.
 
     """
-    assert isinstance(da, DataArray), 'da should be an xarray.DataArray.'
-    assert len(da.dims) == 2, 'da should be a two-dimensional data array.'
+    if not isinstance(x, DataArray):
+        raise TypeError('x should be an xarray.DataArray.')
+
+    if len(x.dims) != 2:
+        raise ValueError('x should be a two-dimensional data array.')
+
+    dim = dim or x.dims[-1]
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimension "{dim}"')
+
+    dim0 = x.isel({dim: 0}).dims[0]
 
     st = Stream()
 
-    dim = da.dims[-2]
-
-    for i, d in enumerate(da[dim]):
-
-        obj = da.loc[{dim: d}]
-
-        st += to_trace(obj, **{'station': f'{dim}_{i}', dim: d.values})
+    for i, d in enumerate(x[dim0]):
+        st += to_trace(
+            x=x.loc[{dim0: d}],
+            **{**kwargs, 'station': f'{dim}_{i}', dim: dim}
+        )
 
     return st

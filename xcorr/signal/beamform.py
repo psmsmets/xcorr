@@ -1,9 +1,9 @@
 r"""
 
-:mod:`signal.plane_wave` -- Plane wave
-======================================
+:mod:`signal.beamform` -- Beamform
+==================================
 
-Least squares estimation of a plane wave to an N-D labeled array of data.
+Least-squares plane wave beamforming to an N-D labeled array of data.
 
 """
 
@@ -23,8 +23,8 @@ def plane_wave(
     s: xr.DataArray, x: xr.DataArray, y: xr.DataArray, dim: str = None
 ):
     """
-    Return the estimted plane wave given a signal and xy-coordinates,
-    all N-D labeled data arrays.
+    Return the least-squares estimated plane wave given a signal and
+    xy-coordinates, all N-D labeled data arrays.
 
     Parameters
     ----------
@@ -46,11 +46,10 @@ def plane_wave(
     Returns
     -------
 
-    doa : :class:`xarray.DataArray`
-        The direction of arrival (back-azimuth, clockwise from north).
-
-    vel : :class:`xarray.DataArray`
-        The horizontal propagation velocity across the array.
+    ds : :class:`xarray.Dataset`
+        Data set with the estimated plane wave direction of arrival, the
+        horizontal propagation velocity across the array and the LSE error
+        minimum value.
 
     """
     # signal dim
@@ -108,7 +107,7 @@ def plane_wave(
             in2=s.isel({rdim: coAi1[i]}),
             dim=dim
         )
-        argmax = np.abs(cc).argmax(dim='delta_'+dim)
+        argmax = xr.ufuncs.fabs(cc).argmax(dim='delta_'+dim)
         tau.loc[{'M': i}] = cc['delta_'+dim][argmax]
 
     # estimate plane wave (broadcast-like)
@@ -116,11 +115,15 @@ def plane_wave(
         s = ATAinvAT.dot(tau)
         vel = 1/np.linalg.norm(s)
         doa = (np.arctan2(s[0], s[1]).item() * 180./np.pi) % 360.
-        return doa, vel
+        e = tau - A.dot(s)
+        err = e.T.dot(e)
+        return doa, vel, err
     av = np.apply_along_axis(LSE, -1, tau.values)
 
     # output
-    doa = xr.DataArray(
+    ds = xr.Dataset()
+
+    ds['doa'] = xr.DataArray(
         data=np.take(av, 0, axis=-1),
         dims=out_dims,
         coords={d: s[d] for d in out_dims},
@@ -133,7 +136,7 @@ def plane_wave(
         name='doa',
     )
 
-    vel = xr.DataArray(
+    ds['vel'] = xr.DataArray(
         data=np.take(av, 1, axis=-1),
         dims=out_dims,
         coords={d: s[d] for d in out_dims},
@@ -145,4 +148,16 @@ def plane_wave(
         name='vel',
     )
 
-    return doa, vel
+    ds['err'] = xr.DataArray(
+        data=np.take(av, 2, axis=-1),
+        dims=out_dims,
+        coords={d: s[d] for d in out_dims},
+        attrs={
+            'long_name': 'Error minimum value',
+            'standard_name': 'error_min_value',
+            'units': 's2',
+        },
+        name='err',
+    )
+
+    return ds

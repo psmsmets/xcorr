@@ -57,35 +57,34 @@ def window(
 
     """
     if len(x.dims) != 1 or x.name not in x.dims:
-        raise ValueError('``x`` should be a coordinate or variable with '
+        raise ValueError('x should be a coordinate or variable with '
                          'a single dimension!')
 
     if 'sampling_rate' not in x.attrs:
-        raise ValueError('``x`` has no attribute "sampling_rate"!')
+        raise ValueError('x has no attribute "sampling_rate"!')
 
     wtype = wtype or 'hann'
     if wtype not in signal.windows.__all__:
-        raise ValueError('``wtype`` should be a :func:`scipy.signal.windows`!')
+        raise ValueError('wtype should be a :func:`scipy.signal.windows`!')
 
     side = side or 'both'
     if side not in _sides:
-        raise ValueError('``side`` should be either "left", "right" or '
-                         '"both"!')
+        raise ValueError('side should be either "left", "right" or "both"!')
 
     nmax = 0.5 * len(x)
 
     if max_percentage:
         if not isinstance(max_percentage, float):
-            raise TypeError('``max_percentage`` should be of type `float`.')
+            raise TypeError('max_percentage should be of type `float`.')
         if max_percentage < 0. or max_percentage > .5:
-            raise ValueError('``max_percentage`` should be within [0, .5].')
+            raise ValueError('max_percentage should be within [0, .5].')
         nmax = max_percentage * len(x)
 
     if max_length:
         if not isinstance(max_length, float):
-            raise TypeError('``max_length`` should be of type `float`.')
+            raise TypeError('max_length should be of type `float`.')
         if max_length < 0. or max_length > np.max(x.values):
-            raise ValueError('``max_length`` should be within [0, ``x``].')
+            raise ValueError('max_length should be within [0, x].')
         nmax = max_length * x.attrs['sampling_rate']
 
     nmax = int(round(nmax))

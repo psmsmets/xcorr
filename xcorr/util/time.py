@@ -95,19 +95,17 @@ def update_lag_indices(lag: xr.DataArray):
     """
     """
     for attr in ['sampling_rate', 'delta', 'npts', 'index_min', 'index_max']:
+        if attr not in lag.attrs:
+            raise KeyError(f'Lag has no attribute "{attr}"!')
 
-        assert attr in lag.attrs, (
-            f'Lag has no attribute "{attr}"!'
-        )
-
-    assert lag.units == 's', ('Lag time unit should be seconds.')
+    if lag.units != 's':
+        raise ValueError('Lag time unit should be seconds.')
 
     lag_max = (lag.attrs['npts']-1)*lag.attrs['delta']
 
     srate = lag.attrs['sampling_rate']
-
-    lag.attrs['index_min'] = int((lag.values[0]+lag_max)*srate)
-    lag.attrs['index_max'] = int((lag.values[-1]+lag_max)*srate+1)
+    lag.attrs['index_min'] = int(round((lag.values[0]+lag_max)*srate))
+    lag.attrs['index_max'] = int(round((lag.values[-1]+lag_max)*srate+1))
 
 
 def get_dates(start: pd.Timestamp, end: pd.Timestamp):

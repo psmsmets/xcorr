@@ -31,7 +31,7 @@ def main():
         prog='xcorr-ct',
         description=('Coincidence triggers of crosscrorrelation '
                      'signal-to-noise ratios.'),
-        epilog='See also xcorr-snr xcorr-timelapse xcorr-psd',
+        epilog='See also xcorr-snr xcorr-timelapse xcorr-psd xcorr-beamform',
     )
     parser.add_argument(
         'paths', metavar='paths', type=str, nargs='+',

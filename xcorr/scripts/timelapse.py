@@ -188,14 +188,15 @@ def get_spectrogram(pair, time, root):
         return
 
     # extract time_offset and pair_offset
-    delay = -xcorr.util.time.to_seconds(ds.pair_offset + ds.time_offset)
+    delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
 
     # process cc
     cc = xcorr.signal.unbias(ds.cc)
     cc = xcorr.signal.demean(cc)
-    cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag')
-    cc = xcorr.signal.taper(cc, max_length=3.)
+    cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase wrapping
+    cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
     cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
+    cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
 
     # spectrogram
     psd = xcorr.signal.spectrogram(cc, duration=2.5, padding_factor=4)
@@ -367,7 +368,7 @@ def main():
         prog='xcorr-timelapse',
         description=('Two-dimensional crosscorrelation of crosscorrelation '
                      'spectrograms.'),
-        epilog='See also xcorr-snr xcorr-ct xcorr-psd',
+        epilog='See also xcorr-snr xcorr-ct xcorr-psd xcorr-beamform',
     )
     parser.add_argument(
         'paths', metavar='paths', type=str, nargs='+',

@@ -4,14 +4,14 @@ xcorr.signal init
 """
 
 # Import all main functions
+from ..signal.beamform import plane_wave
 from ..signal.correlate import correlate1d, correlate2d
 from ..signal.detrend import detrend, demean
-from ..signal.fft import fft, ifft
+from ..signal.fft import *
 from ..signal.filter import filter
 from ..signal.lombscargle import lombscargle
 from ..signal.mask import mask, multi_mask
 from ..signal.normalize import norm1d, norm2d
-from ..signal.plane_wave import plane_wave
 from ..signal.rms import rms
 from ..signal.snr import snr
 from ..signal.spectrogram import spectrogram
@@ -22,7 +22,4 @@ from ..signal.unbias import unbias
 from ..signal.window import window
 
 
-__all__ = ['coincidence_trigger', 'correlate1d', 'correlate2d', 'detrend',
-           'demean', 'fft', 'ifft', 'filter', 'lombscargle', 'mask',
-           'multi_mask', 'norm1d', 'norm2d', 'rms', 'snr', 'spectrogram',
-           'taper', 'timeshift', 'unbias', 'window']
+__all__ = []
