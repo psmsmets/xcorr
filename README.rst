@@ -133,7 +133,7 @@ If you publish results for which you used xcorr, please give credit by citing
 
     Smets, P. S. M., ... (2020),
     Long-range hydroacoustic observations of the Monowai Volcanic Centre:
-    a proxy for seasonal variations in sound propagation,
+    a proxy for variations in deep-ocean temperature,
     Journal (number), pages, DOI: `doi <#>`_.
 
 All releases have a Zenodo-DOI, which can be found on `Zenodo-DOI <#>`_.
