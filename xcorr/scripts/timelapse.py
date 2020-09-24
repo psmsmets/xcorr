@@ -338,14 +338,14 @@ def spectrogram_timelapse_on_client(
         correlate_spectrograms,
         args=[root],
         template=ds,
-    ).persist()
+    )  # .persist()
 
     # force await async
-    distributed.wait(mapped)
+    # distributed.wait(mapped)
 
     # compute blocks
-    ds = client.gather(mapped).load()
-    # ds = mapped.compute()
+    # ds = client.gather(mapped).load()
+    ds = mapped.compute()
 
     # fill upper triangle
     if sparse:
