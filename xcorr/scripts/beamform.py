@@ -108,6 +108,10 @@ def main():
         help='Array name to select pairs and set the output file'
     )
     parser.add_argument(
+        'inventory', metavar='inventory', type=str,
+        help='Path to stationxml inventory with receiver coordinates'
+    )
+    parser.add_argument(
         'start', metavar='start', type=str,
         help='Start date'
     )
@@ -127,10 +131,6 @@ def main():
     group.add_argument(
         '--last', action="store_true", default=False,
         help=('Select last receiver from each pair')
-    )
-    parser.add_argument(
-        '-i', '--inventory', metavar='..', type=str, required=True,
-        help='Path to stationxml inventory with receiver coordinates'
     )
     parser.add_argument(
         '--format', metavar='..', type=str, default=None,
