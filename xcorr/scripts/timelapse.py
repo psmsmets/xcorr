@@ -480,7 +480,7 @@ def main():
                                else args.pair))
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
-    if args.freq:
+    if args.freq is not None:
         print('{:>20} : {}'.format(
             'frequency', (', '.join([f'{f[0]}-{f[1]}' for f in args.freq]))
         ))
