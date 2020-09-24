@@ -12,9 +12,10 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import dask
 import distributed
-import os
 import argparse
+import os
 from obspy import read_inventory
+from glob import glob
 
 # Relative imports
 import xcorr
@@ -103,8 +104,20 @@ def main():
         epilog='See also xcorr-snr xcorr-ct xcorr-timelapse xcorr-psd',
     )
     parser.add_argument(
-        'pairs', metavar='pairs', type=str, nargs='+',
-        help='Pair names to construct the array'
+        'name', metavar='name', type=str,
+        help='Array name to select pairs and set the output file'
+    )
+    parser.add_argument(
+        'start', metavar='start', type=str,
+        help='Start date'
+    )
+    parser.add_argument(
+        'end', metavar='end', type=str, default=None, nargs='?',
+        help='End date (default: start)'
+    )
+    parser.add_argument(
+        '-c', '--channel', metavar='..', type=str, default='',
+        help='Set channel code to select specific pairs'
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
@@ -116,20 +129,8 @@ def main():
         help=('Select last receiver from each pair')
     )
     parser.add_argument(
-        '--name', metavar='..', type=str, default='array',
-        help='Set array name for output file'
-    )
-    parser.add_argument(
         '-i', '--inventory', metavar='..', type=str, required=True,
-        help='Path to stationxml inventory with receiver coordinates.'
-    )
-    parser.add_argument(
-        '-s', '--start', metavar='..', type=str, required=True,
-        help='Set start date time'
-    )
-    parser.add_argument(
-        '-e', '--end', metavar='..', type=str, required=True,
-        help='Set end date time'
+        help='Path to stationxml inventory with receiver coordinates'
     )
     parser.add_argument(
         '--format', metavar='..', type=str, default=None,
@@ -168,10 +169,19 @@ def main():
     args = parser.parse_args()
     args.root = os.path.abspath(args.root)
     args.start = pd.to_datetime(args.start, format=args.format)
-    args.end = pd.to_datetime(args.end, format=args.format)
+    args.end = (pd.to_datetime(args.end, format=args.format)
+                if args.end else args.start)
+
+    args.pairs = sorted(list(set([
+        p.split(os.path.sep)[-1]
+        for p in glob(os.path.join(args.root, '*', f'*{args.name}*'))
+        if args.channel in p
+    ])))
 
     if len(args.pairs) < 3:
-        raise ValueError('At least three pairs/receivers should be listed')
+        raise ValueError(
+            f'At least three pairs/receivers should be found in "{root}"'
+        )
 
     # print header and core parameters
     print(f'xcorr-snr v{xcorr.__version__}')
@@ -197,6 +207,7 @@ def main():
     )
     if args.debug:
         print(pair)
+
     inv = read_inventory(args.inventory)
     if args.debug:
         print(inv)
