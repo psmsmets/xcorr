@@ -17,8 +17,6 @@ dependencies:
   - xarray
   - dask
   - distributed
-  - mpi4py
-  - dask-mpi
   - bottleneck
   - matplotlib
   - nc-time-axis
@@ -30,8 +28,6 @@ dependencies:
   - dateparser
   - python-graphviz
   - bokeh=2.0
-  - seaborn
-  - flake8
   - notebook
   - ipython
   - jupyter
