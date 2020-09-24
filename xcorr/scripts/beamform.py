@@ -180,7 +180,7 @@ def main():
 
     if len(args.pairs) < 3:
         raise ValueError(
-            f'At least three pairs/receivers should be found in "{root}"'
+            f'At least three pairs/receivers should be found in "{args.root}"'
         )
 
     # print header and core parameters

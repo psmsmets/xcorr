@@ -113,8 +113,13 @@ def plane_wave(
     # estimate plane wave (broadcast-like)
     def LSE(tau):
         s = ATAinvAT.dot(tau)
-        vel = 1/np.linalg.norm(s)
-        doa = (np.arctan2(s[0], s[1]).item() * 180./np.pi) % 360.
+        ns = np.linalg.norm(s)
+        if ns > 0:
+            vel = 1/ns
+            doa = (np.arctan2(s[0], s[1]).item() * 180./np.pi) % 360.
+        else:
+            vel = np.inf
+            doa = 0.
         e = tau - A.dot(s)
         err = e.T.dot(e)
         return doa, vel, err
