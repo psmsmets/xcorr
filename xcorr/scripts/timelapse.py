@@ -307,9 +307,9 @@ def _all_ncfiles(pair, time, root):
     return ncfiles
 
 
-def process_spectrogram_timelapse(
-    ds: xr.Dataset, root: str, chunk: int = 10, sparse: bool = True,
-    verb: int = 1
+def spectrogram_timelapse_on_client(
+    ds: xr.Dataset, root: str, client: distributed.Client,
+    chunk: int = 10, sparse: bool = True, verb: int = 1
 ):
     """2-d correlate spectrograms on a Dask client
     """
@@ -338,10 +338,14 @@ def process_spectrogram_timelapse(
         correlate_spectrograms,
         args=[root],
         template=ds,
-    )
+    ).persist()
+
+    # force await async
+    distributed.wait(mapped)
 
     # compute blocks
-    ds = mapped.compute()
+    ds = client.gather(mapped).load()
+    # ds = mapped.compute()
 
     # fill upper triangle
     if sparse:
@@ -546,8 +550,8 @@ def main():
         print(ds)
 
     # process on client
-    ds = process_spectrogram_timelapse(
-        ds, args.root, chunk=args.chunk, sparse=(not args.abundant)
+    ds = spectrogram_timelapse_on_client(
+        ds, args.root, client, chunk=args.chunk, sparse=(not args.abundant)
     )
 
     # to netcdf
