@@ -220,7 +220,7 @@ def correlate_spectrograms(obj, root):
                 # already done?
                 if (obj.status.loc[{
                     'pair': pair, 'time1': time1, 'time2': time2,
-                }] != 0).all():
+                }] == 1).all():
                     continue
 
                 # load cc and compute psd on-the-fly
