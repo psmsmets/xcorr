@@ -191,7 +191,7 @@ def get_spectrogram(pair, time, root):
     delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
 
     # process cc
-    cc = xcorr.signal.unbias(ds.cc)
+    cc = xcorr.signal.unbias(cc)
     cc = xcorr.signal.demean(cc)
     cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase wrapping
     cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
