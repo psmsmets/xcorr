@@ -26,13 +26,13 @@ def init_dask(n_workers: int = None, scheduler_file: str = None):
             print(f'.. waiting for {n_workers} workers', end=' ')
             client.wait_for_workers(n_workers=n_workers)
             print('OK.')
+        print('{:>20} : {}'.format('scheduler', client.scheduler.addr))
     else:
         cluster = distributed.LocalCluster(
             processes=False, threads_per_worker=1, n_workers=n_workers,
         )
         client = distributed.Client(cluster)
         print('.. dask client:', repr(client))
-    print('{:>20} : {}'.format('scheduler', client.scheduler.addr))
     return client, cluster
 
 
