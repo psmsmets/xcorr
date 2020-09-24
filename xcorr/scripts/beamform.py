@@ -29,7 +29,7 @@ __all__ = []
 # -----------------
 
 @dask.delayed
-def load(time, pairs, root):
+def load(pairs, time, root):
     """
     """
     try:
@@ -91,7 +91,7 @@ def plane_waves_list(xy, start, end, root):
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
-        ds = load(day, xy.pair, root)
+        ds = load(xy.pair, time, root)
         cc = process(ds)
         fit = lse_fit(cc, xy)
         results.append(fit)
