@@ -32,11 +32,17 @@ __all__ = []
 def load(time, pairs, root):
     """
     """
-    ds = xcorr.merge(
-        [xcorr.util.ncfile(pair, time, root) for pair in pairs],
-        fast=True
-    )
-    return None if ds.pair.size != len(pairs) else ds
+    try:
+        ds = xcorr.merge(
+            [xcorr.util.ncfile(pair, time, root) for pair in pairs],
+            fast=True
+        )
+    except Exception:
+        ds = None
+    if ds is not None
+        return ds if ds.pair.size == len(pairs) else None
+    else:
+        return
 
 
 @dask.delayed
@@ -45,26 +51,24 @@ def process(ds):
     """
     if ds is None:
         return
+    try:
+        cc = ds.cc.where(
+            (ds.lag >= ds.distance.mean()/1.50) &
+            (ds.lag <= ds.distance.mean()/1.45),
+            drop=True,
+        )
+        if xr.ufuncs.isnan(cc).any():
+            return
+        delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
+        cc = xcorr.signal.unbias(cc)
+        cc = xcorr.signal.demean(cc)
+        cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrapping
+        cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
+        cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
+        cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
 
-    cc = ds.cc.where(
-        (ds.lag >= ds.distance.mean()/1.50) &
-        (ds.lag <= ds.distance.mean()/1.45),
-        drop=True,
-    )
-
-    if xr.ufuncs.isnan(cc).any():
-        return
-
-    # extract time_offset and pair_offset
-    delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
-
-    # process cc
-    cc = xcorr.signal.unbias(cc)
-    cc = xcorr.signal.demean(cc)
-    cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrapping
-    cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
-    cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
-    cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
+    except Exception:
+        cc = None
 
     return cc
 
@@ -75,7 +79,10 @@ def lse_fit(cc, xy):
     """
     if cc is None:
         return
-    fit = xcorr.signal.beamform.plane_wave(cc, x=xy.x, y=xy.y, dim='lag')
+    try:
+        fit = xcorr.signal.beamform.plane_wave(cc, x=xy.x, y=xy.y, dim='lag')
+    except Exception:
+        fit = None
     return fit
 
 
