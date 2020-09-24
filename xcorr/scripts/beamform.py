@@ -39,7 +39,7 @@ def load(time, pairs, root):
         )
     except Exception:
         ds = None
-    if ds is not None
+    if ds is not None:
         return ds if ds.pair.size == len(pairs) else None
     else:
         return
