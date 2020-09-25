@@ -43,6 +43,7 @@ def close_dask(client, cluster):
     client.close()
     if cluster is not None:
         cluster.close()
+    return
 
 
 def ncfile(prefix, pair, start, end):
