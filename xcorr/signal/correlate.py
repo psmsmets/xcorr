@@ -302,9 +302,9 @@ def _new_coord(old):
         dims=(f'delta_{old.name}'),
         name=f'delta_{old.name}',
         attrs={
+            **old.attrs,
             'long_name': f'Delta {old.long_name}',
             'standard_name': f'delta_{old.standard_name}',
-            'units': old.units,
         }
     )
 
