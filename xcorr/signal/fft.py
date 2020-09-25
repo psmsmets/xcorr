@@ -32,6 +32,7 @@ __all__ = ['fft', 'ifft', 'rfft', 'irfft']
 _recip_name = '__reciprocal_name__'
 _recip_attr = '__reciprocal_attr__'
 _recip_type = '__reciprocal_type__'
+_recip_zero = '__reciprocal_zero__'
 
 
 def fft(
@@ -241,6 +242,8 @@ def ifft(
         stop=(x[dim].size-1)/np.round(x[dim].size*delta, decimals=6),
         num=x[dim].size,
     )
+    if _recip_zero in x[dim].attrs:
+        time += x[dim].attrs[_recip_zero]
 
     # set axis
     ax = -1
@@ -489,6 +492,8 @@ def irfft(
     n = 2 * x[dim].size - 2
     fN = x[dim][-1].item()
     time = np.linspace(0., (n-1)/2/fN, n)
+    if _recip_zero in x[dim].attrs:
+        time += x[dim].attrs[_recip_zero]
 
     # dask collection?
     dargs = {}
@@ -554,4 +559,5 @@ def _dump_reciprocal_attrs(x: xr.DataArray):
     return {
         _recip_name: x.name,
         _recip_attr: json.dumps(attrs),
+        _recip_zero: x[0].item(),
     }
