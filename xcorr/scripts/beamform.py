@@ -91,7 +91,7 @@ def plane_waves_list(xy, start, end, root):
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
-        ds = load(xy.pair, time, root)
+        ds = load(xy.pair, day, root)
         cc = process(ds)
         fit = lse_fit(cc, xy)
         results.append(fit)
