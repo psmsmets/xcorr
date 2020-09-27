@@ -17,7 +17,7 @@ import argparse
 
 # Relative imports
 import xcorr
-from .helpers import init_dask, close_dask, ncfile
+from .helpers import init_dask_client, ncfile
 
 __all__ = []
 
@@ -154,8 +154,8 @@ def main():
     print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
 
     # init dask client
-    client, cluster = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
+    client = init_dask_client(n_workers=args.nworkers,
+                              scheduler_file=args.scheduler)
 
     # list of files using dask
     print('.. validate cc filelist')
@@ -191,7 +191,7 @@ def main():
         plt.show()
 
     # close dask client and cluster
-    close_dask(client, cluster)
+    client.close()
 
     print('.. done')
 

@@ -18,7 +18,7 @@ import argparse
 
 # relative imports
 import xcorr
-from .helpers import init_dask, close_dask, ncfile
+from .helpers import init_dask_client, ncfile
 
 __all__ = []
 
@@ -484,8 +484,8 @@ def main():
         ))
 
     # init dask client
-    client, cluster = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
+    client = init_dask_client(n_workers=args.nworkers,
+                              scheduler_file=args.scheduler)
 
     # filter snr and ct
     if args.init:
@@ -567,7 +567,7 @@ def main():
         plt.show()
 
     # close dask client and cluster
-    close_dask(client, cluster)
+    client.close()
 
     print('.. done')
 

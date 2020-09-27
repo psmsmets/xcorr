@@ -19,7 +19,7 @@ from glob import glob
 
 # Relative imports
 import xcorr
-from .helpers import init_dask, close_dask, ncfile
+from .helpers import init_dask_client, ncfile
 
 __all__ = []
 
@@ -225,8 +225,8 @@ def main():
         print(xy)
 
     # init dask client
-    client, cluster = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
+    client = init_dask_client(n_workers=args.nworkers,
+                              scheduler_file=args.scheduler)
 
     # fit plane wae
     print('.. compute plane wave per day for period')
@@ -260,8 +260,8 @@ def main():
         plt.tight_layout()
         plt.show()
 
-    # close dask client and cluster
-    close_dask(client, cluster)
+    # close dask client
+    client.close()
 
     print('.. done')
 

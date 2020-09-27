@@ -12,10 +12,10 @@ from pandas import to_datetime
 import distributed
 
 
-__all__ = ['init_dask', 'close_dask', 'ncfile']
+__all__ = ['init_dask_client', 'ncfile']
 
 
-def init_dask(n_workers: int = None, scheduler_file: str = None):
+def init_dask_client(n_workers: int = None, scheduler_file: str = None):
     """
     """
     if scheduler_file is not None:
@@ -33,17 +33,7 @@ def init_dask(n_workers: int = None, scheduler_file: str = None):
         )
         client = distributed.Client(cluster)
         print('.. dask client:', repr(client))
-    return client, cluster
-
-
-def close_dask(client, cluster):
-    """
-    """
-    print('.. close dask connections')
-    client.close()
-    if cluster is not None:
-        cluster.close()
-    return
+    return client
 
 
 def ncfile(prefix, pair, start, end):

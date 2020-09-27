@@ -18,7 +18,7 @@ import argparse
 
 # Relative imports
 import xcorr
-from .helpers import init_dask, close_dask
+from .helpers import init_dask_client
 
 __all__ = []
 
@@ -248,8 +248,8 @@ def main():
     args.end = args.end or pd.to_datetime(snr_ct.time[-1].item())
 
     # init dask client
-    client, cluster = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
+    client = init_dask_client(n_workers=args.nworkers,
+                              scheduler_file=args.scheduler)
 
     # filter snr and ct
     print('.. filter snr and ct')
@@ -290,7 +290,7 @@ def main():
         print(files)
 
     # close dask client and cluster
-    close_dask(client, cluster)
+    client.close()
 
     print('.. done')
 
