@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import dask
 import distributed
 import os
+import sys
 import argparse
 
 # Relative imports
@@ -194,6 +195,7 @@ def main():
     client.close()
 
     print('.. done')
+    sys.exit(0)
 
 
 if __name__ == "__main__":

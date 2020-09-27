@@ -14,6 +14,7 @@ import dask
 import distributed
 import argparse
 import os
+import sys
 from obspy import read_inventory
 from glob import glob
 
@@ -264,6 +265,7 @@ def main():
     client.close()
 
     print('.. done')
+    sys.exit(0)
 
 
 if __name__ == "__main__":

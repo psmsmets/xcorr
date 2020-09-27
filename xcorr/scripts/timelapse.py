@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import distributed
 from time import sleep
 import os
+import sys
 import argparse
 
 # relative imports
@@ -570,6 +571,7 @@ def main():
     client.close()
 
     print('.. done')
+    sys.exit(0)
 
 
 if __name__ == "__main__":

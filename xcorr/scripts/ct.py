@@ -11,6 +11,7 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import argparse
+import sys
 
 # Relative imports
 import xcorr
@@ -137,6 +138,7 @@ def main():
         plt.show()
 
     print('.. done')
+    sys.exit(0)
 
 
 if __name__ == "__main__":
