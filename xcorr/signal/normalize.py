@@ -40,10 +40,10 @@ def norm1d(x: xr.DataArray, dim: str = None, **kwargs):
     Parameters
     ----------
     x : :class:`xarray.DataArray`
-        The data array to be detrended.
+        The data array to be normalized.
 
     dim : `str`, optional
-        The coordinates name of ``x`` to be detrended over. Defaults to the
+        The coordinates name of ``x`` to be normalized over. Defaults to the
         last dimension of ``x``.
 
     **kwargs :
@@ -102,7 +102,7 @@ def norm2d(x: xr.DataArray, dims: tuple = None, **kwargs):
     Parameters
     ----------
     x : :class:`xarray.DataArray`
-        The data array to be detrended.
+        The data array to be normalized.
 
     dims : `tuple`, optional
         A tuple pair with the coordinates name of ``x``. Defaults to the last

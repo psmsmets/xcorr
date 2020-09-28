@@ -88,7 +88,6 @@ def preprocess(ds):
     cc = ds.cc
     cc = xcorr.signal.unbias(cc)
     cc = xcorr.signal.demean(cc)
-    cc = xcorr.signal.detrend(cc)
     cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
     cc = xcorr.signal.taper(cc, max_length=2/3)
 

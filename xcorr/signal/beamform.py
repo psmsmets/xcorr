@@ -87,10 +87,10 @@ def plane_wave(
     M = coAi0.size
 
     # construct location matrix
-    A = np.array((
+    A = np.array([
         x.isel({rdim: coAi1}).values - x.isel({rdim: coAi0}).values,
         y.isel({rdim: coAi1}).values - y.isel({rdim: coAi0}).values,
-    )).T
+    ]).T
 
     # prepare LSE
     ATAinvAT = np.linalg.inv(A.T.dot(A)).dot(A.T)
