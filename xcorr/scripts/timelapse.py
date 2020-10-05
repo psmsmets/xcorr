@@ -209,8 +209,8 @@ def correlate_spectrograms(obj, root):
     """Correlate spectrograms.
     """
     # complete obj?
-    if (obj.status != 0).all():
-        sleep(.5)
+    if (obj.status == 1).all():
+        sleep(10.)
         return obj
 
     # process per item
