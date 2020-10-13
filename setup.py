@@ -33,6 +33,7 @@ setup(
            f'{NAME}-ct=xcorr.scripts.ct:main',
            f'{NAME}-timelapse=xcorr.scripts.timelapse:main',
            f'{NAME}-beamform=xcorr.scripts.beamform:main',
+           f'{NAME}-phasediff=xcorr.scripts.phasediff:main',
         ],
     },
     scripts=[],
