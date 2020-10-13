@@ -25,7 +25,7 @@ from ..util.history import historicize
 
 __all__ = ['detrend', 'demean']
 
-_types = ('demean', 'linear')
+_types = ('constant', 'linear')
 
 
 def detrend(x: xr.DataArray, dim: str = None, type: str = None,
@@ -98,16 +98,17 @@ def detrend(x: xr.DataArray, dim: str = None, type: str = None,
             x = x/pd.Timedelta('1s')
         return np.apply_along_axis(linear_detrend_axis, -1, y, x)
 
-    if type == 'demean':
-        y = x - x.mean(dim=dim, skipna=skipna, keep_attrs=True)
-        y.attrs = x.attrs
-    elif type == 'linear':
+    if type == 'linear':
         y = xr.apply_ufunc(linear_detrend, x[dim], x,
                            input_core_dims=[[dim], [dim]],
                            output_core_dims=[[dim]],
                            keep_attrs=True,
                            vectorize=False,
                            **dargs)
+    else:
+        type = 'constant'
+        y = x - x.mean(dim=dim, skipna=skipna, keep_attrs=True)
+        y.attrs = x.attrs
 
     # log workflow
     historicize(y, f='detrend', a={
