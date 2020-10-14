@@ -159,6 +159,10 @@ def main():
               'available.')
     )
     parser.add_argument(
+        '-o', '--overwrite', action='store_true', default=False,
+        help='Overwrite if output file exists (default: skip)'
+    )
+    parser.add_argument(
         '--scheduler', metavar='..', type=str, default=None,
         help='Connect to a dask scheduler by a scheduler-file'
     )
@@ -179,6 +183,7 @@ def main():
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = (pd.to_datetime(args.end, format=args.format)
                 if args.end else args.start)
+    args.out = ncfile('beamform', args.name, args.start, args.end)
 
     args.pairs = sorted(list(set([
         p.split(os.path.sep)[-1]
@@ -201,6 +206,13 @@ def main():
     print('{:>20} : {}'.format('root', args.root))
     print('{:>20} : {}'.format('start', args.start.strftime('%Y-%m-%d')))
     print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
+    print('{:>20} : {}'.format('outfile', args.out))
+    print('{:>20} : {}'.format('overwrite', args.overwrite))
+
+    # check if output file exists
+    if os.path.exists(args.out) and not args.overwrite:
+        raise FileExistsError(f('Output file "{args.out}" already exists and '
+                                'overwrite is False.'))
 
     # get pair and coordinates
     pair = xr.DataArray(
@@ -243,9 +255,8 @@ def main():
         print(fit)
 
     # to netcdf
-    nc = ncfile('beamform', args.name, args.start, args.end)
-    print(f'.. write to "{nc}"')
-    xcorr.write(fit, nc, variable_encoding=dict(zlib=True, complevel=9),
+    print(f'.. write to "{args.out}"')
+    xcorr.write(fit, args.out, variable_encoding=dict(zlib=True, complevel=9),
                 verb=1 if args.debug else 0)
 
     # plot

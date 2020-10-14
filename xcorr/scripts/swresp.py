@@ -161,6 +161,10 @@ def main():
               'available.')
     )
     parser.add_argument(
+        '-o', '--overwrite', action='store_true', default=False,
+        help='Overwrite if output file exists (default: skip)'
+    )
+    parser.add_argument(
         '--scheduler', metavar='..', type=str, default=None,
         help='Connect to a dask scheduler by a scheduler-file'
     )
@@ -183,6 +187,10 @@ def main():
                 if args.end else args.start)
     args.channels = 'ZT' if args.transverse else 'ZR'
 
+    args.out = ncfile(
+        'swresp', f'{args.station}_{args.channels}', args.start, args.end
+    )
+
     args.pairs = sorted(list(set([
         p.split(os.path.sep)[-1]
         for p in glob(os.path.join(args.root, '*', f'*{args.station}*'))
@@ -203,6 +211,14 @@ def main():
     print('{:>20} : {}'.format('root', args.root))
     print('{:>20} : {}'.format('start', args.start.strftime('%Y-%m-%d')))
     print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
+    print('{:>20} : {}'.format('outfile', args.out))
+    print('{:>20} : {}'.format('overwrite', args.overwrite))
+
+    # check if output file exists
+    if os.path.exists(args.out) and not args.overwrite:
+        raise FileExistsError(f('Output file "{args.out}" already exists and '
+                                'overwrite is False.'))
+
 
     # get pair and coordinates
     pair = xr.DataArray(
@@ -222,7 +238,7 @@ def main():
     client = init_dask_client(n_workers=args.nworkers,
                               scheduler_file=args.scheduler)
 
-    # fit plane wae
+    # surface wave response
     print('.. compute surface wave response per day for period')
     mapped = client.compute(
         surface_wave_response_list(pair, args.start, args.end, args.root)
@@ -236,9 +252,8 @@ def main():
         print(resp)
 
     # to netcdf
-    nc = ncfile('swresp', args.station, args.start, args.end)
-    print(f'.. write to "{nc}"')
-    xcorr.write(resp, nc, variable_encoding=dict(zlib=True, complevel=9),
+    print(f'.. write to "{args.out}"')
+    xcorr.write(resp, args.out, variable_encoding=dict(zlib=True, complevel=9),
                 verb=1 if args.debug else 0)
 
     # plot

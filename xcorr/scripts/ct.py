@@ -62,6 +62,10 @@ def main():
         help='Coincidence trigger threshold (default: 10.)'
     )
     parser.add_argument(
+        '-o', '--overwrite', action='store_true', default=False,
+        help='Overwrite if output file exists (default: skip)'
+    )
+    parser.add_argument(
         '--plot', action='store_true',
         help='Generate plots during processing (stalls)'
     )
@@ -86,6 +90,7 @@ def main():
     if args.end:
         args.end = pd.to_datetime(args.end, format=args.format)
         print('{:>20} : {}'.format('end', args.end))
+    print('{:>20} : {}'.format('overwrite', args.overwrite))
     print('{:>20} : {}'.format('threshold', args.threshold))
     print('{:>20} : {}'.format('plot', args.plot))
 
@@ -124,6 +129,11 @@ def main():
 
     # timelapse filename
     nc = ncfile('snr_ct', args.pair, ds.time[0].item(), ds.time[-1].item())
+
+    # check if output file exists
+    if os.path.exists(nc) and not args.overwrite:
+        raise FileExistsError(f('Output file "{nc}" already exists and '
+                                'overwrite is False.'))
 
     # to netcdf
     print(f'.. write to "{nc}"')
