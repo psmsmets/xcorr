@@ -12,16 +12,16 @@ from pandas import to_datetime
 import distributed
 
 
-__all__ = ['init_dask_client', 'ncfile']
+__all__ = ['init_dask', 'ncfile']
 
 
-def init_dask_client(n_workers: int = None, scheduler_file: str = None):
+def init_dask(n_workers: int = None, scheduler_file: str = None):
     """
     """
     if scheduler_file is not None:
         print('.. dask scheduler:', scheduler_file)
-        client = distributed.Client(scheduler_file=scheduler_file)
         cluster = None
+        client = distributed.Client(scheduler_file=scheduler_file)
         if n_workers:
             print(f'.. waiting for {n_workers} workers', end=' ')
             client.wait_for_workers(n_workers=n_workers)
@@ -33,7 +33,7 @@ def init_dask_client(n_workers: int = None, scheduler_file: str = None):
         )
         client = distributed.Client(cluster)
         print('.. dask client:', repr(client))
-    return client
+    return cluster, client
 
 
 def ncfile(prefix, pair, start, end):

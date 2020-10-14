@@ -19,7 +19,7 @@ import argparse
 
 # relative imports
 import xcorr
-from .helpers import init_dask_client, ncfile
+from .helpers import init_dask, ncfile
 
 __all__ = []
 
@@ -484,9 +484,9 @@ def main():
             'frequency', (', '.join([f'{f[0]}-{f[1]}' for f in args.freq]))
         ))
 
-    # init dask client
-    client = init_dask_client(n_workers=args.nworkers,
-                              scheduler_file=args.scheduler)
+    # init dask cluster and client
+    cluster, client = init_dask(n_workers=args.nworkers,
+                                scheduler_file=args.scheduler)
 
     # filter snr and ct
     if args.init:
@@ -569,6 +569,8 @@ def main():
 
     # close dask client and cluster
     client.close()
+    if cluster is not None:
+        cluster.close()
 
     print('.. done')
     sys.exit(0)

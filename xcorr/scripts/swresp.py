@@ -20,7 +20,7 @@ from glob import glob
 
 # Relative imports
 import xcorr
-from .helpers import init_dask_client, ncfile
+from .helpers import init_dask, ncfile
 
 __all__ = []
 
@@ -233,9 +233,9 @@ def main():
     if args.debug:
         print(pair)
 
-    # init dask client
-    client = init_dask_client(n_workers=args.nworkers,
-                              scheduler_file=args.scheduler)
+    # init dask cluster and client
+    cluster, client = init_dask(n_workers=args.nworkers,
+                                scheduler_file=args.scheduler)
 
     # surface wave response
     print('.. compute surface wave response per day for period')
@@ -264,8 +264,10 @@ def main():
         plt.tight_layout()
         plt.show()
 
-    # close dask client
+    # close dask client and cluster
     client.close()
+    if cluster is not None:
+        cluster.close()
 
     print('.. done')
     sys.exit(0)
