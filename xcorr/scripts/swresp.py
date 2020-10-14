@@ -216,9 +216,8 @@ def main():
 
     # check if output file exists
     if os.path.exists(args.out) and not args.overwrite:
-        raise FileExistsError(f('Output file "{args.out}" already exists and '
-                                'overwrite is False.'))
-
+        raise FileExistsError(f'Output file "{args.out}" already exists'
+                              ' and overwrite is False.')
 
     # get pair and coordinates
     pair = xr.DataArray(

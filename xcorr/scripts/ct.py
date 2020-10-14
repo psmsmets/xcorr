@@ -11,6 +11,7 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import argparse
+import os
 import sys
 
 # Relative imports
@@ -132,8 +133,8 @@ def main():
 
     # check if output file exists
     if os.path.exists(nc) and not args.overwrite:
-        raise FileExistsError(f('Output file "{nc}" already exists and '
-                                'overwrite is False.'))
+        raise FileExistsError(f'Output file "{nc}" already exists'
+                              ' and overwrite is False.')
 
     # to netcdf
     print(f'.. write to "{nc}"')
