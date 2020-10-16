@@ -327,28 +327,35 @@ def spectrogram_timelapse_on_client(
     if sparse:
         _mask_upper_triangle(ds)
 
+    # extract
+    new = ds.drop_vars('freq_bw').where((ds.status != 1), drop=True)
+    new['freq_bw'] = ds['freq_bw']
+
     # create locks
     locks = [distributed.Lock(nc)
-             for nc in _all_ncfiles(ds.pair, ds.time1, root)]
+             for nc in _all_ncfiles(new.pair, new.time1, root)]
     if verb > 0:
         print('{:>20} : {}'.format('locks', len(locks)))
 
     # chunk
-    ds = ds.chunk({'time1': chunk, 'time2': chunk})
+    new = new.chunk({'time1': chunk, 'time2': chunk})
 
     # map and persist blocks
-    mapped = ds.map_blocks(
+    mapped = new.map_blocks(
         correlate_spectrograms,
         args=[root],
-        template=ds,
+        template=new,
     ).persist()
 
     # force await async
     distributed.wait(mapped)
 
     # compute blocks
-    ds = client.gather(mapped).load()
+    new = client.gather(mapped).load()
     # ds = mapped.compute()
+
+    # merge
+    ds = xr.merge([new, ds], compat='override', join='outer')
 
     # fill upper triangle
     if sparse:
