@@ -312,9 +312,35 @@ def _all_ncfiles(pair, time, root):
 
 def spectrogram_timelapse_on_client(
     ds: xr.Dataset, root: str, client: distributed.Client,
-    chunk: int = 10, sparse: bool = True, verb: int = 1
+    chunk: int = 10, sparse: bool = True, merge: bool = False, verb: int = 1
 ):
     """2-d correlate spectrograms on a Dask client
+
+    Parameters:
+    -----------
+
+    ds: :class:`xr.Dataset`
+        Timelapse dataset.
+
+    root: `str`
+        Crosscorrelation root directory
+
+    client: :class:`distributed.Client`
+        Dask distributed client object.
+
+    chunk: `int`, optional
+        Dask map blocks chunk size for time1 and time2 (default: 10).
+
+    sparse: `bool`, optional
+        Only calculate the lower diagonal crosscorrelation values
+        (default: `True`).
+
+    merge: `bool`
+        Merge ``ds`` with the updated timelapse dataset. Avoid when calculating
+        a freshly initiated dataset.
+
+    verb: `int`, optional
+        Set verbosity level (default: 1).
     """
 
     # parameters
@@ -322,6 +348,7 @@ def spectrogram_timelapse_on_client(
         print('.. map and compute blocks')
         print('{:>20} : {}'.format('chunk', chunk))
         print('{:>20} : {}'.format('sparse', sparse))
+        print('{:>20} : {}'.format('merge', merge))
 
     # ignore upper triangle
     if sparse:
@@ -355,7 +382,7 @@ def spectrogram_timelapse_on_client(
     # ds = mapped.compute()
 
     # merge
-    ds = xr.merge([new, ds], compat='override', join='outer')
+    ds = xr.merge([new, ds], join='outer') if merge else new
 
     # fill upper triangle
     if sparse:
@@ -561,7 +588,10 @@ def main():
 
     # process on client
     ds = spectrogram_timelapse_on_client(
-        ds, args.root, client, chunk=args.chunk, sparse=(not args.abundant)
+        ds, args.root, client,
+        merge=args.update,
+        chunk=args.chunk,
+        sparse=(not args.abundant),
     )
 
     # to netcdf
