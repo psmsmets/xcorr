@@ -576,6 +576,9 @@ def main():
             (ds.time2 < args.end.to_datetime64()),
             drop=True
         )
+        for dim in ('pair', 'time1', 'time2'):
+            if dim in bw.dims:
+                bw = bw.loc[{dim: bw[dim][0]}].drop_vars(dim)
         ds['freq_bw'] = bw
         ds['status'] = ds['status'].fillna(0).astype(np.byte)
 
