@@ -1,9 +1,9 @@
 r"""
 
-:mod:`cc.cc` -- Crosscorrelation
+:mod:`cc.cc` -- Cross-correlation
 ================================
 
-Crosscorrelation functions for ``xcorr``.
+Cross-correlation functions for ``xcorr``.
 
 """
 
@@ -35,7 +35,7 @@ def cc(
         Data vector y.
 
     normalize : bool, optional
-        Normalize the crosscorrelation by the norm of `x` and `y` if True
+        Normalize the cross-correlation by the norm of `x` and `y` if True
         (default).
 
     pad : bool, optional
@@ -43,18 +43,18 @@ def cc(
         with N the length of `x` and `y`.
 
     unbiased : bool, optional
-        Correct the crosscorrelation estimate for the reduced number of
-        samples if True, else the biased crosscorrelation estimate is
+        Correct the cross-correlation estimate for the reduced number of
+        samples if True, else the biased cross-correlation estimate is
         returned (default).
 
     dtype : :class:`numpy.dtype`, optional
-        Change the dtype of the crosscorrelation estimate `cc`. If None
+        Change the dtype of the cross-correlation estimate `cc`. If None
         (default), `cc` has the samen dtype as `x` and `y`.
 
     Returns
     -------
     Rxy : :class:`numpy.ndarray`
-        Crosscorrelation estimate of `x` and `y`.
+        Cross-correlation estimate of `x` and `y`.
 
     """
     n = len(x)
@@ -83,15 +83,15 @@ def lag(
     n: int, delta: float, pad: bool = True
 ):
     """
-    Construct the crosscorrelation lag vector.
+    Construct the cross-correlation lag vector.
 
     Parameters
     ----------
     n : int
-        Length of the crosscorrelation input vectors `x` and `y`.
+        Length of the cross-correlation input vectors `x` and `y`.
 
     delta : float
-        Time step (in seconds) of the crosscorrelation input vectors `x`
+        Time step (in seconds) of the cross-correlation input vectors `x`
         and `y`.
 
     pad : bool, optional
@@ -101,7 +101,7 @@ def lag(
     Returns
     -------
     lag : :class:`numpy.ndarray`
-        Crosscorrelation lag vector (in seconds).
+        Cross-correlation lag vector (in seconds).
 
     """
     nn = n*2-1 if pad else n
@@ -112,12 +112,12 @@ def weight(
     n: int, pad: bool = True, clip: float = None
 ):
     """
-    Construct the unbiased crosscorrelation weight vector.
+    Construct the unbiased cross-correlation weight vector.
 
     Parameters
     ----------
     n : int
-        Length of the crosscorrelation input vectors `x` and `y`.
+        Length of the cross-correlation input vectors `x` and `y`.
 
     pad : bool, optional
         Pad the length of `x` and `y` to 2*N-1 samples if True (default),
@@ -130,7 +130,7 @@ def weight(
     Returns
     -------
     w : :class:`numpy.ndarray`
-        Unbiased crosscorrelation weight vector.
+        Unbiased cross-correlation weight vector.
 
     """
     nn = n*2-1 if pad else n
@@ -145,25 +145,25 @@ def extract_shift(
     Rxy: np.ndarray, delta: float = None
 ):
     """
-    Extract crosscorrelation shift.
+    Extract cross-correlation shift.
 
     Returns the sample (or time) shift at the maximum of the
-    crosscorrelation estimate `Rxy`.
+    cross-correlation estimate `Rxy`.
 
     Parameters
     ----------
     Rxy : :class:`numpy.ndarray`
-        Crosscorrelation estimate vector.
+        Cross-correlation estimate vector.
 
     delta : float, optional
-        Time step (in seconds) of the crosscorrelation data vectors `x`
+        Time step (in seconds) of the cross-correlation data vectors `x`
         and `y`. If None (default), the integer sample shift is returned.
 
     Returns
     -------
     shift : int or float
         Sample shift (or lag time if `delta` is provided) at the maximum
-        crosscorrelation.
+        cross-correlation.
 
     """
     zero_index = int(len(Rxy) / 2)
@@ -175,29 +175,29 @@ def extract_shift_and_max(
     Rxy: np.ndarray, delta: float = None
 ):
     """
-    Extract crosscorrelation shift.
+    Extract cross-correlation shift.
 
     Returns the sample (or time) shift at the maximum of the
-    crosscorrelation estimate `Rxy` and the maximum itself.
+    cross-correlation estimate `Rxy` and the maximum itself.
 
 
     Parameters
     ----------
     Rxy : :class:`numpy.ndarray`
-        Crosscorrelation estimate vector.
+        Cross-correlation estimate vector.
 
     delta : float, optional
-        Time step (in seconds) of the crosscorrelation data vectors `x`
+        Time step (in seconds) of the cross-correlation data vectors `x`
         and `y`. If None (default), the integer sample shift is returned.
 
     Returns
     -------
     shift : int or float
         Sample shift (or lag time if `delta` is provided) at the maximum
-        of the crosscorrelation estimate `Rxy`.
+        of the cross-correlation estimate `Rxy`.
 
     Rxy_max : float
-        The maximum of the crosscorrelation estimate `Rxy`.
+        The maximum of the cross-correlation estimate `Rxy`.
 
     """
     zero_index = int(len(Rxy) / 2)
@@ -210,10 +210,10 @@ def compute_shift(
     x: np.ndarray, y: np.ndarray, delta: float = None, **kwargs
 ):
     """
-    Calculate crosscorrelation shift.
+    Calculate cross-correlation shift.
 
     Calculate the sample (or time) shift at the maximum of the
-    crosscorrelation estimate `Rxy` of vectors `x` and `y` in the frequency
+    cross-correlation estimate `Rxy` of vectors `x` and `y` in the frequency
     domain using :func:`cc`.
 
     For all input arguments see :func:`cc`.
@@ -228,14 +228,14 @@ def compute_shift(
         Data vector y.
 
     delta : float, optional
-        Time step (in seconds) of the crosscorrelation data vectors `x`
+        Time step (in seconds) of the cross-correlation data vectors `x`
         and `y`. If None (default), the integer sample shift is returned.
 
     Returns
     -------
     shift : int or float
         Sample shift (or lag time if `delta` is provided) at the maximum
-        of the crosscorrelation estimate `Rxy`.
+        of the cross-correlation estimate `Rxy`.
 
     """
     Rxy = cc(x, y, **kwargs)
@@ -246,10 +246,10 @@ def compute_shift_and_max(
     x: np.ndarray, y: np.ndarray, delta: float = None, **kwargs
 ):
     """
-    Calculate crosscorrelation shift.
+    Calculate cross-correlation shift.
 
     Calculate the sample (or time) shift at the maximum of the
-    crosscorrelation estimate `Rxy` of vectors `x` and `y` in the frequency
+    cross-correlation estimate `Rxy` of vectors `x` and `y` in the frequency
     domain using :func:`cc`.
 
     For all input arguments see :func:`cc`.
@@ -263,17 +263,17 @@ def compute_shift_and_max(
         Data vector y.
 
     delta : float, optional
-        Time step (in seconds) of the crosscorrelation data vectors `x`
+        Time step (in seconds) of the cross-correlation data vectors `x`
         and `y`. If None (default), the integer sample shift is returned.
 
     Returns
     -------
     shift : int or float
         Sample shift (or lag time if `delta` is provided) at the maximum
-        of the crosscorrelation estimate `Rxy`.
+        of the cross-correlation estimate `Rxy`.
 
     Rxy_max : float
-        The maximum of the crosscorrelation estimate `Rxy`.
+        The maximum of the cross-correlation estimate `Rxy`.
 
     """
     Rxy = cc(x, y, **kwargs)

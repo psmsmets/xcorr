@@ -106,7 +106,7 @@ def unbias(
 def get_weights(
     lag: xr.DataArray, name: str = 'w'
 ):
-    """Construct the unbiased crosscorrelation weight vector from the lag vector.
+    """Construct the unbiased cross-correlation weight vector from the lag vector.
 
     Parameters
     ----------
@@ -119,7 +119,7 @@ def get_weights(
     Returns
     -------
        w : :class:`DataArray`
-           Unbiased crosscorrelation weight vector.
+           Unbiased cross-correlation weight vector.
 
     """
 

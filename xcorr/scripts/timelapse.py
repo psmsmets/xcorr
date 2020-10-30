@@ -2,7 +2,7 @@
 TIMELAPSE
 ===
 
-Two-dimensional crosscorrelation of crosscorrelation spectrograms.
+Two-dimensional cross-correlation of cross-correlation spectrograms.
 
 """
 
@@ -39,7 +39,7 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
         with a dash ('-').
 
     time : :class:`xr.DataArray`
-        One-dimensional array of data with selected crosscorrelation times to
+        One-dimensional array of data with selected cross-correlation times to
         correlated.
 
     freq : :class:`np.ndarray`
@@ -57,7 +57,7 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
     ds.attrs = {
         'title': (
             kwargs.pop('title', '') +
-            'Timelapse Crosscorrelations - {} to {}'
+            'Timelapse Cross-correlations - {} to {}'
             .format(
                 time[0].dt.strftime('%Y.%j').item(),
                 time[-1].dt.strftime('%Y.%j').item(),
@@ -111,16 +111,16 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
         dims=('pair', 'freq', 'time1', 'time2'),
         coords=(ds.pair, ds.freq, time, time),
         attrs={
-            'long_name': 'Crosscorrelation status',
-            'standard_name': 'crosscorrelation_status',
+            'long_name': 'Cross-correlation status',
+            'standard_name': 'cross-correlation_status',
             'units': '-',
         },
     )
 
     ds['cc2'] = ds.status.astype(np.float64) * 0
     ds['cc2'].attrs = {
-        'long_name': 'Two-dimensional Crosscorrelation Estimate',
-        'standard_name': '2d_crosscorrelation_estimate',
+        'long_name': 'Two-dimensional Cross-correlation Estimate',
+        'standard_name': '2d_cross-correlation_estimate',
         'units': '-',
         'add_offset': np.float64(0.),
         'scale_factor': np.float64(1.),
@@ -323,7 +323,7 @@ def spectrogram_timelapse_on_client(
         Timelapse dataset.
 
     root: `str`
-        Crosscorrelation root directory
+        Cross-correlation root directory
 
     client: :class:`distributed.Client`
         Dask distributed client object.
@@ -332,7 +332,7 @@ def spectrogram_timelapse_on_client(
         Dask map blocks chunk size for time1 and time2 (default: 10).
 
     sparse: `bool`, optional
-        Only calculate the lower diagonal crosscorrelation values
+        Only calculate the lower diagonal cross-correlation values
         (default: `True`).
 
     merge: `bool`
@@ -401,7 +401,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog='xcorr-timelapse',
-        description=('Two-dimensional crosscorrelation of crosscorrelation '
+        description=('Two-dimensional cross-correlation of cross-correlation '
                      'spectrograms.'),
         epilog='See also xcorr-snr xcorr-ct xcorr-psd xcorr-beamform',
     )
@@ -447,7 +447,7 @@ def main():
     )
     parser.add_argument(
         '-r', '--root', metavar='..', type=str, default=os.getcwd(),
-        help=('Set crosscorrelation root directory (default: current '
+        help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
     parser.add_argument(

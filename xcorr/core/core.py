@@ -66,10 +66,10 @@ def init(
         SEED-id string: '{network}.{station}.{location}.{channel}'.
 
     starttime : `pd.Timestamp`
-        Start time for generating crosscorrelation time windows.
+        Start time for generating cross-correlation time windows.
 
     endtime : `pd.Timestamp`
-        End time for generating crosscorrelation time windows.
+        End time for generating cross-correlation time windows.
 
     preprocess : `dict`
         Preprocessing operations dictionary, containing a list of operations
@@ -84,23 +84,23 @@ def init(
         ['institution', 'author', 'source']
 
     sampling_rate : `float`
-        Sampling rate for the crosscorrelation lag time.
+        Sampling rate for the cross-correlation lag time.
 
     window_length : `float`, optional
-        Crosscorrelation window length, in seconds. Defaults to 86400s.
+        Cross-correlation window length, in seconds. Defaults to 86400s.
 
     window_overlap : `float`, optional
-        Crosscorrelation window overlap, [0,1). Defaults to 0.875.
+        Cross-correlation window overlap, [0,1). Defaults to 0.875.
 
     clip_lag : `float` or `tuple`, optional
-        Clip the crosscorrelation lag time. Defaults to `None`. If ``clip_lag``
-        is a single value ``lag`` is clipped symmetrically around zero with
-        radius ``clip_lag`` (`float` seconds).
+        Clip the cross-correlation lag time. Defaults to `None`.
+        If ``clip_lag`` is a single value ``lag`` is clipped symmetrically
+        around zero with radius ``clip_lag`` (`float` seconds).
         Provide a `tuple` with two elements, (lag_min, lag_max), both of type
         `float` to clip a specific lag range of interest.
 
     unbiased_cc : `bool`, optional
-        Automatically bias correct the crosscorrelation estimate in place if
+        Automatically bias correct the cross-correlation estimate in place if
         `True`. Default is `False`.
 
     closed : {`None`, 'left', 'right'}, optional
@@ -108,7 +108,7 @@ def init(
         the 'left' (default), 'right', or both sides (`None`).
 
     dtype : `np.dtype`, optional
-        Set the crosscorrelation estimate dtype. Defaults to `np.float32`.
+        Set the cross-correlation estimate dtype. Defaults to `np.float32`.
 
     inventory : :class:`obspy.Inventory`, optional
         Inventory object, including the instrument response.
@@ -153,7 +153,7 @@ def init(
     dataset.attrs = {
         'title': (
             (attrs['title'] if 'title' in attrs else '') +
-            ' Crosscorrelations - {}{}'
+            ' Cross-correlations - {}{}'
             .format(
                 starttime.strftime('%Y.%j'),
                 ' to {}'.format(endtime.strftime('%Y.%j'))
@@ -179,7 +179,7 @@ def init(
     # pair
     dataset.coords['pair'] = np.array([pair], dtype=object)
     dataset.pair.attrs = {
-        'long_name': 'Crosscorrelation receiver pair',
+        'long_name': 'Cross-correlation receiver pair',
         'standard_name': 'receiver_pair',
         'units': '-',
         'preprocess': hash_operations(preprocess),
@@ -325,8 +325,8 @@ def init(
         ('pair', 'time', 'lag'),
         np.zeros((1, len(dataset.time), len(dataset.lag)), dtype=dtype),
         {
-            'long_name': 'Crosscorrelation Estimate',
-            'standard_name': 'crosscorrelation_estimate',
+            'long_name': 'Cross-correlation Estimate',
+            'standard_name': 'cross-correlation_estimate',
             'units': '-',
             'add_offset': dtype(0.),
             'scale_factor': dtype(1.),
@@ -362,7 +362,7 @@ def read(
         NetCDF4 filename.
 
     extract : `bool`, optional
-        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
+        Mask cross-correlation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
 
     engine : `str`, optional
@@ -429,7 +429,7 @@ def mfread(
         Paths.
 
     extract : `bool`, optional
-        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
+        Mask cross-correlation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
 
     preprocess : `callable`, optional
@@ -1005,7 +1005,7 @@ def merge(
         :class:`xarray.Dataset` containing the `xcorr` N-D labelled data array.
 
     extract : `bool`, optional
-        Mask crosscorrelation estimates with ``status != 1`` with `Nan` if
+        Mask cross-correlation estimates with ``status != 1`` with `Nan` if
         `True`. Defaults to `False`.
 
     verb : {0, 1, 2, 3, 4}, optional

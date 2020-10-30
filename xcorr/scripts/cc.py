@@ -2,7 +2,7 @@
 CC
 ===
 
-Crosscorrelation using dask.
+Cross-correlation using dask.
 
 """
 from pandas import date_range
