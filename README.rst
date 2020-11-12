@@ -118,7 +118,7 @@ Install xcorr via ``pip``:
 Required are Python version 3.6 or higher and the modules `NumPy`, `SciPy`,
 `ObsPy`, `Pandas`, and `Xarray`.
 
-Create a working (non-conflicting) Python 3.7 environment in conda as follows:
+Create a working (non-conflicting) Python 3.8 environment in conda as follows:
 
 .. code-block:: console
 
