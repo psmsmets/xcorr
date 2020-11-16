@@ -379,10 +379,9 @@ def spectrogram_timelapse_on_client(
 
     # compute blocks
     new = client.gather(mapped).load()
-    # ds = mapped.compute()
 
     # merge
-    ds = xr.merge([new, ds], join='outer', compat='override') if merge else new
+    ds = xr.merge([new, ds], join='outer') if merge else new
 
     # fill upper triangle
     if sparse:
@@ -601,6 +600,7 @@ def main():
     print(f'.. write to "{nc}"')
     xcorr.write(ds, nc, variable_encoding=dict(zlib=True, complevel=9),
                 verb=1 if args.debug else 0)
+
     # plot?
     if args.plot:
         plotset = dict(col='freq', yincrease=False, size=4, aspect=1)
