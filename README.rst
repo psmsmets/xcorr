@@ -3,16 +3,16 @@ xcorr - xarray contained correlations
 *************************************
 
 
-**xcorr** is an open-source project existing of tools to crosscorrelate
+**xcorr** is an open-source project existing of tools to cross-correlate
 waveform timeseries (`obspy.Stream` objects) contained in a self-describing
 N-D labelled `xarray.Dataset` following CF-1.9 Conventions and FAIR data
-guidelines. Data and metadata can be stored as `netCDF4` and read/postprocessed
-in other languages, packages, machines or platforms.
+guidelines. Data and metadata are stored as a `NetCDF Dataset` to be easily
+read / postprocessed by other packages, using different languages or on other 
+platforms.
 
-**xcorr** exists of various submodules such as generalized waveform preprocessing,
-a waterfall-based client wrapping various getters from both local archives and
-remote services, an (unbiased) frequency-domain crosscorrelations algorithm and
-various postprocessing/analysis tools.
+**xcorr** exists of various submodules to create a simple workflow from fetching / 
+archiving / preprocessing raw waveforms to cross-correlation functions followed by 
+various postprocessing and analysis tools. 
 
 
 Features
@@ -23,26 +23,28 @@ Main xcorr features listed per submodule:
 - **core**: Main functions of xcorr are ``init``, ``process``, ``bias_correct``,
   ``read``, ``write`` and ``merge``. All of these return or are applied on an
   `xarray.Dataset`.
-  Batch process crosscorrelations by ``lazy_process``: multithreading and lazy
+  Batch process cross-correlations by ``lazy_process``: multithreading and lazy
   scheduling using `dask <https://dask.org>`_ after first verifying both data
   availability and preprocessing.
   ``mread`` is a multi-file merge and read combining the `xcorr.read` with
   `xarray.open_mfdataset` including **Dask** features like parallelization
   and memory chunking.
 
-- **client**: Load waveform data from a local SeisComP Data Structure (SDS)
-  archive and automatically download missing or incomplete waveforms by the
-  FDSN web service and the `CTBTO <https://www.ctbto.org>`_ Verification Data
-  Messaging System (VDMS, via `pyvdms` wrapping the command line client).
+- **client**: A waterfall-based client wrapping various getters from both 
+  local archives and remote services. Load waveform data from a local SeisComP 
+  Data Structure (SDS) archive and automatically download missing or incomplete 
+  waveforms by the FDSN web service and the `CTBTO <https://www.ctbto.org>`_ 
+  Verification Data Messaging System (VDMS, via `pyvdms` wrapping the command 
+  line client).
 
-- **preprocess**: Process waveforms before correlation given a dictionary with
-  operations per channel id. Channel operations and parameters are added to the
+- **preprocess**: Generalized waveform preprocessing using `obspy` given a dictionary
+  with operations per channel id. Channel operations and parameters are added to the
   `pair` as attribute containing id as key.
 
 - **cc**: Crosscorrelation functions and constructors for `lag` time and
   unbiased `weight` vectors.
 
-- **signal**: Postprocess crosscorrelation estimates, or any `xarray.DataArray`
+- **signal**: Postprocess cross-correlation estimates, or any `xarray.DataArray`
   with a (lag) time dimension. Each signal routine is **Dask** capable for
   large datasets.
 
@@ -81,18 +83,17 @@ Main xcorr features listed per submodule:
 - **scripts**: Core scripts to (re)produce the manuscript results. See entry points.
 
 
-
 Entry points
 ============
 
 Core scripts to (re)produce the manuscript results are implemented as entry points
 and can be accessed from the command line:
 
-- ``xcorr-snr``: Signal-to-noise ratio estimation of crosscrorrelations.
-- ``xcorr-ct``: Coincidence triggers of crosscrorrelation signal-to-noise ratios.
+- ``xcorr-snr``: Signal-to-noise ratio estimation of cross-crorrelationss.
+- ``xcorr-ct``: Coincidence triggers of cross-crorrelations signal-to-noise ratios.
 - ``xcorr-psd``: Spectrogram estimation of signal-to-noise ratio triggered periods.
-- ``xcorr-timelapse`` Two-dimensional crosscorrelation of crosscorrelation spectrograms.
-- ``xcorr-beamform`` Plane wave beamforming of crosscorrelation functions.
+- ``xcorr-timelapse`` Two-dimensional cross-correlation of cross-correlation spectrograms.
+- ``xcorr-beamform`` Plane wave beamforming of cross-correlation functions.
 
 
 Installation
@@ -118,7 +119,7 @@ Install xcorr via ``pip``:
 Required are Python version 3.6 or higher and the modules `NumPy`, `SciPy`,
 `ObsPy`, `Pandas`, and `Xarray`.
 
-Create a working (non-conflicting) Python 3.8 environment in conda as follows:
+Create a Python 3.8 environment in conda as follows:
 
 .. code-block:: console
 
@@ -139,8 +140,14 @@ If you publish results for which you used xcorr, please give credit by citing
 All releases have a Zenodo-DOI, which can be found on `Zenodo-DOI <#>`_.
 
 
-License information
-===================
+Contributing
+============
+
+Only accepts pull requests that fixes bugs / fixes typos / improves existing content.
+
+
+License
+=======
 
 Copyright 2020 Pieter Smets.
 
