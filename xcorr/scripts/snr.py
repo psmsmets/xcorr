@@ -51,7 +51,7 @@ def process(ds):
         x=ds.lag,
         y=ds.distance,
         lower=1.45,
-        upper=1.50,
+        upper=1.52,
         invert=True,
     )
 
