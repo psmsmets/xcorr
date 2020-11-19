@@ -1,36 +1,35 @@
 name: xcorr
 channels:
   - conda-forge
+  - intel
   - defaults
 dependencies:
   - python=3.8
   - numpy
   - scipy
-  - numba
+  - matplotlib
+  - pandas>=1.1.2
   - obspy>=1.2.0
+  - basemap
   - pyfftw
   - h5py
   - h5netcdf
   - netcdf4
-  - gdal
-  - pandas>=1.1.2
   - xarray
+  - cartopy
   - dask
   - distributed
-  - bottleneck
-  - matplotlib
-  - nc-time-axis
+  - python-graphviz
+  - bokeh=2.0
   - pyproj
-  - basemap
-  - cartopy
   - humanfriendly
   - tabulate
   - dateparser
-  - python-graphviz
-  - bokeh=2.0
   - notebook
   - ipython
   - jupyter
+  - flake8
+  - scikit-learn
   - python-slugify
   - pip
   - pip:

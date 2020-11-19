@@ -18,7 +18,7 @@ various postprocessing and analysis tools.
 Features
 ========
 
-Main xcorr features listed per submodule:
+Main `xcorr` features listed per submodule:
 
 - **core**: Main functions of xcorr are ``init``, ``process``, ``bias_correct``,
   ``read``, ``write`` and ``merge``. All of these return or are applied on an
@@ -126,8 +126,8 @@ Create a Python 3.8 environment in conda as follows:
     conda env create -f environment.yml
 
 
-Citation
-========
+Acknowledgements
+================
 
 If you publish results for which you used xcorr, please give credit by citing
 `Smets et al. (2020)  <#>`_:
@@ -137,7 +137,7 @@ If you publish results for which you used xcorr, please give credit by citing
     a proxy for variations in deep-ocean temperature,
     Journal (number), pages, DOI: `doi <#>`_.
 
-All releases have a Zenodo-DOI, which can be found on `Zenodo-DOI <#>`_.
+All stable releases have a Zenodo-DOI, which can be found on `Zenodo-DOI <#>`_.
 
 
 Contributing
