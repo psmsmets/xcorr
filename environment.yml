@@ -9,6 +9,7 @@ dependencies:
   - scipy
   - matplotlib
   - pandas>=1.1.2
+  - seaborn
   - obspy>=1.2.0
   - basemap
   - pyfftw>=0.12.0
@@ -19,6 +20,7 @@ dependencies:
   - cartopy
   - dask
   - distributed
+  - bottleneck
   - python-graphviz
   - bokeh=2.0
   - pyproj
