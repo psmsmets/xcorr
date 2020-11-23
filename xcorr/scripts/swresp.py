@@ -109,7 +109,8 @@ def surface_wave_response(cc, normalize: bool = True, **kwargs):
             ),
             'comment': kwargs.pop('comment', 'n/a'),
             'description': ('Phase difference between the vertical and the '
-                            'radial component of cross-correlation functions.')
+                            'radial component of cross-correlation '
+                            'functions.'),
             'Conventions': 'CF-1.9',
             'xcorr_version': xcorr.__version__,
             'dependencies_version': xcorr.core.core.dependencies_version(),
@@ -129,14 +130,14 @@ def surface_wave_response(cc, normalize: bool = True, **kwargs):
     return resp
 
 
-def surface_wave_response_list(pair, start, end, root):
+def surface_wave_response_list(pair, start, end, root, **kwargs):
     """Evaluate surface wave response for a list of filenames
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
         ds = load(pair, day, root)
         cc = process(ds)
-        resp = surface_wave_response(cc)
+        resp = surface_wave_response(cc, **kwargs)
         results.append(resp)
     return results
 
@@ -199,6 +200,10 @@ def main():
         help='Overwrite if output file exists (default: skip)'
     )
     parser.add_argument(
+        '--disable-norm', action='store_true', default=False,
+        help='Disable normalization (default: normalization)'
+    )
+    parser.add_argument(
         '--scheduler', metavar='..', type=str, default=None,
         help='Connect to a dask scheduler by a scheduler-file'
     )
@@ -220,6 +225,7 @@ def main():
     args.end = (pd.to_datetime(args.end, format=args.format)
                 if args.end else args.start)
     args.channels = 'ZT' if args.transverse else 'ZR'
+    args.normalize = not args.disable_norm
 
     args.out = ncfile(
         'swresp', f'{args.station}_{args.channels}', args.start, args.end
@@ -245,6 +251,7 @@ def main():
     print('{:>20} : {}'.format('root', args.root))
     print('{:>20} : {}'.format('start', args.start.strftime('%Y-%m-%d')))
     print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
+    print('{:>20} : {}'.format('normalize', args.normalize))
     print('{:>20} : {}'.format('outfile', args.out))
     print('{:>20} : {}'.format('overwrite', args.overwrite))
 
@@ -274,7 +281,10 @@ def main():
     # surface wave response
     print('.. compute surface wave response per day for period')
     mapped = client.compute(
-        surface_wave_response_list(pair, args.start, args.end, args.root)
+        surface_wave_response_list(
+            pair, args.start, args.end, args.root,
+            normalize=args.normalize,
+        )
     )
     distributed.wait(mapped)
 
