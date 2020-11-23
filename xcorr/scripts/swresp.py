@@ -75,18 +75,52 @@ def process(ds):
 
 
 @dask.delayed
-def surface_wave_response(cc):
+def surface_wave_response(cc, normalize: bool = True, **kwargs):
     """
     """
     if cc is None:
         return
     try:
+        if normalize:
+            cc = xcorr.signal.norm1d(cc, dim='lag')
+
         Y = xcorr.signal.rfft(cc)
         F = Y.isel(pair=1) * xr.ufuncs.conj(Y.isel(pair=0))  # Vertical first
 
         resp = xr.Dataset()
+
+        resp.attrs = {
+            'title': (
+                kwargs.pop('title', '') +
+                'Surface wave response - {} to {}'
+                .format(
+                    cc.time[0].dt.strftime('%Y.%j').item(),
+                    cc.time[-1].dt.strftime('%Y.%j').item(),
+                )
+            ).strip(),
+            'institution': kwargs.pop('institution', 'n/a'),
+            'author': kwargs.pop('author', 'n/a'),
+            'source': kwargs.pop('source', 'n/a'),
+            'history': 'Created @ {}'.format(pd.to_datetime('now')),
+            'references': (
+                 'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). '
+                 'Random data : analysis and measurement procedures. '
+                 'New York (N.Y.): Wiley-Interscience.'
+            ),
+            'comment': kwargs.pop('comment', 'n/a'),
+            'description': ('Phase difference between the vertical and the '
+                            'radial component of cross-correlation functions.')
+            'Conventions': 'CF-1.9',
+            'xcorr_version': xcorr.__version__,
+            'dependencies_version': xcorr.core.core.dependencies_version(),
+        }
+
         resp['magnitude'] = xr.ufuncs.real(xr.ufuncs.sqrt(F*xr.ufuncs.conj(F)))
-        resp['magnitude'].attrs = {'long_name': 'Magnitude', 'units': '-'}
+        resp['magnitude'].attrs = {
+            'long_name': 'Magnitude',
+            'units': '-',
+            'normalize': normalize,
+        }
         resp['phase'] = xr.ufuncs.arctan2(xr.ufuncs.real(F),
                                           xr.ufuncs.imag(F)) / np.pi
         resp['phase'].attrs = {'long_name': 'Phase', 'units': 'pi'}
@@ -117,7 +151,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog='xcorr-swresp',
         description=('Phase difference between vertical and radial component '
-                     'of crosscorrelation functions.'),
+                     'of cross-correlation functions.'),
         epilog=('See also xcorr-snr xcorr-ct xcorr-timelapse xcorr-psd '
                 'xcorr-beamform'),
     )
@@ -151,7 +185,7 @@ def main():
     )
     parser.add_argument(
         '-r', '--root', metavar='..', type=str, default=os.getcwd(),
-        help=('Set crosscorrelation root directory (default: current '
+        help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
     parser.add_argument(
