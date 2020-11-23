@@ -117,7 +117,7 @@ def main():
     )
     parser.add_argument(
         '-r', '--root', metavar='..', type=str, default=os.getcwd(),
-        help=('Set crosscorrelation root directory (default: current '
+        help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
     parser.add_argument(

@@ -108,7 +108,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog='xcorr-beamform',
-        description='Plane wave beamforming of crosscorrelation functions.',
+        description='Plane wave beamforming of cross-correlation functions.',
         epilog='See also xcorr-snr xcorr-ct xcorr-timelapse xcorr-psd',
     )
     parser.add_argument(
@@ -149,7 +149,7 @@ def main():
     )
     parser.add_argument(
         '-r', '--root', metavar='..', type=str, default=os.getcwd(),
-        help=('Set crosscorrelation root directory (default: current '
+        help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
     parser.add_argument(
