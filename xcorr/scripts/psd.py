@@ -288,11 +288,11 @@ def main():
     files = client.gather(mapped)
     if args.debug:
         print(files)
+    print('.. done')
 
     # close dask client and cluster
     client.close()
 
-    print('.. done')
     sys.exit(0)
 
 

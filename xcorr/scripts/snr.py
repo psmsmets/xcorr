@@ -191,12 +191,13 @@ def main():
         plt.tight_layout()
         plt.show()
 
+    print('.. done')
+
     # close dask client and cluster
     client.close()
     if cluster is not None:
         cluster.close()
 
-    print('.. done')
     sys.exit(0)
 
 
