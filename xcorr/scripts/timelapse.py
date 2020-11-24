@@ -604,6 +604,7 @@ def main():
 
     # plot?
     if args.plot:
+        print('.. plot')
         plotset = dict(col='freq', yincrease=False, size=4, aspect=1)
         ds.cc2.isel(pair=-1).plot(vmin=0, **plotset)
         ds.delta_lag.isel(pair=-1).plot(robust=True, **plotset)
@@ -611,6 +612,7 @@ def main():
         plt.show()
 
     # close dask client and cluster
+    print('.. close dask')
     client.close()
     if cluster is not None:
         cluster.close()

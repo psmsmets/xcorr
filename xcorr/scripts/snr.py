@@ -175,8 +175,13 @@ def main():
     mapped = client.compute(snr_per_file(validated))
     distributed.wait(mapped)
 
+    print('.. gather snr list')
+    snr = client.gather(mapped)
+
     print('.. merge snr list')
-    snr = xr.merge(client.gather(mapped))
+    snr = xr.merge(snr)
+    if args.debug:
+        print(snr)
 
     # to netcdf
     nc = ncfile('snr', args.pair, args.start, args.end)
@@ -186,18 +191,19 @@ def main():
 
     # plot
     if args.plot:
+        print('.. plot')
         snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
                       add_legend=False)
         plt.tight_layout()
         plt.show()
 
-    print('.. done')
-
     # close dask client and cluster
+    print('.. close dask')
     client.close()
     if cluster is not None:
         cluster.close()
 
+    print('.. done')
     sys.exit(0)
 
 

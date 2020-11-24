@@ -248,8 +248,8 @@ def main():
     args.end = args.end or pd.to_datetime(snr_ct.time[-1].item())
 
     # init dask client
-    client = init_dask_client(n_workers=args.nworkers,
-                              scheduler_file=args.scheduler)
+    cluster, client = init_dask_client(n_workers=args.nworkers,
+                                       scheduler_file=args.scheduler)
 
     # filter snr and ct
     print('.. filter snr and ct')
@@ -288,11 +288,14 @@ def main():
     files = client.gather(mapped)
     if args.debug:
         print(files)
-    print('.. done')
 
     # close dask client and cluster
+    print('.. close dask')
     client.close()
+    if cluster is not None:
+        cluster.close()
 
+    print('.. done')
     sys.exit(0)
 
 

@@ -142,6 +142,7 @@ def main():
                 verb=1 if args.debug else 0)
 
     if args.plot:
+        print('.. plot')
         ds.snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
                          add_legend=False)
         xcorr.signal.trigger.plot_trigs(ds.snr, ds.ct)

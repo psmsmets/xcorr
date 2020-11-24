@@ -288,9 +288,11 @@ def main():
     )
     distributed.wait(mapped)
 
-    print('.. merge surface wave response list')
-    resp = xr.merge(list(filter(None, client.gather(mapped))))
+    print('.. gather surface wave response list')
+    resp = client.gather(mapped)
 
+    print('.. merge surface wave response list')
+    resp = xr.merge(list(filter(None, resp)))
     if args.debug:
         print(resp)
 
@@ -301,6 +303,7 @@ def main():
 
     # plot
     if args.plot:
+        print('.. plot')
         resp.mean('time', keep_attrs=True).sortby('magnitude').plot.scatter(
             x='freq', y='phase', hue='magnitude', cmap='gray_r',
             size=3, aspect=3, robust=True
@@ -308,13 +311,13 @@ def main():
         plt.tight_layout()
         plt.show()
 
-    print('.. done')
-
     # close dask client and cluster
+    print('.. close dask')
     client.close()
     if cluster is not None:
         cluster.close()
 
+    print('.. done')
     sys.exit(0)
 
 

@@ -248,9 +248,11 @@ def main():
     )
     distributed.wait(mapped)
 
-    print('.. merge plane wave list')
-    fit = xr.merge(list(filter(None, client.gather(mapped))))
+    print('.. gather plane wave list')
+    fit = client.gather(mapped)
 
+    print('.. merge plane wave list')
+    fit = xr.merge(list(filter(None, fit)))
     if args.debug:
         print(fit)
 
@@ -261,6 +263,8 @@ def main():
 
     # plot
     if args.plot:
+        print('.. plot')
+
         fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(8, 5))
 
         fit.plot.scatter(x='time', y='doa', hue='err', ax=ax1, )
@@ -272,13 +276,14 @@ def main():
         plt.tight_layout()
         plt.show()
 
-    print('.. done')
 
     # close dask client and cluster
+    print('.. close dask')
     client.close()
     if cluster is not None:
         cluster.close()
 
+    print('.. done')
     sys.exit(0)
 
 
