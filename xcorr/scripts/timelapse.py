@@ -382,7 +382,16 @@ def spectrogram_timelapse_on_client(
     new = client.gather(mapped).load()
 
     # merge
-    ds = xr.merge([new, ds], join='outer') if merge else new
+    if merge:
+        new = xr.merge([new, ds], join='outer', compat='override')
+        try:
+            ds = xr.merge([new, ds], join='outer')
+        except Exception as e:
+            print(e)
+            ds = new
+    else:
+        ds = new
+    # ds = xr.merge([new, ds], join='outer') if merge else new
 
     # fill upper triangle
     if sparse:
