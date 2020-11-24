@@ -180,8 +180,8 @@ def get_spectrogram(pair, time, root):
 
     # extract cc
     cc = ds.cc.where(
-        (ds.lag >= ds.distance/1.52) &
-        (ds.lag <= ds.distance/1.45),
+        (ds.lag >= ds.distance/1.50) &
+        (ds.lag <= ds.distance/1.46),
         drop=True,
     )
 

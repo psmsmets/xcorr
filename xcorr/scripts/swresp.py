@@ -54,8 +54,8 @@ def process(ds):
         return
     try:
         cc = ds.cc.where(
-            (ds.lag >= ds.distance.mean()/1.52) &
-            (ds.lag <= ds.distance.mean()/1.45) &
+            (ds.lag >= ds.distance.mean()/1.50) &
+            (ds.lag <= ds.distance.mean()/1.46) &
             (ds.status == 1),
             drop=True,
         )
