@@ -50,11 +50,8 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
     the dataset. Please provide 'institution', 'author' and 'source' to comply
     with COARDS and CF conventions.
     """
-    # create dataset
     ds = xr.Dataset()
-
-    # global attributes
-    ds.attrs = {
+    ds.attrs = xcorr.util.metadata.global_attrs({
         'title': (
             kwargs.pop('title', '') +
             'Timelapse Cross-correlations - {} to {}'
@@ -63,20 +60,13 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
                 time[-1].dt.strftime('%Y.%j').item(),
             )
         ).strip(),
-        'institution': kwargs.pop('institution', 'n/a'),
-        'author': kwargs.pop('author', 'n/a'),
-        'source': kwargs.pop('source', 'n/a'),
-        'history': 'Created @ {}'.format(pd.to_datetime('now')),
+        **kwargs,
         'references': (
              'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). '
              'Random data : analysis and measurement procedures. '
              'New York (N.Y.): Wiley-Interscience.'
         ),
-        'comment': kwargs.pop('comment', 'n/a'),
-        'Conventions': 'CF-1.9',
-        'xcorr_version': xcorr.__version__,
-        'dependencies_version': xcorr.core.core.dependencies_version(),
-    }
+    })
 
     # set coordinates
     ds['pair'] = pair

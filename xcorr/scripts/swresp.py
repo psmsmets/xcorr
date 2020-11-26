@@ -88,8 +88,7 @@ def surface_wave_response(cc, normalize: bool = True, **kwargs):
         F = Y.isel(pair=1) * xr.ufuncs.conj(Y.isel(pair=0))  # Vertical first
 
         resp = xr.Dataset()
-
-        resp.attrs = {
+        resp.attrs = xcorr.util.metadata.global_attrs({
             'title': (
                 kwargs.pop('title', '') +
                 'Surface wave response - {} to {}'
@@ -98,23 +97,13 @@ def surface_wave_response(cc, normalize: bool = True, **kwargs):
                     cc.time[-1].dt.strftime('%Y.%j').item(),
                 )
             ).strip(),
-            'institution': kwargs.pop('institution', 'n/a'),
-            'author': kwargs.pop('author', 'n/a'),
-            'source': kwargs.pop('source', 'n/a'),
-            'history': 'Created @ {}'.format(pd.to_datetime('now')),
+            **kwargs,
             'references': (
                  'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). '
                  'Random data : analysis and measurement procedures. '
                  'New York (N.Y.): Wiley-Interscience.'
             ),
-            'comment': kwargs.pop('comment', 'n/a'),
-            'description': ('Phase difference between the vertical and the '
-                            'radial component of cross-correlation '
-                            'functions.'),
-            'Conventions': 'CF-1.9',
-            'xcorr_version': xcorr.__version__,
-            'dependencies_version': xcorr.core.core.dependencies_version(),
-        }
+        })
 
         resp['magnitude'] = xr.ufuncs.real(xr.ufuncs.sqrt(F*xr.ufuncs.conj(F)))
         resp['magnitude'].attrs = {

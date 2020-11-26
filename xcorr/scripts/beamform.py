@@ -276,7 +276,6 @@ def main():
         plt.tight_layout()
         plt.show()
 
-
     # close dask client and cluster
     print('.. close dask')
     client.close()

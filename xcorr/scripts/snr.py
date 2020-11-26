@@ -38,37 +38,29 @@ def load(filename):
 
 
 @dask.delayed
-def process(ds):
+def process(ds, **attrs):
     """
     """
-    valid = xcorr.signal.mask(
-        x=ds.lag,
-        upper=9./24.,
-        scalar=ds.time.window_length
-    )
+    # extract cc
+    cc = ds.cc.where((ds.status == 1), drop=True)
 
-    signal = xcorr.signal.multi_mask(
-        x=ds.lag,
-        y=ds.distance,
-        lower=1.46,
-        upper=1.50,
-        invert=True,
-    )
+    # extract time_offset and pair_offset
+    delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
 
-    noise = xcorr.signal.mask(
-        x=ds.lag,
-        lower=6./24.,
-        upper=9./24.,
-        scalar=ds.time.window_length
-    )
-
-    cc = ds.cc.where((valid) & (ds.status == 1), drop=True)
+    # process cc
     cc = xcorr.signal.unbias(cc)
     cc = xcorr.signal.demean(cc)
+    cc = xcorr.signal.taper(cc, max_length=5.)
+    cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
     cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
     cc = xcorr.signal.taper(cc, max_length=2/3.)
 
-    snr = xcorr.signal.snr(cc, signal, noise)
+    # signal-to-noise
+    signal = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
+    noise = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
+
+    snr = xcorr.signal.snr(cc, signal, noise, dim='lag',
+                           extend=True, envelope=False, **attrs)
 
     return snr
 
