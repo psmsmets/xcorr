@@ -7,6 +7,7 @@ xcorr.util init
 from ..util import convert
 from ..util import hasher
 from ..util import history
+from ..util import metadata 
 from ..util import receiver
 from ..util import stream
 from ..util import time
@@ -15,5 +16,5 @@ from ..util import time
 from ..util.ncfile import ncfile
 
 
-__all__ = ['convert', 'hasher', 'history', 'ncfile', 'receiver', 'stream',
-           'time']
+__all__ = ['convert', 'hasher', 'history', 'metadata', 'ncfile', 'receiver',
+           'stream', 'time']

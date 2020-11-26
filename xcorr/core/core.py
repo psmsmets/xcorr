@@ -13,7 +13,6 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import obspy
-import scipy
 import json
 import warnings
 import os
@@ -29,7 +28,6 @@ except ModuleNotFoundError:
 
 
 # Relative imports
-from ..version import version as __version__
 from ..client import Client
 from ..import cc as correlate
 from ..signal.unbias import unbias, get_weights
@@ -44,8 +42,7 @@ from ..preprocess import (
 
 
 __all__ = ['init', 'read', 'write', 'merge', 'mfread', 'process',
-           'validate', 'validate_list', 'bias_correct',
-           'dependencies_version']
+           'validate', 'validate_list', 'bias_correct']
 
 
 def init(
@@ -172,8 +169,8 @@ def init(
         ),
         'comment': attrs['comment'] if 'comment' in attrs else 'n/a',
         'Conventions': 'CF-1.9',
-        'xcorr_version': __version__,
-        'dependencies_version': dependencies_version(as_str=True),
+        'xcorr_version': util.metadata.version,
+        'dependencies_version': util.metadata.list_version(as_str=True),
     }
 
     # pair
@@ -1272,20 +1269,3 @@ def bias_correct(
     dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
         dataset, metadata_only=True, debug=False
     )
-
-
-def dependencies_version(as_str: bool = True):
-    """Returns a `dict` with core dependencies and its version.
-    """
-    versions = {
-        json.__name__: json.__version__,
-        np.__name__: np.__version__,
-        obspy.__name__: obspy.__version__,
-        pd.__name__: pd.__version__,
-        scipy.__name__: scipy.__version__,
-        xr.__name__: xr.__version__,
-    }
-    if as_str:
-        return ', '.join(['-'.join(item) for item in versions.items()])
-    else:
-        return versions

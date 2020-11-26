@@ -5,8 +5,7 @@ xcorr.core init
 
 # Import main functions
 from ..core.core import (init, read, write, merge, mfread, process, 
-                         validate, validate_list, bias_correct,
-                         dependencies_version)
+                         validate, validate_list, bias_correct)
 from ..core.lazy import lazy_process
 
 

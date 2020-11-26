@@ -3,7 +3,7 @@ r"""
 :mod:`signal.rms` -- RMS
 ========================
 
-Root-mean-square and N-D labeled array of data.
+Root-mean-square of an N-D labeled array of data.
 
 """
 
@@ -54,6 +54,9 @@ def rms(
 
     # root
     y = xr.ufuncs.sqrt(y)
+
+    # preserve attributes
+    y.attrs = x.attrs
 
     # log workflow
     historicize(y, f='rms', a={
