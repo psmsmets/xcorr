@@ -14,13 +14,15 @@ import numpy as np
 
 # Relative imports
 from ..signal.correlate import correlate1d
+from ..util.metadata import global_attrs
 
 
 __all__ = ['plane_wave']
 
 
 def plane_wave(
-    s: xr.DataArray, x: xr.DataArray, y: xr.DataArray, dim: str = None
+    s: xr.DataArray, x: xr.DataArray, y: xr.DataArray, dim: str = None,
+    **kwargs
 ):
     """
     Return the least-squares estimated plane wave given a signal and
@@ -42,6 +44,10 @@ def plane_wave(
         Defaults to the last dimension of ``s``.
         Other dimensions (excluding the xy-coordinate dimension) will be
         broadcasted.
+
+    **kwargs :
+        Any additional keyword arguments are used to set the dataset global
+        metadata attributes.
 
     Returns
     -------
@@ -127,6 +133,22 @@ def plane_wave(
 
     # output
     ds = xr.Dataset()
+    ds.attrs = global_attrs({
+        'title': (
+            kwargs.pop('title', '') +
+            'Signal-to-noise ratio - {} to {}'
+            .format(
+                x.time[0].dt.strftime('%Y.%j').item(),
+                x.time[-1].dt.strftime('%Y.%j').item(),
+            )
+        ).strip(),
+        **kwargs,
+        'references': (
+             'Bendat, J. Samuel, & Piersol, A. Gerald. (1971). '
+             'Random data : analysis and measurement procedures. '
+             'New York (N.Y.): Wiley-Interscience.'
+        ),
+    })
 
     ds['doa'] = xr.DataArray(
         data=np.take(av, 0, axis=-1),

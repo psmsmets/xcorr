@@ -35,10 +35,10 @@ def unbias(
 
     Parameters
     ----------
-    x: :class:`xarray.Dataset`
+    x: :class:`xarray.DataArray`
         The biased cc data array.
 
-    w :class:`xarray.Dataset`, optional
+    w :class:`xarray.DataArray`, optional
         The unbiased cc weight data array.
 
     dim : `str`, optional
@@ -49,7 +49,7 @@ def unbias(
 
     Returns
     -------
-    y: :class:`xarray.Dataset`
+    y: :class:`xarray.DataArray`
         The unbiased cc data array.
 
     """

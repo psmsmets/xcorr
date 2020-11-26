@@ -82,7 +82,8 @@ def snr(
         raise ValueError(f'x has no dimensions "{dim}"')
     argmax = f'{dim}_s_max'
 
-    ds = xr.Dataset(attrs=global_attrs({
+    ds = xr.Dataset()
+    ds.attrs = global_attrs({
         'title': (
             kwargs.pop('title', '') +
             'Signal-to-noise ratio - {} to {}'
@@ -97,7 +98,7 @@ def snr(
              'Random data : analysis and measurement procedures. '
              'New York (N.Y.): Wiley-Interscience.'
         ),
-    }))
+    })
 
     s = x.where(signal, drop=True)
     s = absolute(hilbert(x, dim=dim) if envelope else s)
