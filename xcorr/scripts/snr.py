@@ -60,7 +60,7 @@ def process(ds, **attrs):
     noise = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
 
     snr = xcorr.signal.snr(cc, signal, noise, dim='lag',
-                           extend=True, envelope=False, **attrs)
+                           extend=True, envelope=True, **attrs)
 
     return snr
 

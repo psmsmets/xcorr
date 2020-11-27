@@ -121,7 +121,7 @@ def snr(
         'units': x.units,
         'description': ('Signal energy is defined as the maximum absolute '
                         'value amplitude in the signal window'),
-        'envelope': envelope,
+        'envelope': np.byte(envelope),
     }
 
     ds.n.attrs = {
@@ -140,9 +140,9 @@ def snr(
         'from_variable': f'{x.long_name} ({x.units})',
         'description': ('SNR is defined as the ratio of the signal {0} to the '
                         'noise {0}'.format('power' if power else 'energy')),
-        'power': power,
-        'decibels': decibels,
-        'envelope': envelope,
+        'power': np.byte(power),
+        'decibels': np.byte(decibels),
+        'envelope': np.byte(envelope),
     }
     if 'history' in x.attrs:
         ds.snr.attrs['history'] = x.history

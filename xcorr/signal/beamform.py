@@ -157,7 +157,7 @@ def plane_wave(
         attrs={
             'long_name': 'Direction of arrival',
             'standard_name': 'direction_of_arrival',
-            'units': 'degrees',
+            'units': 'degree',
             'reference': 'clockwise from north',
         },
         name='doa',
