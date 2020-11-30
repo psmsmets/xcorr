@@ -3,7 +3,7 @@ r"""
 :mod:`signal.absolute` -- Absolute
 ==================================
 
-Hilbert transform of an N-D labeled array of data.
+Calculate the absolute value element-wise of an N-D labeled array of data.
 
 """
 
@@ -52,10 +52,14 @@ def absolute(
     if not isinstance(x, xr.DataArray):
         raise TypeError('x should be an xarray.DataArray')
 
+    # set dtype
+    dtype = (f'float{np.dtype(x.dtype).alignment * 8}'
+             if x.dtype.name.startswith('complex') else x.dtype)
+
     # dask collection?
     dargs = {}
     if dask and dask.is_dask_collection(x):
-        dargs = dict(dask='allowed', output_dtypes=[np.complex128])
+        dargs = dict(dask='allowed', output_dtypes=[dtype])
 
     # apply ufunc (and optional dask distributed)
     y = xr.apply_ufunc(np.absolute, x,
