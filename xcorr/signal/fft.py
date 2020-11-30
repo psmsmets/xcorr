@@ -31,7 +31,6 @@ __all__ = ['fft', 'ifft', 'rfft', 'irfft']
 
 _recip_name = '__reciprocal_name__'
 _recip_attr = '__reciprocal_attr__'
-_recip_type = '__reciprocal_type__'
 _recip_zero = '__reciprocal_zero__'
 
 
@@ -60,7 +59,7 @@ def fft(
         Dictionary with coordinate attributes.
 
     dtype : :class:`np.dtype`, optional
-        Set the dtype. If `None` (default), the complex dtype of ``x`` is used.
+        Set the complex dtype. If `None` (default), `np.complex128` is used.
 
     **kwargs :
         Any additional keyword arguments will be passed to :func:`fftlib.fft`.
@@ -68,7 +67,7 @@ def fft(
     Returns
     -------
     y : :class:`xarray.DataArray`
-        Data array containing the FFT of ``x``.
+        Data array containing the FFT of ``x`` as a complex dtype.
 
     """
 
@@ -94,9 +93,7 @@ def fft(
         raise TypeError('new_dim_attrs should be a dictionary')
 
     # dtype
-    old_dtype = x.attrs[_recip_type] if _recip_type in x.attrs else None
-    dtype = np.dtype(dtype or old_dtype or
-                     f'complex{x.dtype.alignment * 16}')
+    dtype = np.dtype(dtype or 'complex128')
     if not isinstance(dtype, np.dtype):
         raise TypeError('dtype should be a numpy.dtype')
     if 'complex' not in dtype.name:
@@ -110,23 +107,21 @@ def fft(
     )
     freq = fftlib.fftshift(fftlib.fftfreq(x[dim].size, d=delta))
 
-    # set axis
-    ax = -1
-
     # wrapper to simplify ufunc input
     def _fft(f, **kwargs):
-        F = fftlib.fft(f, n=x[dim].size, axis=ax, **kwargs)
-        return fftlib.fftshift(F, axes=ax)
+        F = fftlib.fft(f.astype(dtype), n=x[dim].size, axis=-1, **kwargs)
+        return fftlib.fftshift(F, axes=-1)
 
     # dask collection?
     dargs = {}
     if dask and dask.is_dask_collection(x):
-        dargs = dict(dask='allowed', output_dtypes=[dtype])
+        dargs = dict(dask='allowed')
 
     # apply ufunc (and optional dask distributed)
     y = xr.apply_ufunc(_fft, x,
                        input_core_dims=[[dim]],
                        output_core_dims=[[new_dim]],
+                       output_dtypes=[dtype],
                        keep_attrs=True,
                        vectorize=False,
                        **dargs,
@@ -148,9 +143,6 @@ def fft(
             },
         ),
     })
-
-    # add old dtype to attrs
-    y.attrs[_recip_type] = x.dtype.name
 
     # log workflow
     historicize(y, f='fft', a={
@@ -189,7 +181,7 @@ def ifft(
         Dictionary with coordinate attributes.
 
     dtype : :class:`np.dtype`, optional
-        Set the dtype. If `None` (default), the complex dtype of ``x`` is used.
+        Set the complex dtype. If `None` (default), `np.complex128` is used.
 
     **kwargs :
         Any additional keyword arguments will be passed to :func:`fftlib.ifft`.
@@ -197,7 +189,7 @@ def ifft(
     Returns
     -------
     y : :class:`xarray.DataArray`
-        Data array containing the IFFT of ``x``.
+        Data array containing the IFFT of ``x`` as a complex dtype.
 
     """
 
@@ -223,13 +215,11 @@ def ifft(
         raise TypeError('new_dim_attrs should be a dictionary')
 
     # dtype
-    old_dtype = x.attrs[_recip_type] if _recip_type in x.attrs else None
-    dtype = np.dtype(dtype or old_dtype or
-                     f'float{x.dtype.alignment * 8}')
+    dtype = np.dtype(dtype or 'complex128')
     if not isinstance(dtype, np.dtype):
         raise TypeError('dtype should be a numpy.dtype')
-    if 'float' not in dtype.name:
-        raise TypeError('dtype should be float.')
+    if 'complex' not in dtype.name:
+        raise TypeError('dtype should be complex.')
     dtype = dtype.name
 
     # delta
@@ -245,24 +235,21 @@ def ifft(
     if _recip_zero in x[dim].attrs:
         time += x[dim].attrs[_recip_zero]
 
-    # set axis
-    ax = -1
-
     # wrapper to simplify ufunc input
     def _ifft(F, **kwargs):
-        F = fftlib.fftshift(F, axes=ax)
-        f = fftlib.ifft(F, n=x[dim].size, axis=ax, **kwargs)
-        return xr.ufuncs.real(f).astype(dtype)
+        F = fftlib.fftshift(F, axes=-1)
+        return fftlib.ifft(F.astype(dtype), n=x[dim].size, axis=-1, **kwargs)
 
     # dask collection?
     dargs = {}
     if dask and dask.is_dask_collection(x):
-        dargs = dict(dask='allowed', output_dtypes=[dtype])
+        dargs = dict(dask='allowed')
 
     # apply ufunc (and optional dask distributed)
     y = xr.apply_ufunc(_ifft, x,
                        input_core_dims=[[dim]],
                        output_core_dims=[[new_dim]],
+                       output_dtypes=[dtype],
                        keep_attrs=True,
                        vectorize=False,
                        **dargs,
@@ -284,9 +271,6 @@ def ifft(
             },
         ),
     })
-
-    # add old dtype to attrs
-    y.attrs[_recip_type] = x.dtype.name
 
     # log workflow
     historicize(y, f='ifft', a={
@@ -311,7 +295,7 @@ def rfft(
     Parameters
     ----------
     x : :class:`xarray.DataArray`
-        The data array to apply the RFFT.
+        The real data array to apply the RFFT.
 
     dim : `str`, optional
         Coordinate name of ``x`` to apply the RFFT.
@@ -325,7 +309,8 @@ def rfft(
         Dictionary with coordinate attributes.
 
     dtype : :class:`np.dtype`, optional
-        Set the dtype. If `None` (default), the complex dtype of ``x`` is used.
+        Set the float dtype of ``x``. If `None` (default), ``x`` will be cast
+        to `np.float64`.
 
     **kwargs :
         Any additional keyword arguments will be passed to :func:`fftlib.rfft`.
@@ -333,7 +318,8 @@ def rfft(
     Returns
     -------
     y : :class:`xarray.DataArray`
-        Data array containing the RFFT of ``x``.
+        Data array containing the RFFT of ``x`` as a complex dtype with the
+        same alignment as ``dtype``.
 
     """
 
@@ -359,14 +345,13 @@ def rfft(
         raise TypeError('new_dim_attrs should be a dictionary')
 
     # dtype
-    old_dtype = x.attrs[_recip_type] if _recip_type in x.attrs else None
-    dtype = np.dtype(dtype or old_dtype or
-                     f'complex{x.dtype.alignment * 16}')
+    dtype = np.dtype(dtype or 'float64')
     if not isinstance(dtype, np.dtype):
         raise TypeError('dtype should be a numpy.dtype')
-    if 'complex' not in dtype.name:
-        raise TypeError('dtype should be complex.')
-    dtype = dtype.name
+    if 'float' not in dtype.name:
+        raise TypeError('dtype should be float.')
+    dtype_x = dtype.name
+    dtype_y = f'complex{dtype.alignment * 16}'
 
     # samples, period and frequency
     n = x[dim].size - 1 if x[dim].size & 0x1 else x[dim].size
@@ -376,12 +361,13 @@ def rfft(
     # dask collection?
     dargs = {}
     if dask and dask.is_dask_collection(x):
-        dargs = dict(dask='allowed', output_dtypes=[dtype])
+        dargs = dict(dask='allowed')
 
     # apply ufunc (and optional dask distributed)
-    y = xr.apply_ufunc(fftlib.rfft, x,
+    y = xr.apply_ufunc(fftlib.rfft, x.astype(dtype_x),
                        input_core_dims=[[dim]],
                        output_core_dims=[[new_dim]],
+                       output_dtypes=[dtype_y],
                        keep_attrs=True,
                        vectorize=False,
                        **dargs,
@@ -403,9 +389,6 @@ def rfft(
             },
         ),
     })
-
-    # add old dtype to attrs
-    y.attrs[_recip_type] = x.dtype.name
 
     # log workflow
     historicize(y, f='rfft', a={
@@ -444,7 +427,8 @@ def irfft(
         Dictionary with coordinate attributes.
 
     dtype : :class:`np.dtype`, optional
-        Set the dtype. If `None` (default), the complex dtype of ``x`` is used.
+        Set the float dtype of ``x``. If `None` (default), ``x`` will be cast
+        to `np.float64`.
 
     **kwargs :
         Any additional keyword arguments will be passed to
@@ -453,7 +437,7 @@ def irfft(
     Returns
     -------
     y : :class:`xarray.DataArray`
-        Data array containing the IRFFT of ``x``.
+        Data real array containing the IRFFT of ``x``.
 
     """
 
@@ -479,14 +463,13 @@ def irfft(
         raise TypeError('new_dim_attrs should be a dictionary')
 
     # dtype
-    old_dtype = x.attrs[_recip_type] if _recip_type in x.attrs else None
-    dtype = np.dtype(dtype or old_dtype or
-                     f'float{x.dtype.alignment * 8}')
+    dtype = np.dtype(dtype or 'float64')
     if not isinstance(dtype, np.dtype):
         raise TypeError('dtype should be a numpy.dtype')
     if 'float' not in dtype.name:
         raise TypeError('dtype should be float.')
-    dtype = dtype.name
+    dtype_x = f'complex{dtype.alignment * 16}'
+    dtype_y = dtype.name
 
     # samples, Nyquist and time
     n = 2 * x[dim].size - 2
@@ -498,12 +481,13 @@ def irfft(
     # dask collection?
     dargs = {}
     if dask and dask.is_dask_collection(x):
-        dargs = dict(dask='allowed', output_dtypes=[dtype])
+        dargs = dict(dask='allowed')
 
     # apply ufunc (and optional dask distributed)
-    y = xr.apply_ufunc(fftlib.irfft, x,
+    y = xr.apply_ufunc(fftlib.irfft, x.astype(dtype_x),
                        input_core_dims=[[dim]],
                        output_core_dims=[[new_dim]],
+                       output_dtypes=[dtype_y],
                        keep_attrs=True,
                        vectorize=False,
                        **dargs,
@@ -525,9 +509,6 @@ def irfft(
             },
         ),
     })
-
-    # add old dtype to attrs
-    y.attrs[_recip_type] = x.dtype.name
 
     # log workflow
     historicize(y, f='ifft', a={

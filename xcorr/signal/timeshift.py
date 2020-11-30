@@ -49,8 +49,7 @@ def timeshift(
         artefacts.
 
     **kwargs :
-        Any additional keyword arguments will be passed to
-        :func:`xarray.apply_ufunc`.
+        Any additional keyword arguments will be passed to `(i)(r)fft`.
 
     Returns
     -------
@@ -87,14 +86,17 @@ def timeshift(
     dtype = np.dtype(dtype).type
 
     # Make use of xarray wrapped fft and ifft to allow delay broadcasting!
-    # fft
-    X = rfft(x) if fast else fft(x)
+    # rfft
+    X = rfft(x, **kwargs) if fast else fft(x, **kwargs)
 
     # phase shift
     X = X * np.exp(-1j * 2 * np.pi * delay * X.freq)
 
-    # ifft
-    y = irfft(X, dtype=x.dtype) if fast else ifft(X, dtype=x.dtype)
+    # irfft
+    y = irfft(X, **kwargs) if fast else xr.ufuncs.real(ifft(X, **kwargs))
+
+    # restore dtype
+    y = y.astype(x.dtype)
 
     # restore coordinate
     y = y.assign_coords({dim: x[dim][0:y[dim].size]})
