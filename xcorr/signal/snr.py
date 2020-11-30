@@ -10,6 +10,7 @@ Estimate the signal-to-noise ratio of an N-D labeled array of data.
 
 # Mandatory imports
 import xarray as xr
+import numpy as np
 
 
 # Relative imports
