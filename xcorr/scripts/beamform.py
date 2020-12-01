@@ -65,7 +65,7 @@ def process(ds):
         cc = xcorr.signal.demean(cc)
         cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrapping
         cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
-        cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
+        cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
         cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
 
     except Exception:
@@ -75,26 +75,28 @@ def process(ds):
 
 
 @dask.delayed
-def lse_fit(cc, xy):
+def lse_fit(cc, xy, **kwargs):
     """
     """
     if cc is None:
         return
     try:
-        fit = xcorr.signal.beamform.plane_wave(cc, x=xy.x, y=xy.y, dim='lag')
+        fit = xcorr.signal.beamform.plane_wave(cc, x=xy.x, y=xy.y, dim='lag',
+                                               **kwargs)
     except Exception:
         fit = None
+
     return fit
 
 
-def plane_waves_list(xy, start, end, root):
-    """Evaluate snr for a list of filenames
+def delayed_plane_wave_fit(xy, start, end, root, **kwargs):
+    """Plane wave fit for a time period
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
         ds = load(xy.pair, day, root)
         cc = process(ds)
-        fit = lse_fit(cc, xy)
+        fit = lse_fit(cc, xy, **kwargs)
         results.append(fit)
     return results
 
@@ -241,17 +243,17 @@ def main():
     cluster, client = init_dask(n_workers=args.nworkers,
                                 scheduler_file=args.scheduler)
 
-    # fit plane wae
+    # fit plane wave
     print('.. compute plane wave per day for period')
     mapped = client.compute(
-        plane_waves_list(xy, args.start, args.end, args.root)
+        delayed_plane_wave_fit(xy, args.start, args.end, args.root)
     )
     distributed.wait(mapped)
 
-    print('.. gather plane wave list')
+    print('.. gather plane wave results')
     fit = client.gather(mapped)
 
-    print('.. merge plane wave list')
+    print('.. merge plane wave results')
     fit = xr.merge(list(filter(None, fit)))
     if args.debug:
         print(fit)

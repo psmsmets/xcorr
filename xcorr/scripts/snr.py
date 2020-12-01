@@ -28,51 +28,70 @@ __all__ = []
 # -----------------
 
 @dask.delayed
-def load(filename):
+def load(pair, time, root):
     """
     """
-    ds = xcorr.read(filename, fast=True)
-    ds.load()
-    ds.close()
+    try:
+        ds = xcorr.mfread(xcorr.util.ncfile(pair, time, root), fast=True)
+    except Exception:
+        ds = None
     return ds
 
 
 @dask.delayed
-def process(ds, **attrs):
+def process(ds):
     """
     """
-    # extract cc
-    cc = ds.cc.where((ds.status == 1), drop=True)
+    if ds is None:
+        return
 
-    # extract time_offset and pair_offset
-    delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
+    try:
+        cc = ds.cc.where((ds.status == 1), drop=True)
+        if xr.ufuncs.isnan(cc).any():
+            return
+        delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
+        cc = xcorr.signal.unbias(cc)
+        cc = xcorr.signal.demean(cc)
+        cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrapping
+        cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
+        cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
+        cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
 
-    # process cc
-    cc = xcorr.signal.unbias(cc)
-    cc = xcorr.signal.demean(cc)
-    cc = xcorr.signal.taper(cc, max_length=5.)
-    cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
-    cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
-    cc = xcorr.signal.taper(cc, max_length=2/3.)
+        cc = cc.compute()
 
-    # signal-to-noise
-    signal = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
-    noise = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
+    except Exception:
+        cc = None
 
-    snr = xcorr.signal.snr(cc, signal, noise, dim='lag',
-                           extend=True, envelope=True, **attrs)
+    return cc
+
+
+@dask.delayed
+def estimate_snr(ds, cc, **kwargs):
+    """
+    """
+    if ds is None or cc is None:
+        return
+    try:
+        signal = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
+        noise = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
+
+        snr = xcorr.signal.snr(cc, signal, noise, dim='lag',
+                               extend=True, envelope=True, **kwargs)
+    except Exception:
+        snr = None
 
     return snr
 
 
-def snr_per_file(filenames: list):
-    """Evaluate snr for a list of filenames
+def delayed_snr_estimate(pair, start, end, root, **kwargs):
+    """Estimate snr for a time period
     """
     results = []
-    for f in filenames:
-        ds = load(f)
-        snr = process(ds)
-        results.append(snr)
+    for day in pd.date_range(start, end, freq='1D'):
+        ds = load(pair, day, root)
+        cc = process(ds)
+        sn = estimate_snr(ds, cc, **kwargs)
+        results.append(sn)
     return results
 
 
@@ -150,28 +169,18 @@ def main():
     cluster, client = init_dask(n_workers=args.nworkers,
                                 scheduler_file=args.scheduler)
 
-    # list of files using dask
-    print('.. validate cc filelist')
-    validated = xcorr.core.validate_list(
-        [xcorr.util.ncfile(args.pair, t, args.root, verify_receiver=False)
-         for t in pd.date_range(args.start, args.end)],
-        fast=True,
-        paths_only=True,
-        keep_opened=False,
+    # estimate snr
+    print('.. estimate signal-to-noise per day for period')
+    mapped = client.compute(
+        delayed_snr_estimate(args.start, args.end, args.root)
     )
-    if len(validated) == 0:
-        raise RuntimeError('No data found!')
-
-    # snr
-    print('.. compute snr for filename list')
-    mapped = client.compute(snr_per_file(validated))
     distributed.wait(mapped)
 
-    print('.. gather snr list')
+    print('.. gather signal-to-noise results')
     snr = client.gather(mapped)
 
-    print('.. merge snr list')
-    snr = xr.merge(snr)
+    print('.. merge signal-to-noise results')
+    snr = xr.merge(list(filter(None, snr)))
     if args.debug:
         print(snr)
 
