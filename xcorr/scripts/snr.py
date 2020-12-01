@@ -192,6 +192,7 @@ def main():
     print(list(filter(None, snr)))
     snr = xr.merge(
         objects=list(filter(None, snr)),
+        combine_attrs='no_conflicts',
     )
     if args.debug:
         print(snr)
