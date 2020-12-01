@@ -191,8 +191,7 @@ def main():
     print('.. merge signal-to-noise results')
     snr = xr.merge(
         objects=list(filter(None, snr)),
-        join="outer",
-        combine_attrs="override",
+        combine_attrs="no_conflicts",
     )
     if args.debug:
         print(snr)
