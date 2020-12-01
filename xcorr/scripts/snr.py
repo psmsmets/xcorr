@@ -74,21 +74,21 @@ def estimate_snr(ds, cc, attrs):
     if ds is None or cc is None:
         return
     try:
-        s = xcorr.signal.multi_mask(
-            x=ds.lag,
-            y=ds.distance,
-            lower=1.46,
-            upper=1.50,
-            invert=True,
-        )
-        n = xcorr.signal.mask(
-            x=ds.lag,
-            lower=3.,
-            upper=9.,
-            scalar=3600.,
-        )
-        # s = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
-        # n = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
+        # s = xcorr.signal.multi_mask(
+        #     x=ds.lag,
+        #     y=ds.distance,
+        #     lower=1.46,
+        #     upper=1.50,
+        #     invert=True,
+        # )
+        # n = xcorr.signal.mask(
+        #     x=ds.lag,
+        #     lower=3.,
+        #     upper=9.,
+        #     scalar=3600.,
+        # )
+        s = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
+        n = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
         sn = xcorr.signal.snr(cc, signal=s, noise=n, dim='lag',
                               extend=True, envelope=True, **attrs)
     except Exception as e:
