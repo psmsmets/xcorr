@@ -9,10 +9,17 @@ Xcorr scripts helper functions.
 
 # Mandatory imports
 from pandas import to_datetime
+from argparse import ArgumentParser
 import distributed
 
+# Relative imports
+from ..version import version
 
-__all__ = ['init_dask', 'ncfile']
+
+__all__ = ['init_dask', 'ncfile', 'add_common_arguments', 'add_attrs_group',
+           'parse_attrs_group']
+_global_attrs = ('title', 'institution', 'author', 'source',
+                 'references', 'comment')
 
 
 def init_dask(n_workers: int = None, scheduler_file: str = None):
@@ -48,3 +55,66 @@ def ncfile(prefix, pair, start, end):
     return '{}_{}_{}_{}.nc'.format(
         prefix, pair, start.strftime('%Y%j'), end.strftime('%Y%j'),
     )
+
+
+def add_common_arguments(parser: ArgumentParser):
+    """Add common arguments to the argument parser object.
+    """
+    if not isinstance(parser, ArgumentParser):
+        raise TypeError('parser should be :class:`ArgumentParser`')
+
+    parser.add_argument(
+        '-n', '--nworkers', metavar='..', type=int, default=None,
+        help=('Set number of dask workers for the local client. '
+              'If a scheduler is set the client will wait until the given '
+              'number of workers is available.')
+    )
+    parser.add_argument(
+        '--scheduler', metavar='..', type=str, default=None,
+        help='Connect to a dask scheduler by a scheduler-file'
+    )
+    parser.add_argument(
+        '--overwrite', action='store_true', default=False,
+        help='Overwrite if output file exists (default: skip)'
+    )
+    parser.add_argument(
+        '--plot', action='store_true',
+        help='Generate plots during processing (stalls)'
+    )
+    parser.add_argument(
+        '--debug', action='store_true',
+        help='Maximize verbosity'
+    )
+    parser.add_argument(
+        '--version', action='version', version=version,
+        help='Print xcorr version and exit'
+    )
+
+
+def add_attrs_group(parser: ArgumentParser):
+    """Add attribute arguments to the argument parser object.
+    """
+    if not isinstance(parser, ArgumentParser):
+        raise TypeError('parser should be :class:`ArgumentParser`')
+
+    attrs = parser.add_argument_group(
+        title='attribute arguments',
+        description=('Set dataset global attributes following COARDS/CF-1.9 '
+                     'standards.'),
+    )
+    for attr in _global_attrs:
+        attrs.add_argument(
+            f'--{attr}', metavar='..', type=str, default=None,
+            help=f'Set dataset {attr} (default: "n/a")'
+        )
+
+
+def parse_attrs_group(args):
+    """
+    """
+    attrs = dict()
+    for attr in _global_attrs:
+        arg = eval(f'args.{attr}')
+        if arg:
+            attrs[attr] = arg
+    return attrs

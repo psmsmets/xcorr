@@ -19,7 +19,8 @@ import argparse
 
 # Relative imports
 import xcorr
-from .helpers import init_dask_client
+from .helpers import (init_dask, add_common_arguments,
+                      add_attrs_group, parse_attrs_group)
 
 __all__ = []
 
@@ -43,7 +44,7 @@ def load(pair, period, root):
     ds = xcorr.merge(files)
 
     # extract valid data
-    vel = dict(min=1.465, max=1.495)
+    vel = dict(min=1.46, max=1.50)
     t0, t1 = np.datetime64(period.start), np.datetime64(period.end)
     mask = xcorr.signal.multi_mask(
         x=ds.lag,
@@ -139,7 +140,7 @@ def write(ds, period, root):
 # Lazy psd for pairs and periods
 # ------------------------------
 
-def period_spectrograms(snr, ct, root):
+def period_spectrograms(snr, ct, root, attrs, overwrite: bool = False):
     """Evaluate psds for a pair and a set of periods
     """
     periods = xcorr.signal.trigger.trigger_periods(ct)
@@ -165,7 +166,7 @@ def period_spectrograms(snr, ct, root):
 def main():
     """Main script function.
     """
-
+    # arguments
     parser = argparse.ArgumentParser(
         prog='xcorr-psd',
         description=('Spectrogram estimation of signal-to-noise ratio '
@@ -199,31 +200,13 @@ def main():
     )
     parser.add_argument(
         '-r', '--root', metavar='..', type=str, default=os.getcwd(),
-        help=('Set crosscorrelation root directory (default: current '
+        help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
-    parser.add_argument(
-        '-n', '--nworkers', metavar='..', type=int, default=None,
-        help=('Set number of dask workers for local client. If a scheduler '
-              'is set the client will wait until the number of workers is '
-              'available.')
-    )
-    parser.add_argument(
-        '--scheduler', metavar='path', type=str, default=None,
-        help='Connect to a dask scheduler by a scheduler-file.'
-    )
-    parser.add_argument(
-        '--plot', action='store_true',
-        help='Generate plots during processing (stalls)'
-    )
-    parser.add_argument(
-        '--debug', action='store_true',
-        help='Maximize verbosity'
-    )
-    parser.add_argument(
-        '--version', action='version', version=xcorr.__version__,
-        help='Print xcorr version and exit'
-    )
+
+    add_common_arguments(parser)
+    add_attrs_group(parser)
+
     args = parser.parse_args()
 
     # snr and ct file
@@ -235,6 +218,7 @@ def main():
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
         args.end = pd.to_datetime(args.end, format=args.format)
+    args.attrs = parse_attrs_group(args)
 
     # print header and core parameters
     print(f'xcorr-psd v{xcorr.__version__}')
@@ -243,13 +227,14 @@ def main():
                                else args.pair))
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
+    print('{:>20} : {}'.format('overwrite', args.overwrite))
 
     args.start = args.start or pd.to_datetime(snr_ct.time[0].item())
     args.end = args.end or pd.to_datetime(snr_ct.time[-1].item())
 
     # init dask client
-    cluster, client = init_dask_client(n_workers=args.nworkers,
-                                       scheduler_file=args.scheduler)
+    cluster, client = init_dask(n_workers=args.nworkers,
+                                scheduler_file=args.scheduler)
 
     # filter snr and ct
     print('.. filter snr and ct')
@@ -282,7 +267,9 @@ def main():
     # construct datasets with preprocessed cc, snr and psd
     print('.. construct files per active period')
 
-    mapped = client.compute(period_spectrograms(snr, ct, args.root))
+    mapped = client.compute(
+        period_spectrograms(snr, ct, args.root, args.attrs, args.overwrite)
+    )
     distributed.wait(mapped)
 
     files = client.gather(mapped)

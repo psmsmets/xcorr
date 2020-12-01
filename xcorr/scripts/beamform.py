@@ -2,7 +2,7 @@
 Beamform
 ========
 
-Least-squares beamforming of plane wave traversing the array.
+Least-squares beamforming of a plane wave traversing the array.
 
 """
 
@@ -20,7 +20,8 @@ from glob import glob
 
 # Relative imports
 import xcorr
-from .helpers import init_dask, ncfile
+from .helpers import (init_dask, ncfile, add_common_arguments,
+                      add_attrs_group, parse_attrs_group)
 
 __all__ = []
 
@@ -73,14 +74,14 @@ def process(ds):
 
 
 @dask.delayed
-def lse_fit(cc, xy, **kwargs):
+def lse_fit(cc, xy, attrs):
     """
     """
     if cc is None:
         return
     try:
         fit = xcorr.signal.beamform.plane_wave(cc, x=xy.x, y=xy.y, dim='lag',
-                                               **kwargs)
+                                               **attrs)
     except Exception as e:
         print('Error @ lse_fit:', e)
         return
@@ -88,14 +89,14 @@ def lse_fit(cc, xy, **kwargs):
         return fit
 
 
-def delayed_plane_wave_fit(xy, start, end, root, **kwargs):
+def delayed_plane_wave_fit(xy, start, end, root, attrs):
     """Plane wave fit for a time period
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
         ds = load(xy.pair, day, root)
         cc = process(ds)
-        fit = lse_fit(cc, xy, **kwargs)
+        fit = lse_fit(cc, xy, attrs)
         results.append(fit)
     return results
 
@@ -153,38 +154,16 @@ def main():
         help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
-    parser.add_argument(
-        '-n', '--nworkers', metavar='..', type=int, default=None,
-        help=('Set number of dask workers for local client. If a scheduler '
-              'is set the client will wait until the number of workers is '
-              'available.')
-    )
-    parser.add_argument(
-        '-o', '--overwrite', action='store_true', default=False,
-        help='Overwrite if output file exists (default: skip)'
-    )
-    parser.add_argument(
-        '--scheduler', metavar='..', type=str, default=None,
-        help='Connect to a dask scheduler by a scheduler-file'
-    )
-    parser.add_argument(
-        '--plot', action='store_true',
-        help='Generate plots during processing (stalls)'
-    )
-    parser.add_argument(
-        '--debug', action='store_true',
-        help='Maximize verbosity'
-    )
-    parser.add_argument(
-        '--version', action='version', version=xcorr.__version__,
-        help='Print xcorr version and exit'
-    )
+    add_common_arguments(parser)
+    add_attrs_group(parser)
+
     args = parser.parse_args()
     args.root = os.path.abspath(args.root)
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = (pd.to_datetime(args.end, format=args.format)
                 if args.end else args.start)
     args.out = ncfile('beamform', args.name, args.start, args.end)
+    args.attrs = parse_attrs_group(args)
 
     args.pairs = sorted(list(set([
         p.split(os.path.sep)[-1]
@@ -245,7 +224,7 @@ def main():
     # fit plane wave
     print('.. compute plane wave per day for period')
     mapped = client.compute(
-        delayed_plane_wave_fit(xy, args.start, args.end, args.root)
+        delayed_plane_wave_fit(xy, args.start, args.end, args.root, args.attrs)
     )
     distributed.wait(mapped)
 

@@ -2,7 +2,7 @@
 SNR
 ===
 
-Signal-to-noise ratio estimation of crosscrorrelations.
+Signal-to-noise ratio estimation of cross-crorrelations.
 
 """
 
@@ -18,7 +18,8 @@ import argparse
 
 # Relative imports
 import xcorr
-from .helpers import init_dask, ncfile
+from .helpers import (init_dask, ncfile, add_common_arguments,
+                      add_attrs_group, parse_attrs_group)
 
 __all__ = []
 
@@ -35,7 +36,7 @@ def load(pair, time, root):
         ds = xcorr.mfread(
             xcorr.util.ncfile(pair, time, root, verify_receiver=False),
             fast=True
-        ).load()
+        )
     except Exception as e:
         print(f'Error @ load {pair} {time}:', e)
         return
@@ -63,11 +64,11 @@ def process(ds):
     except Exception as e:
         print('Error @ process:', e)
     else:
-        return cc
+        return cc.compute()
 
 
 @dask.delayed
-def estimate_snr(ds, cc, **kwargs):
+def estimate_snr(ds, cc, attrs):
     """
     """
     if ds is None or cc is None:
@@ -76,7 +77,7 @@ def estimate_snr(ds, cc, **kwargs):
         s = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
         n = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
         sn = xcorr.signal.snr(cc, s, n, dim='lag', extend=True,
-                              envelope=True, **kwargs)
+                              envelope=True, **attrs)
     except Exception as e:
         print('Error @ estimate_snr:', e)
         return
@@ -84,14 +85,14 @@ def estimate_snr(ds, cc, **kwargs):
         return sn
 
 
-def delayed_snr_estimate(pair, start, end, root, **kwargs):
+def delayed_snr_estimate(pair, start, end, root, attrs):
     """Estimate snr for a time period
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
         ds = load(pair, day, root)
         cc = process(ds)
-        sn = estimate_snr(ds, cc, **kwargs)
+        sn = estimate_snr(ds, cc, attrs)
         results.append(sn)
     return results
 
@@ -102,7 +103,7 @@ def delayed_snr_estimate(pair, start, end, root, **kwargs):
 def main():
     """Main script function.
     """
-
+    # arguments
     parser = argparse.ArgumentParser(
         prog='xcorr-snr',
         description='Signal-to-noise ratio estimation of crosscrorrelations.',
@@ -132,32 +133,18 @@ def main():
         help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
-    parser.add_argument(
-        '-n', '--nworkers', metavar='..', type=int, default=None,
-        help=('Set number of dask workers for local client. If a scheduler '
-              'is set the client will wait until the number of workers is '
-              'available.')
-    )
-    parser.add_argument(
-        '--scheduler', metavar='..', type=str, default=None,
-        help='Connect to a dask scheduler by a scheduler-file'
-    )
-    parser.add_argument(
-        '--plot', action='store_true',
-        help='Generate plots during processing (stalls)'
-    )
-    parser.add_argument(
-        '--debug', action='store_true',
-        help='Maximize verbosity'
-    )
-    parser.add_argument(
-        '--version', action='version', version=xcorr.__version__,
-        help='Print xcorr version and exit'
-    )
+
+    add_common_arguments(parser)
+    add_attrs_group(parser)
+
     args = parser.parse_args()
+
+    # update arguments
     args.root = os.path.abspath(args.root)
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = pd.to_datetime(args.end, format=args.format)
+    args.out = ncfile('snr', args.pair, args.start, args.end)
+    args.attrs = parse_attrs_group(args)
 
     # print header and core parameters
     print(f'xcorr-snr v{xcorr.__version__}')
@@ -165,6 +152,13 @@ def main():
     print('{:>20} : {}'.format('pair', args.pair))
     print('{:>20} : {}'.format('start', args.start.strftime('%Y-%m-%d')))
     print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
+    print('{:>20} : {}'.format('outfile', args.out))
+    print('{:>20} : {}'.format('overwrite', args.overwrite))
+
+    # check if output file exists
+    if os.path.exists(args.out) and not args.overwrite:
+        raise FileExistsError(f'Output file "{args.out}" already exists'
+                              ' and overwrite is False.')
 
     # init dask cluster and client
     cluster, client = init_dask(n_workers=args.nworkers,
@@ -173,7 +167,8 @@ def main():
     # estimate snr
     print('.. estimate signal-to-noise per day for period')
     mapped = client.compute(
-        delayed_snr_estimate(args.pair, args.start, args.end, args.root)
+        delayed_snr_estimate(args.pair, args.start, args.end, args.root,
+                             args.attrs)
     )
     distributed.wait(mapped)
 
@@ -186,9 +181,8 @@ def main():
         print(snr)
 
     # to netcdf
-    nc = ncfile('snr', args.pair, args.start, args.end)
-    print(f'.. write to "{nc}"')
-    xcorr.write(snr, nc, variable_encoding=dict(zlib=True, complevel=9),
+    print(f'.. write to "{args.out}"')
+    xcorr.write(snr, args.out, variable_encoding=dict(zlib=True, complevel=9),
                 verb=1 if args.debug else 0)
 
     # plot

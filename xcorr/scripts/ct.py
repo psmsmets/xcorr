@@ -16,7 +16,8 @@ import sys
 
 # Relative imports
 import xcorr
-from .helpers import ncfile
+from .helpers import (ncfile, add_common_arguments,
+                      add_attrs_group, parse_attrs_group)
 
 __all__ = []
 
@@ -62,23 +63,11 @@ def main():
         '-t', '--threshold', metavar='..', type=float, default=10.,
         help='Coincidence trigger threshold (default: 10.)'
     )
-    parser.add_argument(
-        '-o', '--overwrite', action='store_true', default=False,
-        help='Overwrite if output file exists (default: skip)'
-    )
-    parser.add_argument(
-        '--plot', action='store_true',
-        help='Generate plots during processing (stalls)'
-    )
-    parser.add_argument(
-        '--debug', action='store_true',
-        help='Maximize verbosity'
-    )
-    parser.add_argument(
-        '--version', action='version', version=xcorr.__version__,
-        help='Print xcorr version and exit'
-    )
+    add_common_arguments(parser)
+    add_attrs_group(parser)
+
     args = parser.parse_args()
+    args.attrs = parse_attrs_group(args)
 
     # print header and core parameters
     print(f'xcorr-ct v{xcorr.__version__}')

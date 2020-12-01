@@ -19,7 +19,8 @@ import argparse
 
 # relative imports
 import xcorr
-from .helpers import init_dask, ncfile
+from .helpers import (init_dask, ncfile, add_common_arguments,
+                      add_attrs_group, parse_attrs_group)
 
 __all__ = []
 
@@ -397,7 +398,7 @@ def spectrogram_timelapse_on_client(
 def main():
     """Main script function.
     """
-
+    # arguments
     parser = argparse.ArgumentParser(
         prog='xcorr-timelapse',
         description=('Two-dimensional cross-correlation of cross-correlation '
@@ -450,36 +451,13 @@ def main():
               'working directory)')
     )
     parser.add_argument(
-        '-n', '--nworkers', metavar='..', type=int, default=None,
-        help=('Set number of dask workers for local client. If a scheduler '
-              'is set the client will wait until the number of workers is '
-              'available.')
-    )
-    parser.add_argument(
-        '--scheduler', metavar='path', type=str, default=None,
-        help='Connect to a dask scheduler by a scheduler-file.'
-    )
-    parser.add_argument(
-        '--abundant', action='store_true',
-        help=('Compute the entire timelapse 2d correlation matrix instead of '
-              'mirroring along the diagonal')
-    )
-    parser.add_argument(
         '-c', '--chunk', metavar='..', type=int, default=10,
         help=('Set dask chunks for time dimension (default: 10)')
     )
-    parser.add_argument(
-        '--plot', action='store_true',
-        help='Generate plots during processing (stalls)'
-    )
-    parser.add_argument(
-        '--debug', action='store_true',
-        help='Maximize verbosity'
-    )
-    parser.add_argument(
-        '--version', action='version', version=xcorr.__version__,
-        help='Print xcorr version and exit'
-    )
+
+    add_common_arguments(parser)
+    add_attrs_group(parser)
+
     args = parser.parse_args()
 
     # open and merge paths
@@ -503,8 +481,7 @@ def main():
         args.end = pd.to_datetime(args.end, format=args.format)
     if args.init:
         args.freq = np.array(((3., 6.), (6., 12.)) or args.freq)
-    else:
-        args.freq = None
+    args.attrs = parse_attrs_group(args)
 
     # print header and core parameters
     print(f'xcorr-timelapse v{xcorr.__version__}')
@@ -514,7 +491,7 @@ def main():
                                else args.pair))
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
-    if args.freq is not None:
+    if args.init:
         print('{:>20} : {}'.format(
             'frequency', (', '.join([f'{f[0]}-{f[1]}' for f in args.freq]))
         ))
@@ -561,6 +538,7 @@ def main():
             pair=snr.pair,
             time=ct.time.where(ct >= 0, drop=True),
             freq=args.freq,
+            **args.attrs,
         )
     else:
         print('.. update timelapse dataset')
@@ -581,24 +559,30 @@ def main():
         ds['freq_bw'] = bw
         ds['status'] = ds['status'].fillna(0).astype(np.byte)
 
-    nc = ncfile('timelapse', args.pair, args.start, args.end)
+    args.out = ncfile('timelapse', args.pair, args.start, args.end)
     print('{:>20} : {}'.format('pair', ds.pair.size))
     print('{:>20} : {}'.format('time', ds.time1.size))
     print('{:>20} : {}'.format('freq', ds.freq.size))
+    print('{:>20} : {}'.format('outfile', args.out))
+    print('{:>20} : {}'.format('overwrite', args.overwrite))
     if args.debug:
         print(ds)
+
+    # check if output file exists
+    if os.path.exists(args.out) and not args.overwrite:
+        raise FileExistsError(f'Output file "{args.out}" already exists'
+                              ' and overwrite is False.')
 
     # process on client
     ds = spectrogram_timelapse_on_client(
         ds, args.root, client,
         merge=args.update,
         chunk=args.chunk,
-        sparse=(not args.abundant),
     )
 
     # to netcdf
-    print(f'.. write to "{nc}"')
-    xcorr.write(ds, nc, variable_encoding=dict(zlib=True, complevel=9),
+    print(f'.. write to "{args.out}"')
+    xcorr.write(ds, args.out, variable_encoding=dict(zlib=True, complevel=9),
                 verb=1 if args.debug else 0)
 
     # plot?

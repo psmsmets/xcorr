@@ -20,7 +20,8 @@ from glob import glob
 
 # Relative imports
 import xcorr
-from .helpers import init_dask, ncfile
+from .helpers import (init_dask, ncfile, add_common_arguments,
+                      add_attrs_group, parse_attrs_group)
 
 __all__ = []
 
@@ -174,52 +175,30 @@ def main():
               'strptime-behavior.')
     )
     parser.add_argument(
-        '-r', '--root', metavar='..', type=str, default=os.getcwd(),
-        help=('Set cross-correlation root directory (default: current '
-              'working directory)')
-    )
-    parser.add_argument(
-        '-n', '--nworkers', metavar='..', type=int, default=None,
-        help=('Set number of dask workers for local client. If a scheduler '
-              'is set the client will wait until the number of workers is '
-              'available.')
-    )
-    parser.add_argument(
-        '-o', '--overwrite', action='store_true', default=False,
-        help='Overwrite if output file exists (default: skip)'
-    )
-    parser.add_argument(
         '--disable-norm', action='store_true', default=False,
         help='Disable normalization (default: normalization)'
     )
     parser.add_argument(
-        '--scheduler', metavar='..', type=str, default=None,
-        help='Connect to a dask scheduler by a scheduler-file'
+        '-r', '--root', metavar='..', type=str, default=os.getcwd(),
+        help=('Set cross-correlation root directory (default: current '
+              'working directory)')
     )
-    parser.add_argument(
-        '--plot', action='store_true',
-        help='Generate plots during processing (stalls)'
-    )
-    parser.add_argument(
-        '--debug', action='store_true',
-        help='Maximize verbosity'
-    )
-    parser.add_argument(
-        '--version', action='version', version=xcorr.__version__,
-        help='Print xcorr version and exit'
-    )
+
+    add_common_arguments(parser)
+    add_attrs_group(parser)
+
     args = parser.parse_args()
+
+    # update args
     args.root = os.path.abspath(args.root)
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = (pd.to_datetime(args.end, format=args.format)
                 if args.end else args.start)
     args.channels = 'ZT' if args.transverse else 'ZR'
     args.normalize = not args.disable_norm
-
-    args.out = ncfile(
-        'swresp', f'{args.station}_{args.channels}', args.start, args.end
-    )
-
+    args.out = ncfile('swresp', f'{args.station}_{args.channels}',
+                      args.start, args.end)
+    args.attrs = parse_attrs_group(args)
     args.pairs = sorted(list(set([
         p.split(os.path.sep)[-1]
         for p in glob(os.path.join(args.root, '*', f'*{args.station}*'))
