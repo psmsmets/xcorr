@@ -260,7 +260,11 @@ def main():
     resp = client.gather(mapped)
 
     print('.. merge surface wave response list')
-    resp = xr.merge(list(filter(None, resp)))
+    resp = xr.merge(
+        objects=list(filter(None, resp)),
+        join="outer",
+        combine_attrs="no_conflicts",
+    )
     if args.debug:
         print(resp)
 

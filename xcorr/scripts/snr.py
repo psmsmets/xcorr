@@ -189,7 +189,11 @@ def main():
     snr = client.gather(mapped)
 
     print('.. merge signal-to-noise results')
-    snr = xr.merge(list(filter(None, snr)))
+    snr = xr.merge(
+        objects=list(filter(None, snr)),
+        join="outer",
+        combine_attrs="no_conflicts",
+    )
     if args.debug:
         print(snr)
 

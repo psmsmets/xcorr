@@ -232,7 +232,11 @@ def main():
     fit = client.gather(mapped)
 
     print('.. merge plane wave results')
-    fit = xr.merge(list(filter(None, fit)))
+    fit = xr.merge(
+        objects=list(filter(None, fit)),
+        join="outer",
+        combine_attrs="no_conflicts",
+    )
     if args.debug:
         print(fit)
 
