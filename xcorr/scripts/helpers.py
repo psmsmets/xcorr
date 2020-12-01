@@ -11,6 +11,9 @@ Xcorr scripts helper functions.
 from pandas import to_datetime
 from argparse import ArgumentParser
 import distributed
+import warnings
+import json
+import os
 
 # Relative imports
 from ..version import version
@@ -102,6 +105,10 @@ def add_attrs_group(parser: ArgumentParser):
         description=('Set dataset global attributes following COARDS/CF-1.9 '
                      'standards.'),
     )
+    attrs.add_argument(
+        '--attrs', metavar='..', type=str, default=None,
+        help='Set dataset global attributes given a JSON file.'
+    )
     for attr in _global_attrs:
         attrs.add_argument(
             f'--{attr}', metavar='..', type=str, default=None,
@@ -113,6 +120,17 @@ def parse_attrs_group(args):
     """
     """
     attrs = dict()
+    # load from json
+    if args.attrs and os.isfile(args.attrs):
+        try:
+            with open(args.attrs) as file:
+                for key, value in json.load(file).items():
+                    if key in _global_attrs:
+                        attrs[key] = value
+        except Exception as e:
+            warnings.warn(('Failed loading dataset attributes from '
+                           'JSON file "{}"\nError: {}').format(args.attrs, e))
+    # load from command line arguments
     for attr in _global_attrs:
         arg = eval(f'args.{attr}')
         if arg:
