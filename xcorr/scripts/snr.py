@@ -32,10 +32,15 @@ def load(pair, time, root):
     """
     """
     try:
-        ds = xcorr.mfread(xcorr.util.ncfile(pair, time, root), fast=True)
-    except Exception:
-        ds = None
-    return ds
+        ds = xcorr.mfread(
+            xcorr.util.ncfile(pair, time, root, verify_receiver=False),
+            fast=True
+        ).load()
+    except Exception as e:
+        print(f'Error @ load {pair} {time}:', e)
+        return
+    else:
+        return ds
 
 
 @dask.delayed
@@ -44,7 +49,6 @@ def process(ds):
     """
     if ds is None:
         return
-
     try:
         cc = ds.cc.where((ds.status == 1), drop=True)
         if xr.ufuncs.isnan(cc).any():
@@ -56,13 +60,10 @@ def process(ds):
         cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
         cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
         cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
-
-        cc = cc.compute()
-
-    except Exception:
-        cc = None
-
-    return cc
+    except Exception as e:
+        print('Error @ process:', e)
+    else:
+        return cc
 
 
 @dask.delayed
@@ -72,15 +73,15 @@ def estimate_snr(ds, cc, **kwargs):
     if ds is None or cc is None:
         return
     try:
-        signal = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
-        noise = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
-
-        snr = xcorr.signal.snr(cc, signal, noise, dim='lag',
-                               extend=True, envelope=True, **kwargs)
-    except Exception:
-        snr = None
-
-    return snr
+        s = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
+        n = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
+        sn = xcorr.signal.snr(cc, s, n, dim='lag', extend=True,
+                              envelope=True, **kwargs)
+    except Exception as e:
+        print('Error @ estimate_snr:', e)
+        return
+    else:
+        return snr
 
 
 def delayed_snr_estimate(pair, start, end, root, **kwargs):
