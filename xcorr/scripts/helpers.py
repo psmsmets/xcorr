@@ -121,7 +121,7 @@ def parse_attrs_group(args):
     """
     attrs = dict()
     # load from json
-    if args.attrs and os.isfile(args.attrs):
+    if args.attrs and os.path.isfile(args.attrs):
         try:
             with open(args.attrs) as file:
                 for key, value in json.load(file).items():
