@@ -81,7 +81,7 @@ def estimate_snr(ds, cc, **kwargs):
         print('Error @ estimate_snr:', e)
         return
     else:
-        return snr
+        return sn
 
 
 def delayed_snr_estimate(pair, start, end, root, **kwargs):

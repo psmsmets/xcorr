@@ -38,12 +38,10 @@ def load(pairs, time, root):
             [xcorr.util.ncfile(pair, time, root) for pair in pairs],
             fast=True
         )
-    except Exception:
-        ds = None
-    if ds is not None:
-        return ds if ds.pair.size == len(pairs) else None
-    else:
+    except Exception as e:
+        print(f'Error @ load {pairs} {time}:', e)
         return
+    return ds if ds is not None and ds.pair.size == len(pairs) else None
 
 
 @dask.delayed
@@ -67,11 +65,11 @@ def process(ds):
         cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
         cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
         cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
-
-    except Exception:
-        cc = None
-
-    return cc
+    except Exception as e:
+        print('Error @ process:', e)
+        return
+    else:
+        return cc
 
 
 @dask.delayed
@@ -83,10 +81,11 @@ def lse_fit(cc, xy, **kwargs):
     try:
         fit = xcorr.signal.beamform.plane_wave(cc, x=xy.x, y=xy.y, dim='lag',
                                                **kwargs)
-    except Exception:
-        fit = None
-
-    return fit
+    except Exception as e:
+        print('Error @ lse_fit:', e)
+        return
+    else:
+        return fit
 
 
 def delayed_plane_wave_fit(xy, start, end, root, **kwargs):
