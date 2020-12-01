@@ -89,7 +89,7 @@ def estimate_snr(ds, cc, attrs):
         # )
         s = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
         n = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
-        sn = xcorr.signal.snr(cc, signal=s, noise=n, dim='lag',
+        sn = xcorr.signal.snr(cc, s, n, dim='lag',
                               extend=True, envelope=True, **attrs)
     except Exception as e:
         print('Error @ estimate_snr:', e)
@@ -189,11 +189,10 @@ def main():
     snr = client.gather(mapped)
 
     print('.. merge signal-to-noise results')
-    print(list(filter(None, snr)))
-    snr = xr.merge(
-        objects=list(filter(None, snr)),
-        combine_attrs='no_conflicts',
-    )
+    snr = list(filter(None, snr))
+    if args.debug:
+        print(snr)
+    snr = xr.merge(snr, combine_attrs='no_conflicts')
     if args.debug:
         print(snr)
 
