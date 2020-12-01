@@ -172,7 +172,7 @@ def main():
     # estimate snr
     print('.. estimate signal-to-noise per day for period')
     mapped = client.compute(
-        delayed_snr_estimate(args.start, args.end, args.root)
+        delayed_snr_estimate(args.pair, args.start, args.end, args.root)
     )
     distributed.wait(mapped)
 
