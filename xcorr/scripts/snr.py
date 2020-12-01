@@ -64,7 +64,7 @@ def process(ds):
     except Exception as e:
         print('Error @ process:', e)
     else:
-        return cc.compute()
+        return cc
 
 
 @dask.delayed

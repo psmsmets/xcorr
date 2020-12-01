@@ -104,7 +104,7 @@ def snr(
     s = x.where(signal, drop=True)
     s = absolute(hilbert(x, dim=dim) if envelope else s)
 
-    ds[argmax] = s[dim][s.argmax(dim=dim).compute()]
+    ds[argmax] = s[dim][s.argmax(dim=dim, skipna=True).compute()]
     ds['s'] = s.loc[{dim: ds[argmax]}]
     ds['n'] = rms(x.where(noise, drop=True), dim=dim)
 
