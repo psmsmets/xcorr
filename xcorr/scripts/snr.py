@@ -36,7 +36,7 @@ def load(pair, time, root):
         ds = xcorr.mfread(
             xcorr.util.ncfile(pair, time, root, verify_receiver=False),
             fast=True
-        )
+        ).load()
     except Exception as e:
         print(f'Error @ load {pair} {time}:', e)
         return
@@ -61,6 +61,7 @@ def process(ds):
         cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
         cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
         cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
+        print('process cc', cc)
     except Exception as e:
         print('Error @ process:', e)
     else:
@@ -74,21 +75,8 @@ def estimate_snr(ds, cc, attrs):
     if ds is None or cc is None:
         return
     try:
-        # s = xcorr.signal.multi_mask(
-        #     x=ds.lag,
-        #     y=ds.distance,
-        #     lower=1.46,
-        #     upper=1.50,
-        #     invert=True,
-        # )
-        # n = xcorr.signal.mask(
-        #     x=ds.lag,
-        #     lower=3.,
-        #     upper=9.,
-        #     scalar=3600.,
-        # )
-        s = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
-        n = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
+        s = (cc.lag >= ds.distance/1.50) & (cc.lag <= ds.distance/1.46)
+        n = (cc.lag >= 6*3600) & (cc.lag <= 9*3600)
         sn = xcorr.signal.snr(cc, s, n, dim='lag',
                               extend=True, envelope=True, **attrs)
     except Exception as e:
@@ -189,10 +177,7 @@ def main():
     snr = client.gather(mapped)
 
     print('.. merge signal-to-noise results')
-    snr = list(filter(None, snr))
-    if args.debug:
-        print(snr)
-    snr = xr.merge(snr, combine_attrs='no_conflicts')
+    snr = xr.merge(list(filter(None, snr)), combine_attrs='no_conflicts')
     if args.debug:
         print(snr)
 

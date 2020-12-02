@@ -83,6 +83,9 @@ def snr(
         raise ValueError(f'x has no dimensions "{dim}"')
     argmax = f'{dim}_s_max'
 
+    if xr.ufuncs.isnan(x).any() and envelope:
+        raise ValueError('x contains NaN values')
+
     ds = xr.Dataset()
     ds.attrs = global_attrs({
         'title': (
@@ -101,8 +104,9 @@ def snr(
         ),
     })
 
-    s = x.where(signal, drop=True)
-    s = absolute(hilbert(s, dim=dim) if envelope else s)
+    s = absolute(
+        hilbert(x, dim=dim) if envelope else x
+    ).where(signal, drop=True)
 
     ds[argmax] = s[dim][s.argmax(dim=dim).compute()]
     ds['s'] = s.loc[{dim: ds[argmax]}]
