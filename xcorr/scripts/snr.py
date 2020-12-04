@@ -55,29 +55,34 @@ def process(ds):
         if xr.ufuncs.isnan(cc).any():
             return
         delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
+        distance = ds.distance
+
         cc = xcorr.signal.unbias(cc)
         cc = xcorr.signal.demean(cc)
         cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrapping
         cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
         cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
         cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
-        print('process cc', cc)
+
+        ds = xr.Dataset()
+        ds['cc'] = cc
+        ds['distance'] = distance
     except Exception as e:
         print('Error @ process:', e)
     else:
-        return cc
+        return ds
 
 
 @dask.delayed
-def estimate_snr(ds, cc, attrs):
+def estimate_snr(ds, attrs):
     """
     """
-    if ds is None or cc is None:
+    if ds is None:
         return
     try:
-        s = (cc.lag >= ds.distance/1.50) & (cc.lag <= ds.distance/1.46)
-        n = (cc.lag >= 6*3600) & (cc.lag <= 9*3600)
-        sn = xcorr.signal.snr(cc, s, n, dim='lag',
+        s = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
+        n = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
+        sn = xcorr.signal.snr(ds.cc, s, n, dim='lag',
                               extend=True, envelope=True, **attrs)
     except Exception as e:
         print('Error @ estimate_snr:', e)
@@ -92,8 +97,8 @@ def delayed_snr_estimate(pair, start, end, root, attrs):
     results = []
     for day in pd.date_range(start, end, freq='1D'):
         ds = load(pair, day, root)
-        cc = process(ds)
-        sn = estimate_snr(ds, cc, attrs)
+        ds = process(ds)
+        sn = estimate_snr(ds, attrs)
         results.append(sn)
     return results
 
@@ -177,7 +182,7 @@ def main():
     snr = client.gather(mapped)
 
     print('.. merge signal-to-noise results')
-    snr = xr.merge(list(filter(None, snr)), combine_attrs='no_conflicts')
+    snr = xr.merge(list(filter(None, snr)), combine_attrs='override')
     if args.debug:
         print(snr)
 

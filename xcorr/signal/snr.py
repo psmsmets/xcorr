@@ -104,13 +104,14 @@ def snr(
         ),
     })
 
-    s = absolute(
+    ds['n'] = rms(x.where(noise, drop=True), dim=dim)
+
+    x = absolute(
         hilbert(x, dim=dim) if envelope else x
     ).where(signal, drop=True)
 
-    ds[argmax] = s[dim][s.argmax(dim=dim).compute()]
-    ds['s'] = s.loc[{dim: ds[argmax]}]
-    ds['n'] = rms(x.where(noise, drop=True), dim=dim)
+    ds[argmax] = x[dim][x.argmax(dim=dim).compute()]
+    ds['s'] = x.loc[{dim: ds[argmax]}]
 
     ds['snr'] = ds.s/ds.n
     if decibels:
