@@ -110,8 +110,8 @@ def snr(
         hilbert(x, dim=dim) if envelope else x
     ).where(signal, drop=True)
 
-    ds[argmax] = x[dim][x.argmax(dim=dim).compute()]
-    ds['s'] = x.loc[{dim: ds[argmax]}]
+    ds[argmax] = x[dim].isel(**{dim: x.argmax(dim=dim).compute()}, drop=True)
+    ds['s'] = x.sel(**{dim: ds[argmax]}, drop=True)
 
     ds['snr'] = ds.s/ds.n
     if decibels:
