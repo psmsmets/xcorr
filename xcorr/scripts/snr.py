@@ -36,7 +36,7 @@ def load(pair, time, root):
         ds = xcorr.mfread(
             xcorr.util.ncfile(pair, time, root, verify_receiver=False),
             fast=True
-        ).load()
+        )
     except Exception as e:
         print(f'Error @ load {pair} {time}:', e)
         return
@@ -45,17 +45,18 @@ def load(pair, time, root):
 
 
 @dask.delayed
-def process(ds):
+def process_pair_cc(ds, pair):
     """
     """
     if ds is None:
         return
     try:
-        cc = ds.cc.where((ds.status == 1), drop=True)
+        cc = ds.cc.sel(pair=pair).where((ds.status == 1), drop=True)
         if xr.ufuncs.isnan(cc).any():
             return
-        delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
-        distance = ds.distance
+        pair_offset = ds.pair_offset.sel(pair=pair)
+        time_offset = ds.time_offset.sel(pair=pair)
+        delay = -(pair_offset + time_offset) / pd.Timedelta('1s')
 
         cc = xcorr.signal.unbias(cc)
         cc = xcorr.signal.demean(cc)
@@ -64,25 +65,24 @@ def process(ds):
         cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
         cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
 
-        ds = xr.Dataset()
-        ds['cc'] = cc
-        ds['distance'] = distance
+        cc = cc.compute()
+
     except Exception as e:
         print('Error @ process:', e)
     else:
-        return ds
+        return cc
 
 
 @dask.delayed
-def estimate_snr(ds, attrs):
+def estimate_pair_snr(cc, distance, attrs):
     """
     """
-    if ds is None:
+    if cc is None:
         return
     try:
-        s = (ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46)
-        n = (ds.lag >= 6*3600) & (ds.lag <= 9*3600)
-        sn = xcorr.signal.snr(ds.cc, s, n, dim='lag',
+        s = (cc.lag >= distance/1.50) & (cc.lag <= distance/1.46)
+        n = (cc.lag >= 6*3600) & (cc.lag <= 9*3600)
+        sn = xcorr.signal.snr(cc, s, n, dim='lag',
                               extend=True, envelope=True, **attrs)
     except Exception as e:
         print('Error @ estimate_snr:', e)
@@ -91,15 +91,24 @@ def estimate_snr(ds, attrs):
         return sn
 
 
+@dask.delayed
+def merge_pair_snr(snr):
+    """
+    """
+    return xr.merge(list(filter(None, snr)), combine_attrs='override')
+
+
 def delayed_snr_estimate(pair, start, end, root, attrs):
     """Estimate snr for a time period
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
         ds = load(pair, day, root)
-        ds = process(ds)
-        sn = estimate_snr(ds, attrs)
-        results.append(sn)
+        sn = []
+        for p in ds.pair:
+            cc = process_pair_cc(ds, p)
+            sn.append(estimate_pair_snr(cc, ds.distance.sel(pair=p), attrs))
+        results.append(merge_pair_snr(sn))
     return results
 
 
