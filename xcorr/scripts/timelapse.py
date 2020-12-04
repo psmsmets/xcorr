@@ -374,9 +374,18 @@ def spectrogram_timelapse_on_client(
 
     # merge
     if merge:
-        new = xr.merge([new, ds], join='outer', compat='override')
+        new = xr.merge(
+            objects=[new, ds],
+            join="outer",
+            compat="override",
+            combine_attrs="override",
+        )
         try:
-            ds = xr.merge([new, ds], join='outer')
+            ds = xr.merge(
+                objects=[new, ds],
+                join="outer",
+                combine_attrs="override",
+            )
         except Exception as e:
             print(e)
             ds = new

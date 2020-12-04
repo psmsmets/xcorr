@@ -89,7 +89,11 @@ def main():
 
     # snr
     print('.. load signal-to-noise ratio')
-    ds = xr.merge([xr.open_dataset(path) for path in args.paths])
+    ds = xr.merge(
+        objects=[xr.open_dataset(path) for path in args.paths],
+        join="outer",
+        combine_attrs="override",
+    )
     if args.debug:
         print(ds)
 

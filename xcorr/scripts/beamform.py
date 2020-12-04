@@ -235,7 +235,7 @@ def main():
     fit = xr.merge(
         objects=list(filter(None, fit)),
         join="outer",
-        combine_attrs="no_conflicts",
+        combine_attrs="override",
     )
     if args.debug:
         print(fit)

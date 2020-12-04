@@ -263,7 +263,7 @@ def main():
     resp = xr.merge(
         objects=list(filter(None, resp)),
         join="outer",
-        combine_attrs="no_conflicts",
+        combine_attrs="override",
     )
     if args.debug:
         print(resp)
