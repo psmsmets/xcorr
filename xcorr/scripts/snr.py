@@ -29,86 +29,68 @@ __all__ = []
 # -----------------
 
 @dask.delayed
-def load(pair, time, root):
+def estimate_snr_for_day(pair_str, day, root, attrs, verbose=False):
     """
     """
+    if verbose:
+        print('.'*4, f'Load {pair_str} {day}')
     try:
         ds = xcorr.mfread(
-            xcorr.util.ncfile(pair, time, root, verify_receiver=False),
+            xcorr.util.ncfile(pair_str, day, root, verify_receiver=False),
             fast=True
         )
     except Exception as e:
-        print(f'Error @ load {pair} {time}:', e)
+        print(f'Error @ load {pair_str} {day}:', e)
         return
-    else:
-        return ds
+
+    snr = []
+    for pair in ds.pair:
+        if verbose:
+            print('.'*6, str(pair.values))
+        try:
+            cc = ds.cc.sel(pair=pair, drop=False).where(
+                (ds.status.sel(pair=pair) == 1),
+                drop=True
+            ).load()
+            if xr.ufuncs.isnan(cc).any():
+                continue
+            pair_offset = ds.pair_offset.sel(pair=pair)
+            time_offset = ds.time_offset.sel(pair=pair)
+            delay = -(pair_offset + time_offset) / pd.Timedelta('1s')
+            cc = xcorr.signal.unbias(cc)
+            cc = xcorr.signal.demean(cc)
+            cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrap
+            cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
+            cc = xcorr.signal.filter(cc, frequency=3., btype='highpass',
+                                     order=2)
+            cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
+        except Exception as e:
+            print('Error @ process cc:', e)
+            continue
+        try:
+            d = ds.distance.sel(pair=pair, drop=False).load()
+            s = (cc.lag >= d/1.50) & (cc.lag <= d/1.46)
+            n = (cc.lag >= 6*3600) & (cc.lag <= 9*3600)
+            sn = xcorr.signal.snr(cc, s, n, dim='lag',
+                                  extend=True, envelope=True, **attrs)
+        except Exception as e:
+            print('Error @ estimate snr:', e)
+            continue
+        else:
+            if sn is not None:
+                snr.append(sn)
+    snr =  xr.concat(
+        snr, dim='pair', combine_attrs='override'
+    ) if snr else None
+    return snr
 
 
-@dask.delayed
-def process_pair_cc(ds, pair):
-    """
-    """
-    if ds is None:
-        return
-    try:
-        cc = ds.cc.sel(pair=pair).where((ds.status == 1), drop=True)
-        if xr.ufuncs.isnan(cc).any():
-            return
-        pair_offset = ds.pair_offset.sel(pair=pair)
-        time_offset = ds.time_offset.sel(pair=pair)
-        delay = -(pair_offset + time_offset) / pd.Timedelta('1s')
-
-        cc = xcorr.signal.unbias(cc)
-        cc = xcorr.signal.demean(cc)
-        cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrapping
-        cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
-        cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
-        cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
-
-        cc = cc.compute()
-
-    except Exception as e:
-        print('Error @ process:', e)
-    else:
-        return cc
-
-
-@dask.delayed
-def estimate_pair_snr(cc, distance, attrs):
-    """
-    """
-    if cc is None:
-        return
-    try:
-        s = (cc.lag >= distance/1.50) & (cc.lag <= distance/1.46)
-        n = (cc.lag >= 6*3600) & (cc.lag <= 9*3600)
-        sn = xcorr.signal.snr(cc, s, n, dim='lag',
-                              extend=True, envelope=True, **attrs)
-    except Exception as e:
-        print('Error @ estimate_snr:', e)
-        return
-    else:
-        return sn
-
-
-@dask.delayed
-def merge_pair_snr(snr):
-    """
-    """
-    return xr.merge(list(filter(None, snr)), combine_attrs='override')
-
-
-def delayed_snr_estimate(pair, start, end, root, attrs):
+def delayed_snr_estimate(pair, start, end, root, attrs, verbose=False):
     """Estimate snr for a time period
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
-        ds = load(pair, day, root)
-        sn = []
-        for p in ds.pair:
-            cc = process_pair_cc(ds, p)
-            sn.append(estimate_pair_snr(cc, ds.distance.sel(pair=p), attrs))
-        results.append(merge_pair_snr(sn))
+        results.append(estimate_snr_for_day(pair, day, root, attrs, verbose))
     return results
 
 
@@ -183,7 +165,7 @@ def main():
     print('.. estimate signal-to-noise per day for period')
     mapped = client.compute(
         delayed_snr_estimate(args.pair, args.start, args.end, args.root,
-                             args.attrs)
+                             args.attrs, verbose=args.debug)
     )
     distributed.wait(mapped)
 
