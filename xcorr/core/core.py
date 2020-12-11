@@ -476,9 +476,6 @@ def mfread(
         if verb > 3:
             print('validated :', validated)
 
-    # init chunks
-    # chunks = chunks or {'pair': 1, 'time': 1}
-
     # validate wrapper to pass arguments
     def _validate(ds):
         return validate(ds, quick_and_dirty=True)
