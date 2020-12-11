@@ -37,26 +37,27 @@ def estimate_snr_for_day(pair_str, day, root, attrs, verbose=False):
     try:
         ds = xcorr.mfread(
             xcorr.util.ncfile(pair_str, day, root, verify_receiver=False),
-            fast=True
+            fast=True, parallel=False,
         )
+        pairs = ds.pair.load()
+        ds.close()
     except Exception as e:
         print(f'Error @ load {pair_str} {day}:', e)
         return
-
+    if ds is None:
+        return
     snr = []
-    for pair in ds.pair:
+    for pair in pairs:
         if verbose:
             print('.'*6, str(pair.values))
         try:
-            cc = ds.cc.sel(pair=pair, drop=False).where(
-                (ds.status.sel(pair=pair) == 1),
-                drop=True
-            ).load()
+            ds = xcorr.read(xcorr.util.ncfile(pair, day, root), fast=True)
+            if ds is None:
+                continue
+            cc = ds.cc.where((ds.status == 1), drop=True)
             if xr.ufuncs.isnan(cc).any():
                 continue
-            pair_offset = ds.pair_offset.sel(pair=pair)
-            time_offset = ds.time_offset.sel(pair=pair)
-            delay = -(pair_offset + time_offset) / pd.Timedelta('1s')
+            delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
             cc = xcorr.signal.unbias(cc)
             cc = xcorr.signal.demean(cc)
             cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrap
@@ -68,8 +69,7 @@ def estimate_snr_for_day(pair_str, day, root, attrs, verbose=False):
             print('Error @ process cc:', e)
             continue
         try:
-            d = ds.distance.sel(pair=pair, drop=False).load()
-            s = (cc.lag >= d/1.50) & (cc.lag <= d/1.46)
+            s = (cc.lag >= ds.distance/1.50) & (cc.lag <= ds.distance/1.46)
             n = (cc.lag >= 6*3600) & (cc.lag <= 9*3600)
             sn = xcorr.signal.snr(cc, s, n, dim='lag',
                                   extend=True, envelope=True, **attrs)
@@ -79,6 +79,8 @@ def estimate_snr_for_day(pair_str, day, root, attrs, verbose=False):
         else:
             if sn is not None:
                 snr.append(sn)
+    if ds is not None:
+        ds.close()
     snr =  xr.concat(
         snr, dim='pair', combine_attrs='override'
     ) if snr else None
