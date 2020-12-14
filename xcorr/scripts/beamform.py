@@ -80,8 +80,13 @@ def lse_fit(cc, xy, attrs):
     if cc is None:
         return
     try:
-        fit = xcorr.signal.beamform.plane_wave(cc, x=xy.x, y=xy.y, dim='lag',
-                                               **attrs)
+        fit = xcorr.signal.beamform.plane_wave(
+            s=cc, x=xy.x, y=xy.y,
+            dim='lag',
+            dtype='float64',
+            envelope=True,
+            **attrs
+        )
     except Exception as e:
         print('Error @ lse_fit:', e)
         return

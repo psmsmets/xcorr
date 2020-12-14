@@ -472,7 +472,7 @@ def mfread(
         validated = paths
     else:
         validated = validate_list(paths, keep_opened=False, paths_only=True,
-                                  engine=engine, **kwargs)
+                                  engine=engine, verb=verb, **kwargs)
         if verb > 3:
             print('validated :', validated)
 
@@ -766,6 +766,8 @@ def validate_list(
 
     isFile = len(sources) > 0
     sources = sorted(sources) if isFile else datasets
+    if verb > 3:
+        print('validate sources:', sources)
     validated = []
 
     # get dataset wrapper
@@ -794,7 +796,7 @@ def validate_list(
         ds = get_dataset(source)
         if ds is None:
             continue
-        ds = validate(ds, verb=verb, **kwargs)
+        ds = validate(ds, verb=verb-4, **kwargs)
         if ds is not None:
             break
 
@@ -812,7 +814,7 @@ def validate_list(
         'xcorr_version': ds.attrs['xcorr_version'] if strict else None,
     }
     if verb > 3:
-        print('validate_args', validate_args)
+        print('validate_args:', validate_args)
 
     # evaluate
     if parallel:

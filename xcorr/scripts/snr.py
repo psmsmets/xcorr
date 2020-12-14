@@ -71,8 +71,13 @@ def estimate_snr_for_day(pair_str, day, root, attrs, verbose=False):
         try:
             s = (cc.lag >= ds.distance/1.50) & (cc.lag <= ds.distance/1.46)
             n = (cc.lag >= 6*3600) & (cc.lag <= 9*3600)
-            sn = xcorr.signal.snr(cc, s, n, dim='lag',
-                                  extend=True, envelope=True, **attrs)
+            sn = xcorr.signal.snr(
+                cc, s, n,
+                dim='lag',
+                extend=True,
+                envelope=False,
+                **attrs
+            )
         except Exception as e:
             print('Error @ estimate snr:', e)
             continue
