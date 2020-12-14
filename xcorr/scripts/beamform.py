@@ -40,7 +40,7 @@ def load(pairs, time, root):
             fast=True
         )
     except Exception as e:
-        print(f'Error @ load {pairs} {time}:', e)
+        print(f'Error @ loading pairs for {time}:', e)
         return
     return ds if ds is not None and ds.pair.size == len(pairs) else None
 
