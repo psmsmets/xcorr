@@ -48,7 +48,7 @@ def plane_wave(
         broadcasted.
 
     dtype : `str` or :class:`np.dtype`, optional
-        Set the dtype for the rfft. If `None` (default), `np.float64` is used.
+        Set the dtype. If `None` (default), `np.float64` is used.
 
     envelope : `bool`, optional
         Calculate the amplitude envelope of the co-array cross-correlated
@@ -111,6 +111,7 @@ def plane_wave(
     M = coAi0.size
 
     # construct location matrix
+    x, y = x.astype(dtype), y.astype(dtype)
     A = np.array([
         x.isel({rdim: coAi1}).values - x.isel({rdim: coAi0}).values,
         y.isel({rdim: coAi1}).values - y.isel({rdim: coAi0}).values,
@@ -166,6 +167,9 @@ def plane_wave(
              'New York (N.Y.): Wiley-Interscience.'
         ),
     })
+
+    ds['x'] = x
+    ds['y'] = y
 
     ds['doa'] = xr.DataArray(
         data=np.take(av, 0, axis=-1).astype(dtype),
