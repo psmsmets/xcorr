@@ -385,8 +385,9 @@ def read(
     engine = engine or ('h5netcdf' if h5netcdf else None)
 
     # open and validate
-    dataset = validate(xr.open_dataset(path, engine=engine),
-                       verb=verb, **kwargs)
+    dataset = validate(
+        xr.open_dataset(path, engine=engine), verb=verb, **kwargs
+    )
 
     # early return?
     if dataset is None:
@@ -608,7 +609,7 @@ def validate(
         return None
 
     # pair as utf-8
-    dataset['pair'] = dataset.pair.astype('>U')
+    dataset.assign_coords({'pair': dataset.pair.astype('>U')})
 
     # convert preprocess operations
     preprocess_operations_to_dict(dataset.pair)
