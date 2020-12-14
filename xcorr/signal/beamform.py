@@ -13,7 +13,9 @@ import xarray as xr
 import numpy as np
 
 # Relative imports
+from ..signal.absolute import absolute 
 from ..signal.correlate import correlate1d
+from ..signal.hilbert import hilbert
 from ..util.metadata import global_attrs
 
 
@@ -22,7 +24,7 @@ __all__ = ['plane_wave']
 
 def plane_wave(
     s: xr.DataArray, x: xr.DataArray, y: xr.DataArray, dim: str = None,
-    **kwargs
+    dtype=None, envelope: bool = False, **kwargs
 ):
     """
     Return the least-squares estimated plane wave given a signal and
@@ -45,6 +47,15 @@ def plane_wave(
         Other dimensions (excluding the xy-coordinate dimension) will be
         broadcasted.
 
+    dtype : `str` or :class:`np.dtype`, optional
+        Set the dtype for the rfft. If `None` (default), `np.float64` is used.
+
+    envelope : `bool`, optional
+        Calculate the amplitude envelope of the co-array cross-correlated
+        signal before extracting the lag time at the peak correlation
+        coefficient. The envelope is given by magnitude of the analytic signal.
+        Defaults to `False`.
+
     **kwargs :
         Any additional keyword arguments are used to set the dataset global
         metadata attributes.
@@ -64,6 +75,13 @@ def plane_wave(
         raise TypeError('dim should be a string')
     if dim not in s.dims:
         raise ValueError(f's has no dimensions "{dim}"')
+
+    # dtype
+    dtype = np.dtype(dtype or 'float64')
+    if not isinstance(dtype, np.dtype):
+        raise TypeError('dtype should be a numpy.dtype')
+    if 'float' not in dtype.name:
+        raise TypeError('dtype should be float.')
 
     # x-coordinate
     if len(x.dims) != 1:
@@ -103,18 +121,21 @@ def plane_wave(
 
     # obtain lag times per co-array receiver couple
     tau = xr.DataArray(
-        data=np.zeros(out_shape + (M,), dtype=x.dtype),
+        data=np.zeros(out_shape + (M,), dtype=dtype),
         dims=out_dims + ('M',),
-        coords={d: s[d] for d in out_dims},
+        coords={'M': range(M), **{d: s[d] for d in out_dims}},
     )
-    for i in range(M):
+    ddim = 'delta_'+dim
+    for i in tau.M:
         cc = correlate1d(
-            in1=s.isel({rdim: coAi0[i]}),
-            in2=s.isel({rdim: coAi1[i]}),
-            dim=dim
+            in1=s.isel({rdim: coAi0[i]}).astype(dtype),
+            in2=s.isel({rdim: coAi1[i]}).astype(dtype),
+            dim=dim, dtype=dtype,
         )
-        argmax = xr.ufuncs.fabs(cc).argmax(dim='delta_'+dim)
-        tau.loc[{'M': i}] = cc['delta_'+dim][argmax]
+        if envelope:
+            cc = hilbert(cc, dim=ddim)
+        argmax = absolute(cc).argmax(dim=ddim)
+        tau.loc[{'M': i}] = cc['delta_'+dim][argmax].astype(dtype)
 
     # estimate plane wave (broadcast-like)
     def LSE(tau):
@@ -136,11 +157,7 @@ def plane_wave(
     ds.attrs = global_attrs({
         'title': (
             kwargs.pop('title', '') +
-            'Signal-to-noise ratio - {} to {}'
-            .format(
-                x.time[0].dt.strftime('%Y.%j').item(),
-                x.time[-1].dt.strftime('%Y.%j').item(),
-            )
+            'Least-Squares Estimated Plane Wave'
         ).strip(),
         **kwargs,
         'references': (
@@ -151,7 +168,7 @@ def plane_wave(
     })
 
     ds['doa'] = xr.DataArray(
-        data=np.take(av, 0, axis=-1),
+        data=np.take(av, 0, axis=-1).astype(dtype),
         dims=out_dims,
         coords={d: s[d] for d in out_dims},
         attrs={
@@ -164,7 +181,7 @@ def plane_wave(
     )
 
     ds['vel'] = xr.DataArray(
-        data=np.take(av, 1, axis=-1),
+        data=np.take(av, 1, axis=-1).astype(dtype),
         dims=out_dims,
         coords={d: s[d] for d in out_dims},
         attrs={
@@ -176,7 +193,7 @@ def plane_wave(
     )
 
     ds['err'] = xr.DataArray(
-        data=np.take(av, 2, axis=-1),
+        data=np.take(av, 2, axis=-1).astype(dtype),
         dims=out_dims,
         coords={d: s[d] for d in out_dims},
         attrs={

@@ -607,6 +607,9 @@ def validate(
         dataset.close()
         return None
 
+    # pair as utf-8
+    dataset['pair'] = dataset.pair.astype('>U')
+
     # convert preprocess operations
     preprocess_operations_to_dict(dataset.pair)
 

@@ -118,7 +118,7 @@ def correlate1d(
         dargs = dict(dask='allowed', output_dtypes=[in1.dtype])
 
     # apply ufunc (and optional dask distributed)
-    cc = xr.apply_ufunc(_correlate1d, in1, in2,
+    cc = xr.apply_ufunc(_correlate1d, in1.astype(dtype), in2.astype(dtype),
                         input_core_dims=[[dim], [dim]],
                         output_core_dims=[[new_dim]],
                         keep_attrs=False,
@@ -295,7 +295,7 @@ def _new_coord(old):
     """Private helper to construct the new dimension.
     """
     n = 2*old.size-1
-    s = (old.max()-old.min()).item()/(old.size-1)
+    s = 1/np.round(n//2/(old.max() - old.min()).item(), decimals=0)
 
     new = xr.DataArray(
         data=fft.fftshift(fft.fftfreq(n, 1/n/s)),

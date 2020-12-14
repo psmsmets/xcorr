@@ -53,7 +53,7 @@ def ncfile(pair, time: pd.Timestamp, root: str = None,
     # check pair
     if isinstance(pair, xr.DataArray):
         if pair.size == 1:
-            pair = str(pair.values)
+            pair = str(pair.values.astype('<U'))
         else:
             raise ValueError('pair should be a single element')
     if verify_receiver:

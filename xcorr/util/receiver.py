@@ -1,6 +1,6 @@
 r"""
 
-:mod:`util.receiver` -- Receiver Utilities
+:class:`util.receiver` -- Receiver Utilities
 ==========================================
 
 Receiver utilities for ``xcorr`` such as checks, type conversions,
@@ -42,7 +42,7 @@ def check_receiver(
 
     Check if the receiver string matches the SEED-id regex pattern.
 
-    This check-function is called by routines in :mod:`clients`.
+    This check-function is called by routines in :class:`clients`.
 
     Parameters
     ----------
@@ -98,7 +98,7 @@ def split_pair(
 
     Parameters
     ----------
-    pair : `str` or :mod:`~xarray.DataArray`
+    pair : `str` or :class:`~xarray.DataArray`
         Receiver couple separated by ``separator``. Each receiver is specified
         by a SEED-id string: '{network}.{station}.{location}.{channel}'.
 
@@ -128,13 +128,15 @@ def split_pair(
 
     """
     if isinstance(pair, xr.DataArray):
-        pair = str(pair.values)
-    elif isinstance(pair, np.ndarray):
-        pair = str(pair)
+        pair = pair.values
+    if isinstance(pair, np.ndarray):
+        pair = str(pair.astype('<U'))
+
     assert isinstance(pair, str), (
         'Pair should be either a string, numpy.ndarray or '
         'an xarray.DataArray'
     )
+
     three_components = three_components or '12Z'
     if three_components not in ('12Z', 'NEZ'):
         raise ValueError('three_components should be either "12Z" or "NEZ"!')
@@ -160,7 +162,7 @@ def split_pairs(pairs, **kwargs):
 
     Parameters
     ----------
-    pairs : `list` or :mod:`~xarray.DataArray`
+    pairs : `list` or :class:`~xarray.DataArray`
         List or N-D labeled array of receiver couple strings separated by
         ``separator``. Each receiver is specified by a SEED-id string:
         '{network}.{station}.{location}.{channel}'.
@@ -196,9 +198,10 @@ def receiver_to_dict(receiver: str):
 
     """
     if isinstance(receiver, xr.DataArray):
-        receiver = str(receiver.values)
-    elif isinstance(receiver, np.ndarray):
-        receiver = str(receiver)
+        receiver = receiver.values
+    if isinstance(receiver, np.ndarray):
+        receiver = str(receiver.astype('<U'))
+
     assert isinstance(receiver, str), (
         'Receiver should be either a string, numpy.ndarray or '
         'an xarray.DataArray'
