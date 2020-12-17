@@ -13,7 +13,7 @@ import xarray as xr
 import numpy as np
 
 # Relative imports
-from ..signal.absolute import absolute 
+from ..signal.absolute import absolute
 from ..signal.correlate import correlate1d
 from ..signal.hilbert import hilbert
 from ..util.metadata import global_attrs
@@ -167,6 +167,7 @@ def plane_wave(
              'New York (N.Y.): Wiley-Interscience.'
         ),
     })
+    ds.attrs['envelope'] = np.int8(envelope)
 
     ds['x'] = x
     ds['y'] = y

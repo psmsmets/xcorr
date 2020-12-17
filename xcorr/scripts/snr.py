@@ -29,10 +29,10 @@ __all__ = []
 # -----------------
 
 @dask.delayed
-def estimate_snr_for_day(pair_str, day, root, attrs, verbose=False):
+def estimate_snr_for_day(pair_str, day, root, envelope, attrs, debug=False):
     """
     """
-    if verbose:
+    if debug:
         print('.'*4, f'Load {pair_str} {day}')
     try:
         ds = xcorr.mfread(
@@ -48,7 +48,7 @@ def estimate_snr_for_day(pair_str, day, root, attrs, verbose=False):
         return
     snr = []
     for pair in pairs:
-        if verbose:
+        if debug:
             print('.'*6, str(pair.values))
         try:
             ds = xcorr.read(xcorr.util.ncfile(pair, day, root), fast=True)
@@ -66,7 +66,7 @@ def estimate_snr_for_day(pair_str, day, root, attrs, verbose=False):
                                      order=2)
             cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
         except Exception as e:
-            print('Error @ process cc:', e)
+            print(f'Error @ process cc {str(pair.values)} {day}:', e)
             continue
         try:
             s = (cc.lag >= ds.distance/1.50) & (cc.lag <= ds.distance/1.46)
@@ -75,29 +75,31 @@ def estimate_snr_for_day(pair_str, day, root, attrs, verbose=False):
                 cc, s, n,
                 dim='lag',
                 extend=True,
-                envelope=False,
+                envelope=envelope,
                 **attrs
             )
         except Exception as e:
-            print('Error @ estimate snr:', e)
+            print(f'Error @ estimate snr {day}:', e)
             continue
         else:
             if sn is not None:
                 snr.append(sn)
     if ds is not None:
         ds.close()
-    snr =  xr.concat(
+    snr = xr.concat(
         snr, dim='pair', combine_attrs='override'
     ) if snr else None
     return snr
 
 
-def delayed_snr_estimate(pair, start, end, root, attrs, verbose=False):
+def delayed_snr_estimate(pair, start, end, root, envelope, attrs, debug=False):
     """Estimate snr for a time period
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
-        results.append(estimate_snr_for_day(pair, day, root, attrs, verbose))
+        results.append(
+            estimate_snr_for_day(pair, day, root, envelope, attrs, debug)
+        )
     return results
 
 
@@ -127,6 +129,11 @@ def main():
               'See strftime documentation for more information on choices: '
               'https://docs.python.org/3/library/datetime.html#strftime-and-'
               'strptime-behavior.')
+    )
+    parser.add_argument(
+        '-e', '--envelope', action="store_true", default=False,
+        help=('Calculate the amplitude envelope of the signal part before '
+              'locating the peak amplitude (default: `False`)')
     )
     parser.add_argument(
         '-p', '--pair', metavar='..', type=str, default='*',
@@ -172,7 +179,7 @@ def main():
     print('.. estimate signal-to-noise per day for period')
     mapped = client.compute(
         delayed_snr_estimate(args.pair, args.start, args.end, args.root,
-                             args.attrs, verbose=args.debug)
+                             args.attrs, debug=args.debug)
     )
     distributed.wait(mapped)
 

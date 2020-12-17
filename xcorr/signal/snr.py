@@ -61,9 +61,9 @@ def snr(
         Defaults to `False`.
 
     envelope : `bool`, optional
-        Calculate the amplitude envelope of ``x`` before the signal-to-noise
-        ratio. The envelope is given by magnitude of the analytic signal.
-        Defaults to `False`.
+        Calculate the amplitude envelope of the signal part before locating the
+        peak amplitude. The envelope is given by magnitude of the analytic
+        signal. Defaults to `False`.
 
     **kwargs :
         Any additional keyword arguments are used to set the dataset global

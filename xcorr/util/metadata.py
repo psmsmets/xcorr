@@ -23,7 +23,7 @@ from ..version import version
 __all__ = ['global_attrs', 'list_versions', 'version']
 
 
-def global_attrs(kwargs: dict):
+def global_attrs(kwargs: dict, cf_only: bool = True):
     r"""Set the global attribute dictionary for a dataset following
     COARDS/CF-1.9 standards
 
@@ -33,6 +33,9 @@ def global_attrs(kwargs: dict):
     kwargs : `dict`
         Dictionary with keyword arguments. COARDS/CF-1.9 attributes are
         extracted to set the global metadata attributes.
+
+    cf_only : `bool`, optional
+        If `True` (default) extract COARDS/CF global attributes only.
 
     Returns
     -------
@@ -53,7 +56,7 @@ def global_attrs(kwargs: dict):
         'dependencies_version': list_versions(as_str=True),
     }
 
-    return attrs
+    return attrs if cf_only else {**kwargs, **attrs}
 
 
 def list_versions(as_str: bool = True):

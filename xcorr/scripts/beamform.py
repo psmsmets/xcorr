@@ -74,7 +74,7 @@ def process(ds):
 
 
 @dask.delayed
-def lse_fit(cc, xy, attrs):
+def lse_fit(cc, xy, envelope, attrs):
     """
     """
     if cc is None:
@@ -84,7 +84,7 @@ def lse_fit(cc, xy, attrs):
             s=cc, x=xy.x, y=xy.y,
             dim='lag',
             dtype='float64',
-            envelope=True,
+            envelope=envelope,
             **attrs
         )
     except Exception as e:
@@ -94,14 +94,14 @@ def lse_fit(cc, xy, attrs):
         return fit
 
 
-def delayed_plane_wave_fit(xy, start, end, root, attrs):
+def delayed_plane_wave_fit(xy, start, end, root, envelope, attrs):
     """Plane wave fit for a time period
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
         ds = load(xy.pair, day, root)
         cc = process(ds)
-        fit = lse_fit(cc, xy, attrs)
+        fit = lse_fit(cc, xy, envelope, attrs)
         results.append(fit)
     return results
 
@@ -137,6 +137,12 @@ def main():
     parser.add_argument(
         '-c', '--channel', metavar='..', type=str, default='',
         help='Set channel code to select specific pairs'
+    )
+    parser.add_argument(
+        '-e', '--envelope', action="store_true", default=False,
+        help=('Calculate the amplitude envelope of the co-array cross-'
+              'correlated signal before extracting the lag time at the peak '
+              'correlation coefficient (default: `False`)')
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
