@@ -63,7 +63,7 @@ def main():
         '-t', '--threshold', metavar='..', type=float, default=10.,
         help='Coincidence trigger threshold (default: 10.)'
     )
-    add_common_arguments(parser)
+    add_common_arguments(parser, dask=False)
     add_attrs_group(parser)
 
     args = parser.parse_args()
@@ -97,6 +97,9 @@ def main():
     if args.debug:
         print(ds)
 
+    # fix attributes
+    ds.pair.attrs['long_name'] = 'Receiver pair'
+
     # filter snr
     print('.. filter snr for pair and time range')
     t0 = args.start or pd.to_datetime(ds.time[0].item())
@@ -118,6 +121,10 @@ def main():
         ds.snr, thr_on=args.threshold, extend=0, thr_coincidence_sum=None,
     )
     print(f'periods = {ds.ct.attrs["nperiods"]}')
+
+    # prevent warning
+    ds.attrs.pop('sha256_hash_metadata', None)
+    ds.attrs.pop('sha256_hash', None)
     if args.debug:
         print(ds.ct)
 

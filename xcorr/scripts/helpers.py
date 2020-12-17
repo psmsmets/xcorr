@@ -60,22 +60,23 @@ def ncfile(prefix, pair, start, end):
     )
 
 
-def add_common_arguments(parser: ArgumentParser):
+def add_common_arguments(parser: ArgumentParser, dask: bool = True):
     """Add common arguments to the argument parser object.
     """
     if not isinstance(parser, ArgumentParser):
         raise TypeError('parser should be :class:`ArgumentParser`')
 
-    parser.add_argument(
-        '-n', '--nworkers', metavar='..', type=int, default=None,
-        help=('Set number of dask workers for the local client. '
-              'If a scheduler is set the client will wait until the given '
-              'number of workers is available.')
-    )
-    parser.add_argument(
-        '--scheduler', metavar='..', type=str, default=None,
-        help='Connect to a dask scheduler by a scheduler-file'
-    )
+    if dask:
+        parser.add_argument(
+            '-n', '--nworkers', metavar='..', type=int, default=None,
+            help=('Set number of dask workers for the local client. '
+                  'If a scheduler is set the client will wait until the '
+                  'given number of workers is available.')
+        )
+        parser.add_argument(
+            '--scheduler', metavar='..', type=str, default=None,
+            help='Connect to a dask scheduler by a scheduler-file'
+        )
     parser.add_argument(
         '--overwrite', action='store_true', default=False,
         help='Overwrite if output file exists (default: skip)'

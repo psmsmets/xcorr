@@ -55,7 +55,7 @@ def to_trace(x: DataArray, dim: str = None, starttime: np.datetime64 = None,
         starttime = to_datetime(starttime or 'now')
         x[dim] = x[dim]*pd.Timedelta('1s')
 
-    delta = (x[dim].diff('lag').mean()/pd.Timedelta('1s')).item()
+    delta = (x[dim][1:].diff('lag').min()/pd.Timedelta('1s')).item()
 
     # trace header
     header = {
