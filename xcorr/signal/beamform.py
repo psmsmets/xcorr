@@ -150,8 +150,8 @@ def plane_wave(
             doa = 0.
         e = tau - A.dot(s)
         err = e.T.dot(e)
-        return doa, vel, err
-    av = np.apply_along_axis(LSE, -1, tau.values)
+        return s[0], s[1], doa, vel, err
+    fit = np.apply_along_axis(LSE, -1, tau.values)
 
     # output
     ds = xr.Dataset()
@@ -172,8 +172,30 @@ def plane_wave(
     ds['x'] = x
     ds['y'] = y
 
+    ds['s_x'] = xr.DataArray(
+        data=np.take(fit, 0, axis=-1).astype(dtype)*1e3,
+        dims=out_dims,
+        coords={d: s[d] for d in out_dims},
+        attrs={
+            'long_name': 'Horizontal slowness x-component',
+            'units': 's km-1',
+        },
+        name='s_x',
+    )
+
+    ds['s_y'] = xr.DataArray(
+        data=np.take(fit, 1, axis=-1).astype(dtype)*1e3,
+        dims=out_dims,
+        coords={d: s[d] for d in out_dims},
+        attrs={
+            'long_name': 'Horizontal slowness y-component',
+            'units': 's km-1',
+        },
+        name='s_y',
+    )
+
     ds['doa'] = xr.DataArray(
-        data=np.take(av, 0, axis=-1).astype(dtype),
+        data=np.take(fit, 2, axis=-1).astype(dtype),
         dims=out_dims,
         coords={d: s[d] for d in out_dims},
         attrs={
@@ -186,7 +208,7 @@ def plane_wave(
     )
 
     ds['vel'] = xr.DataArray(
-        data=np.take(av, 1, axis=-1).astype(dtype),
+        data=np.take(fit, 3, axis=-1).astype(dtype),
         dims=out_dims,
         coords={d: s[d] for d in out_dims},
         attrs={
@@ -198,7 +220,7 @@ def plane_wave(
     )
 
     ds['err'] = xr.DataArray(
-        data=np.take(av, 2, axis=-1).astype(dtype),
+        data=np.take(fit, 4, axis=-1).astype(dtype),
         dims=out_dims,
         coords={d: s[d] for d in out_dims},
         attrs={

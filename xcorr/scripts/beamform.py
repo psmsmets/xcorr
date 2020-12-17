@@ -235,7 +235,8 @@ def main():
     # fit plane wave
     print('.. compute plane wave per day for period')
     mapped = client.compute(
-        delayed_plane_wave_fit(xy, args.start, args.end, args.root, args.attrs)
+        delayed_plane_wave_fit(xy, args.start, args.end, args.root,
+                               args.envelope, args.attrs)
     )
     distributed.wait(mapped)
 
