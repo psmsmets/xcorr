@@ -106,7 +106,7 @@ def surface_wave_response(cc, normalize: bool = True, **kwargs):
             ),
         })
 
-        resp['magnitude'] = xr.ufuncs.real(xr.ufuncs.sqrt(F*xr.ufuncs.conj(F)))
+        resp['magnitude'] = xcorr.signal.abs(F*xr.ufuncs.conj(F))
         resp['magnitude'].attrs = {
             'long_name': 'Magnitude',
             'units': '-',
