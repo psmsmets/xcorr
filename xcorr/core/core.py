@@ -170,7 +170,7 @@ def init(
         'comment': attrs['comment'] if 'comment' in attrs else 'n/a',
         'Conventions': 'CF-1.9',
         'xcorr_version': util.metadata.version,
-        'dependencies_version': util.metadata.list_version(as_str=True),
+        'dependencies_version': util.metadata.list_versions(as_str=True),
     }
 
     # pair
