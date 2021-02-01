@@ -350,8 +350,12 @@ class Client(object):
 
         # release sds write access
         if locked:
-            if lock.locked():
-                lock.release()
+            try:
+                if lock.locked():
+                    lock.release()
+            except Exception as e:
+                if verb > 0:
+                    print(e)
 
         if success and verb > 0:
             print(_msg_added_archive)
@@ -638,8 +642,12 @@ class Client(object):
 
         # release
         if locked:
-            if lock.locked():
-                lock.release()
+            try:
+                if lock.locked():
+                    lock.release()
+            except Exception as e:
+                if verb > 0:
+                    print(e)
 
         return st
 
