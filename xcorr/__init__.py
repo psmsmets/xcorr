@@ -25,13 +25,16 @@ analysis tools.
     GNU General Public License, Version 3
     (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
+# Check for Dask
+import importlib
+__dask_spec = ((importlib.util.find_spec("dask") is not None) and
+               (importlib.util.find_spec("distributed") is not None))
 
 # Import main modules
 from xcorr import cc, preprocess, signal
 
 # Import all core functions
-from xcorr.core import (init, read, write, merge, mfread, process,
-                        lazy_process, bias_correct)
+from xcorr.core import (init, read, write, merge, mfread, process, bias_correct)
 
 # Import client class
 from xcorr.client import Client
@@ -39,8 +42,12 @@ from xcorr.client import Client
 # Make only a selection available to __all__ to not clutter the namespace
 # Maybe also to discourage the use of `from xcorr import *`.
 __all__ = ['Client', 'cc', 'signal', 'preprocess', 'init', 'read',
-           'write', 'merge', 'mfread', 'process', 'lazy_process',
-           'bias_correct']
+           'write', 'merge', 'mfread', 'process', 'bias_correct']
+
+# Load optional functions related to Dask
+if __dask_spec:
+    from xcorr.core import lazy_process
+    __all__ += ['lazy_process']
 
 # Version
 try:
