@@ -163,6 +163,7 @@ def main():
     print('{:>20} : {}'.format('pair', args.pair))
     print('{:>20} : {}'.format('start', args.start.strftime('%Y-%m-%d')))
     print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
+    print('{:>20} : {}'.format('envelope', args.envelope))
     print('{:>20} : {}'.format('outfile', args.out))
     print('{:>20} : {}'.format('overwrite', args.overwrite))
 
@@ -179,7 +180,7 @@ def main():
     print('.. estimate signal-to-noise per day for period')
     mapped = client.compute(
         delayed_snr_estimate(args.pair, args.start, args.end, args.root,
-                             args.attrs, debug=args.debug)
+                             args.envelope, args.attrs, debug=args.debug)
     )
     distributed.wait(mapped)
 
