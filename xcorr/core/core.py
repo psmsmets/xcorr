@@ -16,6 +16,7 @@ import obspy
 import json
 import warnings
 import os
+import shutil
 from glob import glob
 try:
     import h5netcdf
@@ -976,7 +977,7 @@ def write(
     # Replace file
     if verb > 0:
         print('Replace', end='. ')
-    os.replace(tmp, os.path.join(abspath, file))
+    shutil.move(tmp, os.path.join(abspath, file))
 
     # convert preprocess operations
     if verb > 1:
