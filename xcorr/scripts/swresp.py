@@ -197,7 +197,7 @@ def main():
     args.channels = 'ZT' if args.transverse else 'ZR'
     args.normalize = not args.disable_norm
     args.out = ncfile('swresp', f'{args.station}_{args.channels}',
-                      args.start, args.end)
+                      args.start, args.end, args.prefix, args.suffix)
     args.attrs = parse_attrs_group(args)
     args.pairs = sorted(list(set([
         p.split(os.path.sep)[-1]

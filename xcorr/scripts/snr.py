@@ -87,7 +87,7 @@ def estimate_snr_for_day(pair_str, day, root, envelope, attrs, debug=False):
     if ds is not None:
         ds.close()
     snr = xr.concat(
-        snr, dim='pair', combine_attrs='override'
+        snr, dim='pair', combine_attrs='override',
     ) if snr else None
     return snr
 
@@ -154,7 +154,9 @@ def main():
     args.root = os.path.abspath(args.root)
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = pd.to_datetime(args.end, format=args.format)
-    args.out = ncfile('snr', args.pair, args.start, args.end)
+    args.out = ncfile('snr_envelope' if args.envelope else 'snr',
+                      args.pair, args.start, args.end,
+                      args.prefix, args.suffix)
     args.attrs = parse_attrs_group(args)
 
     # print header and core parameters

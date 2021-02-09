@@ -133,7 +133,8 @@ def main():
     ds['snr'] = ds.snr.where(ds.snr <= peak)
 
     # timelapse filename
-    nc = ncfile('snr_ct', args.pair, ds.time[0].item(), ds.time[-1].item())
+    nc = ncfile('snr_ct', args.pair, ds.time[0].item(), ds.time[-1].item(),
+                args.prefix, args.suffix)
 
     # check if output file exists
     if os.path.exists(nc) and not args.overwrite:

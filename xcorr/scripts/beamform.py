@@ -173,7 +173,8 @@ def main():
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = (pd.to_datetime(args.end, format=args.format)
                 if args.end else args.start)
-    args.out = ncfile('beamform', args.name, args.start, args.end)
+    args.out = ncfile('beamform', args.name, args.start, args.end,
+                      args.prefix, args.suffix)
     args.attrs = parse_attrs_group(args)
 
     args.pairs = sorted(list(set([

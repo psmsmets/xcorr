@@ -568,7 +568,8 @@ def main():
         ds['freq_bw'] = bw
         ds['status'] = ds['status'].fillna(0).astype(np.byte)
 
-    args.out = ncfile('timelapse', args.pair, args.start, args.end)
+    args.out = ncfile('timelapse', args.pair, args.start, args.end,
+                      args.prefix, args.suffix)
     print('{:>20} : {}'.format('pair', ds.pair.size))
     print('{:>20} : {}'.format('time', ds.time1.size))
     print('{:>20} : {}'.format('freq', ds.freq.size))

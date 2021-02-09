@@ -46,8 +46,8 @@ def init_dask(n_workers: int = None, scheduler_file: str = None):
     return cluster, client
 
 
-def ncfile(prefix, pair, start, end):
-    """Construct netcdf filename.
+def ncfile(title, pair, start, end, prefix=None, suffix=None):
+    """Construct netCDF filename.
     """
     start = to_datetime(start)
     end = to_datetime(end)
@@ -55,9 +55,12 @@ def ncfile(prefix, pair, start, end):
         pair = 'all'
     else:
         pair = pair.translate({ord(c): None for c in '*?'})
-    return '{}_{}_{}_{}.nc'.format(
-        prefix, pair, start.strftime('%Y%j'), end.strftime('%Y%j'),
+    nc = "{}{}_{}_{}_{}{}.nc".format(
+        f"{prefix}_" if prefix else '',
+        title, pair, start.strftime('%Y%j'), end.strftime('%Y%j'),
+        f"_{suffix}" if suffix else '',
     )
+    return nc
 
 
 def add_common_arguments(parser: ArgumentParser, dask: bool = True):
@@ -77,6 +80,14 @@ def add_common_arguments(parser: ArgumentParser, dask: bool = True):
             '--scheduler', metavar='..', type=str, default=None,
             help='Connect to a dask scheduler by a scheduler-file'
         )
+    parser.add_argument(
+        '--prefix', metavar='..', type=str, default=None,
+        help='Set the prefix of the output file (default: None)'
+    )
+    parser.add_argument(
+        '--suffix', metavar='..', type=str, default=None,
+        help='Set the suffix of the output file (default: None)'
+    )
     parser.add_argument(
         '--overwrite', action='store_true', default=False,
         help='Overwrite if output file exists (default: skip)'
