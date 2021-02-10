@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import dask
 import distributed
 import os
+from glob import glob
 import sys
 import argparse
 
@@ -29,23 +30,13 @@ __all__ = []
 # -----------------
 
 @dask.delayed
-def estimate_snr_for_day(pair_str, day, root, envelope, attrs, debug=False):
+def estimate_snr_for_day(
+    pairs, day, root, envelope, attrs, debug=False
+):
     """
     """
     if debug:
-        print('.'*4, f'Load {pair_str} {day}')
-    try:
-        ds = xcorr.mfread(
-            xcorr.util.ncfile(pair_str, day, root, verify_receiver=False),
-            fast=True, parallel=False,
-        )
-        pairs = ds.pair.load()
-        ds.close()
-    except Exception as e:
-        print(f'Error @ load {pair_str} {day}:', e)
-        return
-    if ds is None:
-        return
+        print('.'*4, f'Load pairs for {day}')
     snr = []
     for pair in pairs:
         if debug:
@@ -92,13 +83,15 @@ def estimate_snr_for_day(pair_str, day, root, envelope, attrs, debug=False):
     return snr
 
 
-def delayed_snr_estimate(pair, start, end, root, envelope, attrs, debug=False):
+def delayed_snr_estimate(
+    pairs, start, end, root, envelope, attrs, debug=False
+):
     """Estimate snr for a time period
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
         results.append(
-            estimate_snr_for_day(pair, day, root, envelope, attrs, debug)
+            estimate_snr_for_day(pairs, day, root, envelope, attrs, debug)
         )
     return results
 
@@ -137,7 +130,7 @@ def main():
     )
     parser.add_argument(
         '-p', '--pair', metavar='..', type=str, default='*',
-        help='Filter pairs that contain the given string'
+        help='Filter pairs that contain the given glob string'
     )
     parser.add_argument(
         '-r', '--root', metavar='..', type=str, default=os.getcwd(),
@@ -149,6 +142,12 @@ def main():
     add_attrs_group(parser)
 
     args = parser.parse_args()
+
+    # get pair list
+    args.pairs = list(set([
+        os.path.split(p)[-1]
+        for p in glob(os.path.join(args.root, '*', args.pair))
+    ]))
 
     # update arguments
     args.root = os.path.abspath(args.root)
@@ -162,12 +161,16 @@ def main():
     # print header and core parameters
     print(f'xcorr-snr v{xcorr.__version__}')
     print('{:>20} : {}'.format('root', args.root))
-    print('{:>20} : {}'.format('pair', args.pair))
+    print('{:>20} : {}'.format('pair', args.pair + f"(#{args.pairs})"))
     print('{:>20} : {}'.format('start', args.start.strftime('%Y-%m-%d')))
     print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
     print('{:>20} : {}'.format('envelope', args.envelope))
     print('{:>20} : {}'.format('outfile', args.out))
     print('{:>20} : {}'.format('overwrite', args.overwrite))
+
+    if args.debug:
+        for i, p in enumerate(args.pairs):
+            print('{:>20} : {}'.format('pairs', p) if i == 0 else ' '*22 + p)
 
     # check if output file exists
     if os.path.exists(args.out) and not args.overwrite:
@@ -181,7 +184,7 @@ def main():
     # estimate snr
     print('.. estimate signal-to-noise per day for period')
     mapped = client.compute(
-        delayed_snr_estimate(args.pair, args.start, args.end, args.root,
+        delayed_snr_estimate(args.pairs, args.start, args.end, args.root,
                              args.envelope, args.attrs, debug=args.debug)
     )
     distributed.wait(mapped)
