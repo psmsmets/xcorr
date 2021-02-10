@@ -161,7 +161,7 @@ def main():
     # print header and core parameters
     print(f'xcorr-snr v{xcorr.__version__}')
     print('{:>20} : {}'.format('root', args.root))
-    print('{:>20} : {}'.format('pair', args.pair + f"(#{args.pairs})"))
+    print('{:>20} : {}'.format('pair', args.pair + f" (#{len(args.pairs)})"))
     print('{:>20} : {}'.format('start', args.start.strftime('%Y-%m-%d')))
     print('{:>20} : {}'.format('end', args.end.strftime('%Y-%m-%d')))
     print('{:>20} : {}'.format('envelope', args.envelope))
