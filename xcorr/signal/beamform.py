@@ -52,7 +52,7 @@ def plane_wave(
 
     envelope : `bool`, optional
         Calculate the amplitude envelope of the co-array cross-correlated
-        signal before extracting the lag time at the peak correlation
+        signal before extracting the time lag at the peak correlation
         coefficient. The envelope is given by magnitude of the analytic signal.
         Defaults to `False`.
 
@@ -120,7 +120,7 @@ def plane_wave(
     # prepare LSE
     ATAinvAT = np.linalg.inv(A.T.dot(A)).dot(A.T)
 
-    # obtain lag times per co-array receiver couple
+    # obtain time lags per co-array receiver couple
     tau = xr.DataArray(
         data=np.zeros(out_shape + (M,), dtype=dtype),
         dims=out_dims + ('M',),

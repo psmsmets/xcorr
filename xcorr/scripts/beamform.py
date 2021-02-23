@@ -141,7 +141,7 @@ def main():
     parser.add_argument(
         '-e', '--envelope', action="store_true", default=False,
         help=('Calculate the amplitude envelope of the co-array cross-'
-              'correlated signal before extracting the lag time at the peak '
+              'correlated signal before extracting the time lag at the peak '
               'correlation coefficient (default: `False`)')
     )
     group = parser.add_mutually_exclusive_group()

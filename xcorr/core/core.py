@@ -219,8 +219,8 @@ def init(
         nmax = 2*npts-1
     dataset.coords['lag'] = lag[nmin:nmax]
     dataset.lag.attrs = {
-        'long_name': 'Lag time',
-        'standard_name': 'lag_time',
+        'long_name': 'Time lag',
+        'standard_name': 'time_lag',
         'units': 's',
         'sampling_rate': float(sampling_rate),
         'delta': float(delta),
