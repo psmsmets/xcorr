@@ -46,7 +46,7 @@ def correlate1d(
 
     normalize : `bool`, optional
         If `True` (default), ``in1`` and ``in2`` are normalized before
-        crosscorrelation.
+        cross-correlation.
 
     dtype : :class:`np.dtype`, optional
         Set the dtype. If `None` (default), the dtype of ``in1`` is used.
@@ -62,7 +62,7 @@ def correlate1d(
     Returns
     -------
     cc : :class:`xarray.DataArray`
-        Data array containing the discrete linear crosscorrelation of
+        Data array containing the discrete linear cross-correlation of
         ``in1`` with ``in2``.
 
     """
@@ -135,8 +135,8 @@ def correlate1d(
     cc.name = 'cc'
     cc.attrs = {
         **cc.attrs,
-        'long_name': 'Crosscorrelation Estimate',
-        'standard_name': 'crosscorrelation_estimate',
+        'long_name': 'Cross-correlation Estimate',
+        'standard_name': 'cross_correlation_estimate',
         'units': '-',
         'add_offset': dtype(0.),
         'scale_factor': dtype(1.),
@@ -176,7 +176,7 @@ def correlate2d(
 
     normalize : `bool`, optional
         If `True` (default), ``in1`` and ``in2`` are normalized before
-        crosscorrelation.
+        cross-correlation.
 
     dtype : :class:`np.dtype`, optional
         Set the dtype. If `None` (default), the dtype of ``in1`` is used.
@@ -192,7 +192,7 @@ def correlate2d(
     Returns
     -------
     cc : :class:`xarray.DataArray`
-        Data array containing the discrete linear crosscorrelation of
+        Data array containing the discrete linear cross-correlation of
         ``in1`` with ``in2``.
 
     """
@@ -267,8 +267,8 @@ def correlate2d(
     cc.name = 'cc2'
     cc.attrs = {
         **cc.attrs,
-        'long_name': 'Two-dimensional Crosscorrelation Estimate',
-        'standard_name': '2d_crosscorrelation_estimate',
+        'long_name': 'Two-dimensional Cross-correlation Estimate',
+        'standard_name': '2d_cross_correlation_estimate',
         'units': '-',
         'add_offset': dtype(0.),
         'scale_factor': dtype(1.),
