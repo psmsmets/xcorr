@@ -181,7 +181,10 @@ def get_spectrogram(pair, time, root):
         return
 
     # extract time_offset and pair_offset
-    delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
+    delay = -(ds.pair_offset + ds.time_offset)
+    if delay.dtype.name == 'timedelta64[ns]':
+        delay = delay / pd.Timedelta('1s')
+        delay.attrs['units'] = 's'
 
     # process cc
     cc = xcorr.signal.unbias(cc)

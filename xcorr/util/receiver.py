@@ -306,7 +306,7 @@ def get_pair_inventory(
         for r in set(rr):
             d = receiver_to_dict(r)
             if d['channel'][-1] in ('R', 'T'):
-                for h in ['1', '2', 'N', 'E']:
+                for h in ['1', '2', 'N', 'E', 'Z']:
                     c = d['channel'][:-1] + h
                     inv += inventory.select(
                         **{**d, 'channel': c}, starttime=t0, endtime=t1

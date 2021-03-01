@@ -503,18 +503,15 @@ class Client(object):
         t0 = pd.to_datetime(time)
 
         if centered:
-
             t0 -= pd.offsets.DateOffset(seconds=duration/2)
 
         t1 = t0 + pd.offsets.DateOffset(seconds=duration)
 
         if buffer > 0.:
-
             t0 -= pd.offsets.DateOffset(seconds=buffer)
             t1 += pd.offsets.DateOffset(seconds=buffer)
 
         if verb > 0:
-
             print(
                 'Get waveforms for {} from {} until {}'
                 .format(receiver, t0, t1)
@@ -542,7 +539,6 @@ class Client(object):
             stream = Stream()
 
             for day in days:
-
                 stream += self._get_waveforms_for_date(
                     receiver=receiver,
                     date=day,
@@ -603,7 +599,6 @@ class Client(object):
 
         # feedback
         if verb > 0:
-
             print("Get waveforms for {} from {} until {}"
                   .format(receiver, kwargs['starttime'], kwargs['endtime']))
 
@@ -715,7 +710,6 @@ class Client(object):
             if daystream:
 
                 if verb > 1:
-
                     print(_msg_loaded_archive.format(time))
 
                 return daystream
@@ -723,7 +717,6 @@ class Client(object):
             else:
 
                 if verb > 1:
-
                     print(_msg_no_data.format(time))
 
         # 2. check services
@@ -733,25 +726,20 @@ class Client(object):
             if self.fdsn:
 
                 if verb > 1:
-
                     print('Try FDSN.')
 
                 try:
-
                     daystream = self.fdsn.get_waveforms(**get_args)
 
                     if self._sds_write_daystream(daystream, **set_args):
-
                         return daystream
 
                 except (KeyboardInterrupt, SystemExit):
-
                     raise
 
                 except FDSNNoDataException:
 
                     if verb > 1:
-
                         print(_msg_no_data.format(time))
 
                 except Exception as e:
@@ -769,7 +757,6 @@ class Client(object):
             if self.vdms:
 
                 if verb > 1:
-
                     print('Try VDMS')
 
                 try:
@@ -781,11 +768,9 @@ class Client(object):
                         return daystream
 
                     if verb > 1:
-
                         print(_msg_no_data.format(time))
 
                 except (KeyboardInterrupt, SystemExit):
-
                     raise
 
                 except Exception as e:
@@ -817,11 +802,9 @@ class Client(object):
 
         """
         try:
-
             stream = self._get_waveforms_for_date(**kwargs)
 
         except (KeyboardInterrupt, SystemExit):
-
             raise
 
         except Exception as e:
@@ -889,6 +872,7 @@ class Client(object):
 
         three_components: {'12Z', 'NEZ'}, optional
             Set the three-component orientation characters. Defaults to '12Z'.
+            Is no longer needed. All orientations '12ZNE' are evaluated.
 
         duration_check: `bool`, optional
             If `True` (default), verify the preprocessed stream duration using
@@ -920,22 +904,20 @@ class Client(object):
         util.receiver.check_receiver(receiver, allow_wildcards=False,
                                      raise_error=True)
 
-        three_components = three_components or '12Z'
-        assert three_components == '12Z' or three_components == 'NEZ', (
-            '``three_components`` should be either "12Z" or "NEZ"!'
-        )
+        # No longer needed. Test all '12NEZ' components
+        # three_components = three_components or '12Z'
+        # assert three_components == '12Z' or three_components == 'NEZ', (
+        #     '``three_components`` should be either "12Z" or "NEZ"!'
+        # )
 
         ch = receiver.split('.')[-1]
 
         # radial or transverse component? Request all channels manually.
         if substitute and ch[-1] in 'RT':
 
-            st = Stream()
-
-            for c in three_components:  # '12NEZ'??
-
-                st = st + self.get_waveforms(
-                    receiver=receiver[:-1]+c,
+            def _get_waveforms(orientation):
+                return self.get_waveforms(
+                    receiver=receiver[:-1]+orientation,
                     time=time,
                     duration=duration,
                     centered=centered,
@@ -943,8 +925,20 @@ class Client(object):
                     **kwargs
                 )
 
-        else:
 
+            # Get vertical component 'Z'
+            st = _get_waveforms('Z')
+
+            # Get horizontal components 'NE' or '12'
+            for h in ('12', 'NE'):
+                for c in h:
+                    tr = _get_waveforms(c) 
+                    if tr:
+                        st += tr
+                    else:
+                        break
+
+        else:
             st = self.get_waveforms(
                 receiver=receiver,
                 time=time,
@@ -955,19 +949,15 @@ class Client(object):
             )
 
         if verb > 2:
-
             print(st)
 
         if not isinstance(st, Stream) or len(st) == 0:
-
             return Stream()
 
         if centered:
-
             t0 = util.time.to_UTCDateTime(time) - duration/2
 
         else:
-
             t0 = util.time.to_UTCDateTime(time)
 
         t1 = t0 + duration
@@ -986,7 +976,6 @@ class Client(object):
         if not isinstance(st, Stream) or len(st) != 1:
 
             if raise_error:
-
                 raise ValueError('No stream with single trace returned '
                                  'after preprocessing.')
 
@@ -1038,15 +1027,12 @@ class Client(object):
         kwargs['duration_check'] = False
 
         try:
-
             stream = self.get_preprocessed_waveforms(**kwargs)
 
         except (KeyboardInterrupt, SystemExit):
-
             raise
 
         except RuntimeError:
-
             return -2
 
         passed = self.check_duration(stream, duration=kwargs['duration'],

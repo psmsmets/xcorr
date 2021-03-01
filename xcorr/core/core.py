@@ -196,7 +196,7 @@ def init(
         'closed': closed,
     }
 
-    # lag
+    # time lag
     lag = correlate.lag(npts, delta, pad=True)
     if clip_lag is not None:
         msg = ('``clip_lag`` should be in seconds of type `float` or of type'
@@ -259,7 +259,7 @@ def init(
     # status
     dataset['status'] = (
         ('pair', 'time'),
-        np.zeros((1, len(dataset.time)), dtype=np.byte),
+        np.zeros((1, dataset.time.size), dtype=np.byte),
         {
             'long_name': 'processing status',
             'standard_name': 'processing_status',
@@ -274,7 +274,7 @@ def init(
     if hash_waveforms:
         dataset['hash'] = (
             ('pair', 'time'),
-            np.array([['n/a']*len(dataset.time)], dtype=object),
+            np.array([['n/a']*dataset.time.size], dtype=object),
             {
                 'long_name': 'pair preprocessed stream hash',
                 'standard_name': 'pair_preprocessed_stream_hash',
@@ -295,10 +295,11 @@ def init(
     # pair offset
     dataset['pair_offset'] = (
         ('pair', 'time'),
-        np.zeros((1, len(dataset.time)), dtype=np.timedelta64),
+        np.zeros((1, dataset.time.size), dtype=np.float64),
         {
             'long_name': 'receiver pair start sample offset',
             'standard_name': 'receiver_pair_start_sample_offset',
+            'units': 's',
             'description': (
                 'offset = receiver[0].starttime - receiver[1].starttime'
             ),
@@ -308,10 +309,11 @@ def init(
     # time offset
     dataset['time_offset'] = (
         ('pair', 'time'),
-        np.zeros((1, len(dataset.time)), dtype=np.timedelta64),
+        np.zeros((1, dataset.time.size), dtype=np.float64),
         {
             'long_name': 'first receiver start sample offset',
             'standard_name': 'first_receiver_start_sample_offset',
+            'units': 's',
             'description': (
                 'offset = receiver[0].starttime - time + window_length/2'
             ),
@@ -321,7 +323,7 @@ def init(
     # cc
     dataset['cc'] = (
         ('pair', 'time', 'lag'),
-        np.zeros((1, len(dataset.time), len(dataset.lag)), dtype=dtype),
+        np.zeros((1, dataset.time.size, dataset.lag.size), dtype=dtype),
         {
             'long_name': 'Cross-correlation Estimate',
             'standard_name': 'cross-correlation_estimate',
@@ -407,6 +409,12 @@ def read(
     # extract valid data
     if extract:
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
+
+    # time offsets to seconds
+    for var in ('pair_offset', 'time_offset'):
+        if dataset[var].dtype.name == 'timedelta64[ns]':
+            dataset[var] = dataset[var] / pd.Timedelta('1s')
+            dataset[var].attrs['units'] = 's'
 
     return dataset
 
@@ -1174,19 +1182,17 @@ def process(
             dataset.pair_offset.loc[pt] = (
                 pd.to_datetime(st[0].stats.starttime.datetime) -
                 pd.to_datetime(st[1].stats.starttime.datetime)
-            )
+            ) / pd.Timedelta('1s')
             dataset.time_offset.loc[pt] = (
                 pd.to_datetime(st[0].stats.starttime.datetime) +
                 pd.to_timedelta(dataset.time.window_length / 2, unit='s') -
                 dataset.time.loc[{'time': t}].values
-            )
+            ) / pd.Timedelta('1s')
 
             # hash
             if hash_waveforms:
-
                 if verb > 0:
                     print('Hash', end='. ')
-
                 dataset.hash.loc[pt] = util.hash_Stream(st)
 
             # cc

@@ -62,7 +62,10 @@ def process(ds):
         )
         if xr.ufuncs.isnan(cc).any():
             return
-        delay = -(ds.pair_offset + ds.time_offset) / pd.Timedelta('1s')
+        delay = -(ds.pair_offset + ds.time_offset)
+        if delay.dtype.name == 'timedelta64[ns]':
+            delay = delay / pd.Timedelta('1s')
+            delay.attrs['units'] = 's'
         cc = xcorr.signal.unbias(cc)
         cc = xcorr.signal.demean(cc)
         cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrapping
