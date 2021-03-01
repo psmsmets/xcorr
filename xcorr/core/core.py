@@ -411,10 +411,7 @@ def read(
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
 
     # time offsets to seconds
-    for var in ('pair_offset', 'time_offset'):
-        if dataset[var].dtype.name == 'timedelta64[ns]':
-            dataset[var] = dataset[var] / pd.Timedelta('1s')
-            dataset[var].attrs['units'] = 's'
+    xcorr.util.time.dataset_timedelta64_to_seconds(dataset)
 
     return dataset
 
@@ -691,6 +688,9 @@ def validate(
                               UserWarning)
             dataset.close()
             return None
+
+    # timedelta64 to seconds
+    dataset = util.time.dataset_timedelta64_to_seconds(dataset)
 
     return dataset
 
