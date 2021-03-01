@@ -305,7 +305,7 @@ def get_pair_inventory(
             rr += split_pair(p, separator, to_dict=False)
         for r in set(rr):
             d = receiver_to_dict(r)
-            if d['channel'][-1] == 'R':
+            if d['channel'][-1] in ('R', 'T'):
                 for h in ['1', '2', 'N', 'E']:
                     c = d['channel'][:-1] + h
                     inv += inventory.select(
@@ -339,7 +339,7 @@ def get_receiver_coordinates(receiver: str, inventory: Inventory):
         The extracted receiver coordinates from the ``inventory`` object.
 
     """
-    if receiver[-1] == 'R' or receiver[-1] == 'T':
+    if receiver[-1] in ('R', 'T'):
         receiver = receiver[:-1] + 'Z'
     return inventory.get_coordinates(receiver)
 
