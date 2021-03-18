@@ -17,11 +17,11 @@ from obspy import UTCDateTime
 
 
 __all__ = ['_one_second', 'to_seconds', 'to_datetime', 'to_UTCDateTime',
-           'dataset_timedelta64_to_seconds', 'get_dates', '_dpm',
-           'leap_year', 'get_dpm', 'get_dpy', 'update_lag_indices']
+           'get_dates', '_dpm', 'leap_year', 'get_dpm', 'get_dpy',
+           'update_lag_indices']
 
 
-_one_second = pd.to_timedelta(1, unit='s')
+_one_second = pd.to_timedelta('1s')
 
 
 def to_seconds(time):
@@ -89,16 +89,6 @@ def to_UTCDateTime(time):
 
     """
     return UTCDateTime(to_datetime(time))
-
-
-def dataset_timedelta64_to_seconds(ds: xr.Dataset):
-    """Updates dataset variables of type timedelta64[ns] to float64 in seconds
-    """
-    for var in ds.variables:
-        if ds[var].dtype == np.dtype('timedelta64[ns]'):
-            ds[var] = ds[var] / _one_second 
-            ds[var].attrs['units'] = 's'
-    return ds
 
 
 def update_lag_indices(lag: xr.DataArray):

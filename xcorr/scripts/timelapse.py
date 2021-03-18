@@ -12,7 +12,6 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import distributed
-from time import sleep
 import os
 import sys
 import argparse
@@ -97,7 +96,7 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
     )
 
     ds['status'] = xr.DataArray(
-        np.zeros((len(ds.pair), len(freq), time.size, time.size),
+        np.zeros((ds.pair.size, ds.freq.size, time.size, time.size),
                  dtype=np.byte),
         dims=('pair', 'freq', 'time1', 'time2'),
         coords=(ds.pair, ds.freq, time, time),
@@ -141,6 +140,11 @@ def get_spectrogram(pair, time, root):
     """
     # construct abs path and filename
     nc = xcorr.util.ncfile(pair, time, root)
+    f = os.path.split(nc)[-1]
+
+    # exists?
+    if not os.path.isfile(nc):
+        raise FileNotFoundError("cc dataset not found in" + f)
 
     # set lock
     lock = distributed.Lock(name=nc)
@@ -157,17 +161,18 @@ def get_spectrogram(pair, time, root):
         ds.close()
     except Exception:
         ds = None
+        pass
 
     # release lock
     try:
         if lock.locked():
             lock.release()
-    except Exception as e:
-        print(e)
+    except Exception:
+        pass
 
     # no data?
     if ds is None or not ok:
-        return
+        raise ValueError("cc trace load failed from" + f)
 
     # extract cc
     cc = ds.cc.where(
@@ -178,7 +183,7 @@ def get_spectrogram(pair, time, root):
 
     # no valid data?
     if xr.ufuncs.isnan(cc).any():
-        return
+        raise ValueError("cc trace contains NaN in" + f)
 
     # extract time_offset and pair_offset
     delay = -(ds.pair_offset + ds.time_offset)
@@ -197,24 +202,28 @@ def get_spectrogram(pair, time, root):
     return psd
 
 
-def correlate_spectrogram(obj, pair, time1, time2, root):
+def correlate_spectrogram(obj, loc, root):
     """Correlate spectrogram.
     """
-    # locs
-    items = {'pair': pair, 'time1': time1, 'time2': time2}
-
     # already done?
-    if (obj.status.loc[items] == 1).all():
+    if (obj.status.loc[loc] == 1).all():
+        return
+
+    # no need to process?
+    if xr.ufuncs.isnan(obj.status.loc[loc]).all():
         return
 
     # load cc and compute psd on-the-fly
     psd1, psd2 = None, None
     try:
-        psd1 = get_spectrogram(pair, time1, root)
-        psd2 = get_spectrogram(pair, time2, root)
+        psd1 = get_spectrogram(loc['pair'], loc['time1'], root)
+        psd2 = get_spectrogram(loc['pair'], loc['time2'], root)
     except Exception as e:
-        print(e)
+        print("Spectrogram computation failed:", e)
+        return
+
     if psd1 is None or psd2 is None:
+        print("Spectrogram computation returned None")
         return
 
     # correlate per freq range
@@ -239,11 +248,11 @@ def correlate_spectrogram(obj, pair, time1, time2, root):
         amax1, amax2 = np.unravel_index(cc2.argmax(), cc2.shape)
 
         # store values in object
-        item = {**items, 'freq': freq}
-        obj['status'].loc[item] = np.byte(1)
-        obj['cc2'].loc[item] = cc2.isel({dim1: amax1, dim2: amax2})
-        obj[dim1].loc[item] = cc2[dim1][amax1]
-        obj[dim2].loc[item] = cc2[dim2][amax2]
+        locf = {**loc, 'freq': freq}
+        obj['status'].loc[locf] = np.byte(1)
+        obj['cc2'].loc[locf] = cc2.isel({dim1: amax1, dim2: amax2})
+        obj[dim1].loc[locf] = cc2[dim1][amax1]
+        obj[dim2].loc[locf] = cc2[dim2][amax2]
 
     return
 
@@ -251,22 +260,49 @@ def correlate_spectrogram(obj, pair, time1, time2, root):
 def correlate_spectrograms(obj, root):
     """Correlate spectrograms.
     """
+
+    # worker
+    worker = distributed.get_worker()
+
     # complete obj?
     if (obj.status == 1).all():
-        sleep(2.)
+        worker.log_event("info", {
+            "Correlate spectrograms": "block already completed",
+        })
         return obj
 
+    # catch memory error
+    obj = obj.copy(True)
+
+    worker.log_event("info", {"Correlate spectrograms": "block started"})
+
     # process per item
-    for pair in obj.pair:
+    for time2 in obj.time2:
         for time1 in obj.time1:
-            for time2 in obj.time2:
-                correlate_spectrogram(obj, pair, time1, time2, root)
+            for pair in obj.pair:
+                loc = dict(pair=pair, time1=time1, time2=time2)
+                correlate_spectrogram(obj, loc, root)
+                try:
+                    correlate_spectrogram(obj, loc, root)
+                except Exception as e:
+                    worker.log_event("warn", {
+                        "Correlate spectrograms": "failed",
+                        "error": e,
+                        "loc": loc,
+                    })
+                    # in the case where something goes wrong you want to rejoin
+                    # so that your client knows that this function call failed
+                    # distributed.rejoin()
+    worker.log_event("info", {"Correlate spectrograms": "block completed"})
+
     return obj
 
 
-def _mask_upper_triangle(ds):
-    """Mark upper triangle (one offset)
+def _mask_upper_triangle(ds, verbose=False):
+    """Mask upper triangle (one offset)
     """
+    if verbose:
+        print(".. sparse time lapse: mask upper triangle")
     ind1, ind2 = np.triu_indices(ds.time1.size, 1)
     for i in range(len(ind1)):
         ds.status.loc[{
@@ -275,16 +311,17 @@ def _mask_upper_triangle(ds):
         }] = np.byte(1)
 
 
-def _fill_upper_triangle(ds):
+def _fill_upper_triangle(ds, verbose=False):
     """Fill upper triangle (one offset)
     """
-    # copy lower to upper triangle
+    if verbose:
+        print(".. sparse time lapse: fill upper triangle")
     ind1, ind2 = np.triu_indices(ds.time1.size, 1)
     for i in range(len(ind1)):
-        time1 = ds.time1[ind1[i]]
-        time2 = ds.time2[ind2[i]]
-        triu = {'time1': time1, 'time2': time2}
-        tril = {'time1': time2, 'time2': time1}
+        t1, t2 = ds.time1[ind1[i]], ds.time2[ind2[i]]
+        triu = {'time1': t1, 'time2': t2}
+        tril = {'time1': t2, 'time2': t1}
+        ds.status.loc[triu] = ds.status.loc[tril]
         ds.cc2.loc[triu] = ds.cc2.loc[tril]
         ds.delta_freq.loc[triu] = -ds.delta_freq.loc[tril]
         ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
@@ -303,8 +340,8 @@ def _all_ncfiles(pair, time, root):
 
 
 def spectrogram_timelapse_on_client(
-    ds: xr.Dataset, root: str, client: distributed.Client,
-    chunk: int = 10, sparse: bool = True, merge: bool = False, verb: int = 1
+    ds: xr.Dataset, client: distributed.Client, root: str,
+    chunk: int = 10, debug: bool = False, plot: bool = False,
 ):
     """2-d correlate spectrograms on a Dask client
 
@@ -314,90 +351,93 @@ def spectrogram_timelapse_on_client(
     ds: :class:`xr.Dataset`
         Timelapse dataset.
 
-    root: `str`
-        Cross-correlation root directory
-
     client: :class:`distributed.Client`
         Dask distributed client object.
+
+    root: `str`
+        Cross-correlation root directory
 
     chunk: `int`, optional
         Dask map blocks chunk size for time1 and time2 (default: 10).
 
-    sparse: `bool`, optional
-        Only calculate the lower diagonal cross-correlation values
-        (default: `True`).
+    debug: `bool`, optional
+        Verbose more (defaults to `False`).
 
-    merge: `bool`
-        Merge ``ds`` with the updated timelapse dataset. Avoid when calculating
-        a freshly initiated dataset.
-
-    verb: `int`, optional
-        Set verbosity level (default: 1).
+    plot: `bool`, optional
+        Plot results (defaults to `False`).
     """
 
     # parameters
-    if verb > 0:
-        print('.. map and compute blocks')
-        print('{:>20} : {}'.format('chunk', chunk))
-        print('{:>20} : {}'.format('sparse', sparse))
-        print('{:>20} : {}'.format('merge', merge))
+    print('.. map and compute blocks')
+    print('{:>20} : {}'.format('chunk', chunk))
 
     # ignore upper triangle
-    if sparse:
-        _mask_upper_triangle(ds)
+    _mask_upper_triangle(ds, verbose=debug)
 
-    # extract
+    # extract unprocessed
     new = ds.drop_vars('freq_bw').where((ds.status != 1), drop=True)
-    new['freq_bw'] = ds['freq_bw']
+    new['freq_bw'] = ds.freq_bw
+
+    # plot?
+    if debug and plot:
+        plot_timelapse(new)
 
     # create locks
-    locks = [distributed.Lock(nc)
-             for nc in _all_ncfiles(new.pair, new.time1, root)]
-    if verb > 0:
-        print('{:>20} : {}'.format('locks', len(locks)))
+    ncfiles = _all_ncfiles(new.pair, new.time1, root)
+    locks = [distributed.Lock(nc) for nc in ncfiles]
+    print('{:>20} : {}'.format('locks', len(locks)))
 
     # chunk
-    new = new.chunk({'time1': chunk, 'time2': chunk})
+    new = new.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
+    if debug:
+        print('{:>20} : {}'.format('chunks', new.chunks))
 
-    # map and persist blocks
-    mapped = new.map_blocks(
+    # map blocks and persist
+    new = new.map_blocks(
         correlate_spectrograms,
         args=[root],
         template=new,
     ).persist()
 
-    # force await async
-    distributed.wait(mapped)
+    # await async
+    distributed.wait(new)
 
-    # compute blocks
-    new = client.gather(mapped).load()
+    # gather blocks
+    new = client.gather(new)
+
+    # load results from Dask-array
+    new.load()
+
+    # plot?
+    if debug and plot:
+        plot_timelapse(new)
 
     # merge
-    if merge:
-        new = xr.merge(
-            objects=[new, ds],
-            join="outer",
-            compat="override",
-            combine_attrs="override",
-        )
-        try:
-            ds = xr.merge(
-                objects=[new, ds],
-                join="outer",
-                combine_attrs="override",
-            )
-        except Exception as e:
-            print(e)
-            ds = new
-    else:
-        ds = new
-    # ds = xr.merge([new, ds], join='outer') if merge else new
+    ds = new.combine_first(ds)
 
     # fill upper triangle
-    if sparse:
-        _fill_upper_triangle(ds)
+    _fill_upper_triangle(ds, verbose=debug)
 
     return ds
+
+
+def plot_timelapse(ds):
+    """Plot timelapse dataset
+    """
+    print('.. plot timelapse dataset')
+    plotset = dict(
+        row='freq',
+        col='pair',
+        yincrease=False,
+        size=3,
+        aspect=1.12,
+        cbar_kwargs=dict(shrink=1/ds.freq.size),
+    )
+    ds.status.plot(**plotset)
+    ds.cc2.plot(vmin=0, vmax=1, **plotset)
+    ds.delta_lag.plot(robust=True, **plotset)
+    ds.delta_freq.plot(robust=True, **plotset)
+    plt.show()
 
 
 ###############################################################################
@@ -407,6 +447,9 @@ def spectrogram_timelapse_on_client(
 def main():
     """Main script function.
     """
+    # head
+    print(f"xcorr-timelapse v{xcorr.__version__}")
+
     # arguments
     parser = argparse.ArgumentParser(
         prog='xcorr-timelapse',
@@ -463,11 +506,15 @@ def main():
         '-c', '--chunk', metavar='..', type=int, default=10,
         help=('Set dask chunks for time dimension (default: 10)')
     )
-
     add_common_arguments(parser)
     add_attrs_group(parser)
 
+    # parse arguments
     args = parser.parse_args()
+
+    # init dask cluster and client
+    cluster, client = init_dask(n_workers=args.nworkers,
+                                scheduler_file=args.scheduler)
 
     # open and merge paths
     ds = xr.open_mfdataset(
@@ -480,7 +527,7 @@ def main():
     ds.close()
 
     if args.debug:
-        print(ds)
+        print('.. merged paths:', ds)
 
     # update arguments
     args.root = os.path.abspath(args.root)
@@ -492,12 +539,11 @@ def main():
         args.freq = np.array(((3., 6.), (6., 12.)) or args.freq)
     args.attrs = parse_attrs_group(args)
 
-    # print header and core parameters
-    print(f'xcorr-timelapse v{xcorr.__version__}')
+    # print core parameters
     print('{:>20} : {}'.format('action', 'update' if args.update else 'init'))
     print('{:>20} : {}'.format('root', args.root))
     print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
-                               else args.pair))
+                                       else args.pair))
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
     if args.init:
@@ -505,15 +551,14 @@ def main():
             'frequency', (', '.join([f'{f[0]}-{f[1]}' for f in args.freq]))
         ))
 
-    # init dask cluster and client
-    cluster, client = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
-
-    # filter snr and ct
+    # init timelapse dataset
     if args.init:
-        print('.. filter snr and ct')
+        # load snr and ct to init
+        print(".. filter snr and ct")
         args.start = args.start or pd.to_datetime(ds.time[0])
         args.end = args.end or (pd.to_datetime(ds.time[-1])+pd.Timedelta('1s'))
+
+        # extract signal-to-noise ratio
         snr = ds.snr.where(
             (
                 (ds.time >= args.start.to_datetime64()) &
@@ -523,7 +568,9 @@ def main():
             drop=True,
         )
         if args.debug:
-            print(snr)
+            print(".. extract signal-to-noise ratio", snr)
+
+        # extract coincidence triggers
         ct = ds.ct.where(
             (
                 (ds.time >= args.start.to_datetime64()) &
@@ -532,28 +579,39 @@ def main():
             drop=True,
         )
         if args.debug:
-            print(ct)
+            print(".. extract coincidence triggers", ct)
+
+        # plot extracted snr and coincidence triggers
         if args.plot:
+            print(".. plot snr and coincidence triggers")
             snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
                           add_legend=False)
             xcorr.signal.trigger.plot_trigs(snr, ct)
             plt.tight_layout()
             plt.show()
+
+        # set end time
         args.end = pd.to_datetime(ct.time[-1].item())
 
-        # init timelapse
-        print('.. init timelapse dataset')
+        # init time lapse dataset
+        print(".. init time lapse dataset")
         ds = init_spectrogram_timelapse(
             pair=snr.pair,
             time=ct.time.where(ct >= 0, drop=True),
             freq=args.freq,
             **args.attrs,
         )
+
     else:
-        print('.. update timelapse dataset')
+        # update timelapse dataset
+        print(".. update time lapse dataset")
+
+        # set start and end times
         args.start = args.start or pd.to_datetime(ds.time1[0].item())
         args.end = args.end or (pd.to_datetime(ds.time1[-1].item()) +
                                 pd.Timedelta('1s'))
+
+        # trim merged dataset to start and end times
         bw = ds.freq_bw
         ds = ds.drop_vars('freq_bw').where(
             (ds.time1 >= args.start.to_datetime64()) &
@@ -566,29 +624,37 @@ def main():
             if dim in bw.dims:
                 bw = bw.loc[{dim: bw[dim][0]}].drop_vars(dim)
         ds['freq_bw'] = bw
+
+        # empty status to zero
         ds['status'] = ds['status'].fillna(0).astype(np.byte)
 
+        # plot merged dataset
+        if args.plot:
+            plot_timelapse(ds)
+
+    # set output file
     args.out = ncfile('timelapse', args.pair, args.start, args.end,
                       args.prefix, args.suffix)
+
+    # logs
     print('{:>20} : {}'.format('pair', ds.pair.size))
     print('{:>20} : {}'.format('time', ds.time1.size))
     print('{:>20} : {}'.format('freq', ds.freq.size))
     print('{:>20} : {}'.format('outfile', args.out))
     print('{:>20} : {}'.format('overwrite', args.overwrite))
     if args.debug:
-        print(ds)
+        print(".. time lapse dataset", ds)
 
     # check if output file exists
     if os.path.exists(args.out) and not args.overwrite:
-        raise FileExistsError(f'Output file "{args.out}" already exists'
-                              ' and overwrite is False.')
+        raise FileExistsError(
+            f'Output file "{args.out}" already exists and overwrite is False.'
+        )
 
     # process on client
-    ds = spectrogram_timelapse_on_client(
-        ds, args.root, client,
-        merge=args.update,
-        chunk=args.chunk,
-    )
+    print('{:>20} : {}'.format('pair', ds.pair.size))
+    ds = spectrogram_timelapse_on_client(ds, client, args.root,
+                                         args.chunk, args.debug, args.plot)
 
     # to netcdf
     print(f'.. write to "{args.out}"')
@@ -597,15 +663,10 @@ def main():
 
     # plot?
     if args.plot:
-        print('.. plot')
-        plotset = dict(col='freq', yincrease=False, size=4, aspect=1)
-        ds.cc2.isel(pair=-1).plot(vmin=0, **plotset)
-        ds.delta_lag.isel(pair=-1).plot(robust=True, **plotset)
-        ds.delta_freq.isel(pair=-1).plot(robust=True, **plotset)
-        plt.show()
+        plot_timelapse(ds)
 
     # close dask client and cluster
-    print('.. close dask')
+    print('.. close Dask')
     client.close()
     if cluster is not None:
         cluster.close()

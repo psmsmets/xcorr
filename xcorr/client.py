@@ -925,14 +925,13 @@ class Client(object):
                     **kwargs
                 )
 
-
             # Get vertical component 'Z'
             st = _get_waveforms('Z')
 
             # Get horizontal components 'NE' or '12'
             for h in ('12', 'NE'):
                 for c in h:
-                    tr = _get_waveforms(c) 
+                    tr = _get_waveforms(c)
                     if tr:
                         st += tr
                     else:

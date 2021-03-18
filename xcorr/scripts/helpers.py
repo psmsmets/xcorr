@@ -12,6 +12,7 @@ from pandas import to_datetime
 from argparse import ArgumentParser
 import distributed
 import warnings
+import logging
 import json
 import os
 
@@ -19,30 +20,45 @@ import os
 from ..version import version
 
 
-__all__ = ['init_dask', 'ncfile', 'add_common_arguments', 'add_attrs_group',
-           'parse_attrs_group']
+__all__ = ['init_dask', 'ncfile', 'add_common_arguments',
+           'add_attrs_group', 'parse_attrs_group']
 _global_attrs = ('title', 'institution', 'author', 'source',
                  'references', 'comment')
 
 
-def init_dask(n_workers: int = None, scheduler_file: str = None):
+def init_logging(debug=False):
+    """Init the logging format
+    """
+    logging.basicConfig(
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        level=(logging.DEBUG if debug else logging.INFO),
+    )
+
+
+def init_dask(n_workers=None, scheduler_file=None):
     """
     """
-    if scheduler_file is not None:
-        print('.. dask scheduler:', scheduler_file)
+    # separate scheduler and worker
+    if scheduler_file:
         cluster = None
         client = distributed.Client(scheduler_file=scheduler_file)
-        if n_workers:
-            print(f'.. waiting for {n_workers} workers', end=' ')
-            client.wait_for_workers(n_workers=n_workers)
-            print('OK.')
-        print('{:>20} : {}'.format('scheduler', client.scheduler.addr))
+    # local cluster
     else:
         cluster = distributed.LocalCluster(
-            processes=False, threads_per_worker=1, n_workers=n_workers,
+            processes=False,
+            threads_per_worker=1,
+            n_workers=n_workers,
         )
         client = distributed.Client(cluster)
-        print('.. dask client:', repr(client))
+
+    # feedback
+    print(f".. Dask {client}")
+
+    if n_workers and scheduler_file:
+        print(f".. Waiting for {n_workers} workers.", end=' ')
+        client.wait_for_workers(n_workers=n_workers)
+        print('OK.')
+
     return cluster, client
 
 

@@ -410,8 +410,11 @@ def read(
     if extract:
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
 
-    # time offsets to seconds
-    xcorr.util.time.dataset_timedelta64_to_seconds(dataset)
+    # timedelta64 to float seconds
+    for var in dataset.variables:
+        if dataset[var].dtype == np.dtype('timedelta64[ns]'):
+            dataset[var] = dataset[var] / pd.to_timedelta('1s')
+            dataset[var].attrs['units'] = 's'
 
     return dataset
 
@@ -584,7 +587,7 @@ def validate(
     if 'sha256_hash' not in dataset.attrs:
         fast = True
 
-    # fix single-element float/integers represented as np.arrays (h5netcdf)
+    # dataset fixes single-elements represented as np.arrays (h5netcdf)
     for var in dataset.variables:
         for attr in dataset[var].attrs.keys():
             if (
@@ -613,9 +616,6 @@ def validate(
                           UserWarning)
         dataset.close()
         return None
-
-    # pair as utf-8
-    dataset.assign_coords({'pair': dataset.pair.astype('>U')})
 
     # convert preprocess operations
     preprocess_operations_to_dict(dataset.pair)
@@ -689,8 +689,19 @@ def validate(
             dataset.close()
             return None
 
-    # timedelta64 to seconds
-    dataset = util.time.dataset_timedelta64_to_seconds(dataset)
+    # pair as utf-8
+    try:
+        dataset = dataset.assign_coords({
+            'pair': dataset.pair.str.decode('utf-8')
+        })
+    except AttributeError:
+        pass
+
+    # timedelta64 to float seconds
+    for var in dataset.variables:
+        if dataset[var].dtype == np.dtype('timedelta64[ns]'):
+            dataset[var] = dataset[var] / pd.to_timedelta('1s')
+            dataset[var].attrs['units'] = 's'
 
     return dataset
 
