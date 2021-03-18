@@ -447,9 +447,6 @@ def plot_timelapse(ds):
 def main():
     """Main script function.
     """
-    # head
-    print(f"xcorr-timelapse v{xcorr.__version__}")
-
     # arguments
     parser = argparse.ArgumentParser(
         prog='xcorr-timelapse',
@@ -511,6 +508,9 @@ def main():
 
     # parse arguments
     args = parser.parse_args()
+
+    # head
+    print(f"xcorr-timelapse v{xcorr.__version__}")
 
     # init dask cluster and client
     cluster, client = init_dask(n_workers=args.nworkers,
