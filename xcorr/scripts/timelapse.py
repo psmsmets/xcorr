@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
+import dask
 import distributed
 import os
 import sys
@@ -528,14 +529,15 @@ def main():
                                 scheduler_file=args.scheduler)
 
     # open and merge paths
-    ds = xr.open_mfdataset(
-        paths=args.paths,
-        combine='by_coords',
-        data_vars='minimal',
-        join='outer',
-    )
-    ds.load()
-    ds.close()
+    with dask.config.set(**{'array.slicing.split_large_chunks': True}):
+        ds = xr.open_mfdataset(
+            paths=args.paths,
+            combine='by_coords',
+            data_vars='minimal',
+            join='outer',
+        )
+        ds.load()
+        ds.close()
 
     if args.debug:
         print('.. merged paths:', ds)
