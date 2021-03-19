@@ -414,23 +414,40 @@ def spectrogram_timelapse_on_client(
     return ds
 
 
-def plot_timelapse(ds):
+def plot_timelapse(ds, data_vars: list = [], **kwargs):
     """Plot timelapse dataset
     """
     print('.. plot timelapse dataset')
-    plotset = dict(
-        row='freq',
-        col='pair',
-        yincrease=False,
-        size=3,
-        aspect=1.12,
-        cbar_kwargs=dict(shrink=1/ds.freq.size),
-    )
-    ds.status.plot(**plotset)
-    ds.cc2.plot(vmin=0, vmax=1, **plotset)
-    ds.delta_lag.plot(robust=True, **plotset)
-    ds.delta_freq.plot(robust=True, **plotset)
+
+    plotset = {
+        'row': 'freq',
+        'col': 'pair',
+        'yincrease': False,
+        'size': 3,
+        'aspect': 1,
+        'cbar_kwargs': dict(shrink=1/ds.freq.size),
+        **kwargs,
+    }
+
+    data_vars = data_vars or ['status', 'cc2', 'delta_freq', 'delta_lag']
+
+    gs = []
+
+    if 'status' in data_vars:
+        gs.append(ds.status.plot(**plotset))
+    if 'cc2' in data_vars:
+        gs.append(ds.cc2.plot(vmin=0, vmax=1, **plotset))
+    if 'delta_lag' in data_vars:
+        gs.append(ds.delta_lag.plot(robust=True, **plotset))
+    if 'delta_freq' in data_vars:
+        gs.append(ds.delta_freq.plot(robust=True, **plotset))
+
+    for g in gs:
+        [axis.set_aspect('equal') for axis in g.axes.ravel()]
+
     plt.show()
+
+    return gs
 
 
 ###############################################################################
