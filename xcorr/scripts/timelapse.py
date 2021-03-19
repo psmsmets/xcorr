@@ -362,7 +362,7 @@ def spectrogram_timelapse_on_client(
     _mask_upper_triangle(ds)
 
     # extract unprocessed
-    print(".. extract unprocessed results")
+    print(".. extract unprocessed")
     new = ds.drop_vars('freq_bw').where((ds.status != 1), drop=True)
     new['freq_bw'] = ds.freq_bw
 
@@ -386,12 +386,13 @@ def spectrogram_timelapse_on_client(
         print('{:>20} : {}'.format('time2', chunk))
 
     # map blocks and persist
-    print('.. map and compute blocks')
-    new = new.map_blocks(
+    print('.. map and persist blocks')
+    mapped = new.map_blocks(
         correlate_spectrograms,
         args=[root],
         template=new,
-    ).persist()
+    )
+    new = client.persist(mapped)
 
     # await async
     print('.. await async')
@@ -407,11 +408,11 @@ def spectrogram_timelapse_on_client(
 
     # plot?
     if debug and plot:
-        print('.. plot new timelapse dataset')
+        print('.. plot processed dataset')
         plot_timelapse(new)
 
     # merge
-    print('.. merge')
+    print('.. merge results')
     ds = new.combine_first(ds)
 
     # fill upper triangle
@@ -647,7 +648,7 @@ def main():
 
         # plot merged dataset
         if args.plot:
-            print('.. plot original timelapse dataset')
+            print('.. plot original dataset')
             plot_timelapse(ds)
 
     # set output file
@@ -681,7 +682,7 @@ def main():
 
     # plot?
     if args.plot:
-        print('.. plot final timelapse dataset')
+        print('.. plot final dataset')
         plot_timelapse(ds)
 
     # close dask client and cluster
