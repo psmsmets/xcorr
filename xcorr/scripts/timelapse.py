@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import distributed
 import os
 import sys
+import gc
 import argparse
 
 # relative imports
@@ -199,6 +200,10 @@ def get_spectrogram(pair, time, root):
     # spectrogram
     psd = xcorr.signal.spectrogram(cc, duration=2.5, padding_factor=4)
 
+    # clean
+    del cc
+    del ds
+
     return psd
 
 
@@ -254,6 +259,11 @@ def correlate_spectrogram(obj, loc, root):
         obj[dim1].loc[locf] = cc2[dim1][amax1]
         obj[dim2].loc[locf] = cc2[dim2][amax2]
 
+    # clean
+    del psd1
+    del psd2
+    del cc2
+
     return
 
 
@@ -261,20 +271,12 @@ def correlate_spectrograms(obj, root):
     """Correlate spectrograms.
     """
 
-    # worker
-    worker = distributed.get_worker()
-
-    # complete obj?
-    if (obj.status == 1).all():
-        worker.log_event("info", {
-            "Correlate spectrograms": "block already completed",
-        })
+    # complete or no need to process obj?
+    if (obj.status == 1).all() or xr.ufuncs.isnan(obj.status).all():
         return obj
 
     # catch memory error
     obj = obj.copy(True)
-
-    worker.log_event("info", {"Correlate spectrograms": "block started"})
 
     # process per item
     for time2 in obj.time2:
@@ -282,18 +284,9 @@ def correlate_spectrograms(obj, root):
             for pair in obj.pair:
                 loc = dict(pair=pair, time1=time1, time2=time2)
                 correlate_spectrogram(obj, loc, root)
-                try:
-                    correlate_spectrogram(obj, loc, root)
-                except Exception as e:
-                    worker.log_event("warn", {
-                        "Correlate spectrograms": "failed",
-                        "error": e,
-                        "loc": loc,
-                    })
-                    # in the case where something goes wrong you want to rejoin
-                    # so that your client knows that this function call failed
-                    # distributed.rejoin()
-    worker.log_event("info", {"Correlate spectrograms": "block completed"})
+
+    # clean
+    gc.collect()
 
     return obj
 
@@ -489,7 +482,8 @@ def main():
         help='Filter pairs that contain the given string'
     )
     parser.add_argument(
-        '-f', '--frequency', metavar='..', type=str, default=None,
+        '-f', '--frequency', metavar='..', type=str,
+        default="(3., 6.), (6., 12.)",
         help=('Set psd frequency bands. Frequency should be a list of '
               'tuple-pairs with start and end frequencies (default: '
               '"(3., 6.), (6., 12.)")')
@@ -535,8 +529,7 @@ def main():
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
         args.end = pd.to_datetime(args.end, format=args.format)
-    if args.init:
-        args.freq = np.array(((3., 6.), (6., 12.)) or args.freq)
+    args.frequency = np.array(eval(args.frequency))
     args.attrs = parse_attrs_group(args)
 
     # print core parameters
@@ -548,7 +541,8 @@ def main():
     print('{:>20} : {}'.format('end', args.end))
     if args.init:
         print('{:>20} : {}'.format(
-            'frequency', (', '.join([f'{f[0]}-{f[1]}' for f in args.freq]))
+            'frequency',
+            ', '.join([f'{f[0]}-{f[1]}' for f in args.frequency]),
         ))
 
     # init timelapse dataset
@@ -598,7 +592,7 @@ def main():
         ds = init_spectrogram_timelapse(
             pair=snr.pair,
             time=ct.time.where(ct >= 0, drop=True),
-            freq=args.freq,
+            freq=args.frequency,
             **args.attrs,
         )
 
