@@ -35,9 +35,24 @@ def init_logging(debug=False):
     )
 
 
-def init_dask(n_workers=None, scheduler_file=None):
+def logging_arg_info(*args):
+    """Log argument fo
+    """
+    logging.info('{:.>15} = {}'.format(*args))
+
+
+def logging_arg_debug(*args):
     """
     """
+    logging.debug('{:.>15} = {}'.format(*args))
+
+
+def init_dask(n_workers=None, scheduler_file=None, logger=None):
+    """
+    """
+    def log(item):
+        (logging.info(item) if logger else print('..' + item))
+
     # separate scheduler and worker
     if scheduler_file:
         cluster = None
@@ -52,12 +67,13 @@ def init_dask(n_workers=None, scheduler_file=None):
         client = distributed.Client(cluster)
 
     # feedback
-    print(f".. Dask {client}")
+    c = repr(client)[9:-1].replace('\'', '').replace(',', '')
+    log(f"Dask - {c}")
 
     if n_workers and scheduler_file:
-        print(f".. Waiting for {n_workers} workers.", end=' ')
+        log(f"Waiting for {n_workers} workers")
         client.wait_for_workers(n_workers=n_workers)
-        print('OK.')
+        log("Workers have arrived")
 
     return cluster, client
 

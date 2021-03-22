@@ -20,8 +20,10 @@ import argparse
 
 # relative imports
 import xcorr
-from .helpers import (init_dask, ncfile, add_common_arguments,
-                      add_attrs_group, parse_attrs_group)
+from ..scripts import helpers
+from ..scripts.helpers import logging as log
+from ..scripts.helpers import logging_arg_info as arg_info
+from ..scripts.helpers import logging_arg_debug as arg_debug
 
 __all__ = []
 
@@ -384,38 +386,36 @@ def spectrogram_timelapse_on_client(
     """
 
     # ignore upper triangle
-    print('.. mask upper triangle')
+    log.info(".. mask upper triangle")
     mask_upper_triangle(ds)
 
     # set all False to 1 (status completed)
 
     # extract unprocessed
-    print(".. extract unprocessed")
+    log.info(".. extract status != 1")
     new = ds.drop_vars('freq_bw').where((ds.status != 1), drop=True)
     new['freq_bw'] = ds.freq_bw
 
     # plot?
     if debug and plot:
-        print('.. plot extracted timelapse dataset')
+        log.debug(".. plot extracted timelapse dataset")
         plot_timelapse(new)
 
     # create locks cc ncfiles locks
-    print(".. create locks cc ncfiles")
+    log.info(".. create locks cc files")
     ncfiles = _all_ncfiles(new.pair, new.time1, root)
     locks = [distributed.Lock(nc) for nc in ncfiles]
-    if debug:
-        print('{:>20} : {}'.format('locks', len(locks)))
+    arg_debug('locks', len(locks))
 
     # chunk
-    print(".. chunk")
+    log.info(".. chunk")
     new = new.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
-    if debug:
-        print('{:>20} : {}'.format('pair', 1))
-        print('{:>20} : {}'.format('time1', chunk))
-        print('{:>20} : {}'.format('time2', chunk))
+    arg_debug('pair', 1)
+    arg_debug('time1', chunk)
+    arg_debug('time2', chunk)
 
     # map blocks and persist
-    print('.. map and persist blocks')
+    log.info(".. map and persist blocks")
     mapped = new.map_blocks(
         correlate_spectrograms,
         args=[root],
@@ -424,11 +424,11 @@ def spectrogram_timelapse_on_client(
     new = client.persist(mapped)
 
     # await async
-    print('.. await async')
+    log.info(".. await async")
     distributed.wait(new)
 
     # gather blocks
-    print('.. gather blocks')
+    log.info(".. gather blocks")
     new = client.gather(new)
 
     # load results from Dask-array
@@ -437,19 +437,19 @@ def spectrogram_timelapse_on_client(
 
     # plot?
     if debug and plot:
-        print('.. plot processed dataset')
+        log.info(".. plot processed dataset")
         plot_timelapse(new)
 
     # merge
-    print('.. merge results')
+    log.info(".. merge results")
     ds = new.combine_first(ds)
 
     # fill upper triangle
-    print('.. fill mirrored upper triangle')
+    log.info(".. fill mirrored upper triangle")
     fill_upper_triangle(ds)
 
     # load results from Dask-arrays
-    print('.. load results')
+    log.info(".. load results")
     ds.load()
 
     return ds
@@ -519,18 +519,22 @@ def main():
         '-c', '--chunk', metavar='..', type=int, default=10,
         help=('Set dask chunks for time dimension (default: 10)')
     )
-    add_common_arguments(parser)
-    add_attrs_group(parser)
+    helpers.add_common_arguments(parser)
+    helpers.add_attrs_group(parser)
 
     # parse arguments
     args = parser.parse_args()
 
-    # head
-    print(f"xcorr-timelapse v{xcorr.__version__}")
+    # init logging
+    helpers.init_logging(args.debug)
+
+    # header
+    log.info(f"xcorr-timelapse v{xcorr.__version__}")
 
     # init dask cluster and client
-    cluster, client = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
+    cluster, client = helpers.init_dask(
+         n_workers=args.nworkers, scheduler_file=args.scheduler, logger=True
+    )
 
     # open and merge paths
     with dask.config.set(**{'array.slicing.split_large_chunks': True}):
@@ -542,36 +546,34 @@ def main():
         )
         ds.load()
         ds.close()
-
-    if args.debug:
-        print('.. merged paths:', ds)
+    log.debug(ds)
 
     # update arguments
-    args.root = os.path.abspath(args.root)
     if args.start:
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
         args.end = pd.to_datetime(args.end, format=args.format)
-    args.frequency = np.array(eval(args.frequency))
-    args.attrs = parse_attrs_group(args)
+    if args.init:
+        args.frequency = np.array(eval(args.frequency))
+    else:
+        args.frequency = np.array([ds.freq.values - ds.freq_bw.values/2,
+                                   ds.freq.values + ds.freq_bw.values/2])
+    args.attrs = helpers.parse_attrs_group(args)
 
     # print core parameters
-    print('{:>20} : {}'.format('action', 'update' if args.update else 'init'))
-    print('{:>20} : {}'.format('root', args.root))
-    print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
-                                       else args.pair))
-    print('{:>20} : {}'.format('start', args.start))
-    print('{:>20} : {}'.format('end', args.end))
-    if args.init:
-        print('{:>20} : {}'.format(
-            'frequency',
-            ', '.join([f'{f[0]}-{f[1]}' for f in args.frequency]),
-        ))
+    log.info("Parameters:")
+    arg_info('action', 'update' if args.update else 'init')
+    arg_info('root', args.root)
+    arg_info('pair', 'all' if args.pair in ('*', '') else args.pair)
+    arg_info('start', args.start)
+    arg_info('end', args.end)
+    arg_info('frequency', ', '.join([f'{f[0]}-{f[1]}'
+                                     for f in args.frequency]))
 
     # init timelapse dataset
     if args.init:
         # load snr and ct to init
-        print(".. filter snr and ct")
+        log.info("Filter snr and ct")
         args.start = args.start or pd.to_datetime(ds.time[0])
         args.end = args.end or (pd.to_datetime(ds.time[-1])+pd.Timedelta('1s'))
 
@@ -584,8 +586,7 @@ def main():
             ),
             drop=True,
         )
-        if args.debug:
-            print(".. extract signal-to-noise ratio", snr)
+        log.debug(snr)
 
         # extract coincidence triggers
         ct = ds.ct.where(
@@ -595,12 +596,11 @@ def main():
             ),
             drop=True,
         )
-        if args.debug:
-            print(".. extract coincidence triggers", ct)
+        log.debug(ct)
 
         # plot extracted snr and coincidence triggers
         if args.plot:
-            print(".. plot snr and coincidence triggers")
+            log.info("Plot snr and coincidence triggers")
             snr.plot.line(x='time', hue='pair', aspect=2.5, size=3.5,
                           add_legend=False)
             xcorr.signal.trigger.plot_trigs(snr, ct)
@@ -611,7 +611,7 @@ def main():
         args.end = pd.to_datetime(ct.time[-1].item())
 
         # init time lapse dataset
-        print(".. init time lapse dataset")
+        log.info("Init time lapse dataset")
         ds = init_spectrogram_timelapse(
             pair=snr.pair,
             time=ct.time.where(ct >= 0, drop=True),
@@ -620,8 +620,13 @@ def main():
         )
 
     else:
+        # plot merged dataset
+        if args.plot:
+            log.info('Plot original dataset')
+            plot_timelapse(ds)
+
         # update timelapse dataset
-        print(".. update merged dataset")
+        log.info("Update merged dataset")
 
         # set start and end times
         args.start = args.start or pd.to_datetime(ds.time1[0].item())
@@ -645,51 +650,48 @@ def main():
         # empty status to zero
         ds['status'] = ds['status'].fillna(0).astype(np.byte)
 
-        # plot merged dataset
-        if args.plot:
-            print('.. plot original dataset')
-            plot_timelapse(ds)
-
     # set output file
-    args.out = ncfile('timelapse', args.pair, args.start, args.end,
-                      args.prefix, args.suffix)
+    args.out = helpers.ncfile('timelapse', args.pair, args.start, args.end,
+                              args.prefix, args.suffix)
 
-    # logs
-    print('{:>20} : {}'.format('pair', ds.pair.size))
-    print('{:>20} : {}'.format('time', ds.time1.size))
-    print('{:>20} : {}'.format('freq', ds.freq.size))
-    print('{:>20} : {}'.format('outfile', args.out))
-    print('{:>20} : {}'.format('overwrite', args.overwrite))
-    if args.debug:
-        print(".. time lapse dataset", ds)
+    # log
+    log.info("Time lapse dimensions:")
+    arg_info('pair', ds.pair.size)
+    arg_info('time', ds.time1.size)
+    arg_info('freq', ds.freq.size)
+    log.info("Prepare output:")
+    arg_info('outfile', args.out)
+    arg_info('overwrite', args.overwrite)
+    log.debug(ds)
 
     # check if output file exists
     if os.path.exists(args.out) and not args.overwrite:
-        raise FileExistsError(
-            f'Output file "{args.out}" already exists and overwrite is False.'
-        )
+        log.critical("Output file already exists and overwrite is False.")
+        raise SystemExit()
 
     # process on client
+    log.info("Start spectrogram time lapse")
     ds = spectrogram_timelapse_on_client(ds, client, args.root,
                                          args.chunk, args.debug, args.plot)
+    log.info("Spectrogram time lapse completed")
 
     # to netcdf
-    print(f'.. write to "{args.out}"')
+    log.info(f"Write to '{args.out}'")
     xcorr.write(ds, args.out, variable_encoding=dict(zlib=True, complevel=9),
                 verb=1 if args.debug else 0)
 
     # plot?
     if args.plot:
-        print('.. plot final dataset')
+        log.info("Plot final dataset")
         plot_timelapse(ds)
 
     # close dask client and cluster
-    print('.. close Dask')
+    log.info("Close Dask")
     client.close()
     if cluster is not None:
         cluster.close()
 
-    print('.. done')
+    log.info("Done")
     sys.exit(0)
 
 
