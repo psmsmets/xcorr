@@ -20,7 +20,7 @@ import os
 from ..version import version
 
 
-__all__ = ['init_dask', 'ncfile', 'add_common_arguments',
+__all__ = ['init_logging', 'init_dask', 'ncfile', 'add_common_arguments',
            'add_attrs_group', 'parse_attrs_group']
 _global_attrs = ('title', 'institution', 'author', 'source',
                  'references', 'comment')
