@@ -292,31 +292,6 @@ def correlate_spectrograms(obj, root):
     return obj
 
 
-def _mask_upper_triangle(ds):
-    """Mask upper triangle (one offset)
-    """
-    ind1, ind2 = np.triu_indices(ds.time1.size, 1)
-    for i in range(len(ind1)):
-        ds.status.loc[{
-            'time1': ds.time1[ind1[i]],
-            'time2': ds.time2[ind2[i]],
-        }] = np.byte(1)
-
-
-def _fill_upper_triangle(ds):
-    """Fill upper triangle (one offset)
-    """
-    ind1, ind2 = np.triu_indices(ds.time1.size, 1)
-    for i in range(len(ind1)):
-        t1, t2 = ds.time1[ind1[i]], ds.time2[ind2[i]]
-        triu = {'time1': t1, 'time2': t2}
-        tril = {'time1': t2, 'time2': t1}
-        ds.status.loc[triu] = ds.status.loc[tril]
-        ds.cc2.loc[triu] = ds.cc2.loc[tril]
-        ds.delta_freq.loc[triu] = -ds.delta_freq.loc[tril]
-        ds.delta_lag.loc[triu] = -ds.delta_lag.loc[tril]
-
-
 def _all_ncfiles(pair, time, root):
     """Construct list of unique list of ncfiles
     """
@@ -327,99 +302,6 @@ def _all_ncfiles(pair, time, root):
             if nc not in ncfiles:
                 ncfiles.append(nc)
     return ncfiles
-
-
-def spectrogram_timelapse_on_client(
-    ds: xr.Dataset, client: distributed.Client, root: str,
-    chunk: int = 10, debug: bool = False, plot: bool = False,
-):
-    """2-d correlate spectrograms on a Dask client
-
-    Parameters:
-    -----------
-
-    ds: :class:`xr.Dataset`
-        Timelapse dataset.
-
-    client: :class:`distributed.Client`
-        Dask distributed client object.
-
-    root: `str`
-        Cross-correlation root directory
-
-    chunk: `int`, optional
-        Dask map blocks chunk size for time1 and time2 (default: 10).
-
-    debug: `bool`, optional
-        Verbose more (defaults to `False`).
-
-    plot: `bool`, optional
-        Plot results (defaults to `False`).
-    """
-
-    # ignore upper triangle
-    print('.. mask upper triangle')
-    _mask_upper_triangle(ds)
-
-    # extract unprocessed
-    print(".. extract unprocessed")
-    new = ds.drop_vars('freq_bw').where((ds.status != 1), drop=True)
-    new['freq_bw'] = ds.freq_bw
-
-    # plot?
-    if debug and plot:
-        print('.. plot extracted timelapse dataset')
-        plot_timelapse(new)
-
-    # create locks cc ncfiles locks
-    print(".. create locks cc ncfiles")
-    ncfiles = _all_ncfiles(new.pair, new.time1, root)
-    locks = [distributed.Lock(nc) for nc in ncfiles]
-    print('{:>20} : {}'.format('locks', len(locks)))
-
-    # chunk
-    print(".. chunk")
-    new = new.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
-    if debug:
-        print('{:>20} : {}'.format('pair', 1))
-        print('{:>20} : {}'.format('time1', chunk))
-        print('{:>20} : {}'.format('time2', chunk))
-
-    # map blocks and persist
-    print('.. map and persist blocks')
-    mapped = new.map_blocks(
-        correlate_spectrograms,
-        args=[root],
-        template=new,
-    )
-    new = client.persist(mapped)
-
-    # await async
-    print('.. await async')
-    distributed.wait(new)
-
-    # gather blocks
-    print('.. gather blocks')
-    new = client.gather(new)
-
-    # load results from Dask-array
-    print('.. load results')
-    new.load()
-
-    # plot?
-    if debug and plot:
-        print('.. plot processed dataset')
-        plot_timelapse(new)
-
-    # merge
-    print('.. merge results')
-    ds = new.combine_first(ds)
-
-    # fill upper triangle
-    print('.. fill upper triangle')
-    _fill_upper_triangle(ds)
-
-    return ds
 
 
 def plot_timelapse(ds, data_vars: list = [], **kwargs):
@@ -454,6 +336,123 @@ def plot_timelapse(ds, data_vars: list = [], **kwargs):
     plt.show()
 
     return gs
+
+
+def mask_upper_triangle(ds):
+    """In-place mask the upper diagonal status (one off-diagonal).
+    """
+    mask = xcorr.signal.tri_mask(ds.time1, ds.time2, 1)
+    ds['status'] = ds.status.where(mask, np.byte(1))
+
+
+def fill_upper_triangle(ds):
+    """In-place fill the upper diagonal (one off-diagonal).
+    """
+    mask = xcorr.signal.tri_mask(ds.time1, ds.time2, 1)
+    ds['status'] = xcorr.signal.tri_mirror(ds.status, mask, False)
+    ds['cc2'] = xcorr.signal.tri_mirror(ds.cc2, mask, False)
+    ds['delta_freq'] = xcorr.signal.tri_mirror(ds.delta_freq, mask, True)
+    ds['delta_lag'] = xcorr.signal.tri_mirror(ds.delta_lag, mask, True)
+
+
+def spectrogram_timelapse_on_client(
+    ds: xr.Dataset, client: distributed.Client, root: str,
+    chunk: int = 10, debug: bool = False, plot: bool = False,
+):
+    """2-d correlate spectrograms on a Dask client
+
+    Parameters:
+    -----------
+
+    ds: :class:`xr.Dataset`
+        Timelapse dataset.
+
+    client: :class:`distributed.Client`
+        Dask distributed client object.
+
+    root: `str`
+        Cross-correlation root directory
+
+    chunk: `int`, optional
+        Dask map blocks chunk size for time1 and time2 (default: 10).
+
+    debug: `bool`, optional
+        Verbose more (defaults to `False`).
+
+    plot: `bool`, optional
+        Plot results (defaults to `False`).
+    """
+
+    # ignore upper triangle
+    print('.. mask upper triangle')
+    mask_upper_triangle(ds)
+
+    # set all False to 1 (status completed)
+
+    # extract unprocessed
+    print(".. extract unprocessed")
+    new = ds.drop_vars('freq_bw').where((ds.status != 1), drop=True)
+    new['freq_bw'] = ds.freq_bw
+
+    # plot?
+    if debug and plot:
+        print('.. plot extracted timelapse dataset')
+        plot_timelapse(new)
+
+    # create locks cc ncfiles locks
+    print(".. create locks cc ncfiles")
+    ncfiles = _all_ncfiles(new.pair, new.time1, root)
+    locks = [distributed.Lock(nc) for nc in ncfiles]
+    if debug:
+        print('{:>20} : {}'.format('locks', len(locks)))
+
+    # chunk
+    print(".. chunk")
+    new = new.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
+    if debug:
+        print('{:>20} : {}'.format('pair', 1))
+        print('{:>20} : {}'.format('time1', chunk))
+        print('{:>20} : {}'.format('time2', chunk))
+
+    # map blocks and persist
+    print('.. map and persist blocks')
+    mapped = new.map_blocks(
+        correlate_spectrograms,
+        args=[root],
+        template=new,
+    )
+    new = client.persist(mapped)
+
+    # await async
+    print('.. await async')
+    distributed.wait(new)
+
+    # gather blocks
+    print('.. gather blocks')
+    new = client.gather(new)
+
+    # load results from Dask-array
+    # print('.. load results')
+    # new.load()
+
+    # plot?
+    if debug and plot:
+        print('.. plot processed dataset')
+        plot_timelapse(new)
+
+    # merge
+    print('.. merge results')
+    ds = new.combine_first(ds)
+
+    # fill upper triangle
+    print('.. fill mirrored upper triangle')
+    fill_upper_triangle(ds)
+
+    # load results from Dask-arrays
+    print('.. load results')
+    ds.load()
+
+    return ds
 
 
 ###############################################################################
@@ -622,7 +621,7 @@ def main():
 
     else:
         # update timelapse dataset
-        print(".. update time lapse dataset")
+        print(".. update merged dataset")
 
         # set start and end times
         args.start = args.start or pd.to_datetime(ds.time1[0].item())
@@ -671,7 +670,6 @@ def main():
         )
 
     # process on client
-    print('{:>20} : {}'.format('pair', ds.pair.size))
     ds = spectrogram_timelapse_on_client(ds, client, args.root,
                                          args.chunk, args.debug, args.plot)
 

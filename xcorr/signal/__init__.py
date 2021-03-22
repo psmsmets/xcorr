@@ -19,6 +19,7 @@ from ..signal.snr import snr
 from ..signal.spectrogram import spectrogram
 from ..signal.taper import taper
 from ..signal.timeshift import timeshift
+from ..signal.tri import tri_mask, tri_mirror
 from ..signal.trigger import coincidence_trigger
 from ..signal.unbias import unbias
 from ..signal.window import window
