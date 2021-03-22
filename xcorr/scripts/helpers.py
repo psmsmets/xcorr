@@ -72,9 +72,9 @@ def ncfile(title, pair, start, end, prefix=None, suffix=None):
     else:
         pair = pair.translate({ord(c): None for c in '*?'})
     nc = "{}{}_{}_{}_{}{}.nc".format(
-        f"{prefix}_" if prefix else '',
+        f"{prefix}" if prefix else '',
         title, pair, start.strftime('%Y%j'), end.strftime('%Y%j'),
-        f"_{suffix}" if suffix else '',
+        f"{suffix}" if suffix else '',
     )
     return nc
 
