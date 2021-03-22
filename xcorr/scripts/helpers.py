@@ -38,13 +38,13 @@ def init_logging(debug=False):
 def logging_arg_info(*args):
     """Log argument fo
     """
-    logging.info('{:.>15} = {}'.format(*args))
+    logging.info('{:>15} = {}'.format(*args))
 
 
 def logging_arg_debug(*args):
     """
     """
-    logging.debug('{:.>15} = {}'.format(*args))
+    logging.debug('{:>15} = {}'.format(*args))
 
 
 def init_dask(n_workers=None, scheduler_file=None, logger=None):

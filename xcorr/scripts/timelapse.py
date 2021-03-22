@@ -386,36 +386,36 @@ def spectrogram_timelapse_on_client(
     """
 
     # ignore upper triangle
-    log.info(".. mask upper triangle")
+    log.info("├── mask upper triangle")
     mask_upper_triangle(ds)
 
     # set all False to 1 (status completed)
 
     # extract unprocessed
-    log.info(".. extract status != 1")
+    log.info("├── extract status != 1")
     new = ds.drop_vars('freq_bw').where((ds.status != 1), drop=True)
     new['freq_bw'] = ds.freq_bw
 
     # plot?
     if debug and plot:
-        log.debug(".. plot extracted timelapse dataset")
+        log.debug("├── plot extracted timelapse dataset")
         plot_timelapse(new)
 
     # create locks cc ncfiles locks
-    log.info(".. create locks cc files")
+    log.info("├── create locks cc files")
     ncfiles = _all_ncfiles(new.pair, new.time1, root)
     locks = [distributed.Lock(nc) for nc in ncfiles]
     arg_debug('locks', len(locks))
 
     # chunk
-    log.info(".. chunk")
+    log.info("├── chunk")
     new = new.chunk({'pair': 1, 'time1': chunk, 'time2': chunk})
     arg_debug('pair', 1)
     arg_debug('time1', chunk)
     arg_debug('time2', chunk)
 
     # map blocks and persist
-    log.info(".. map and persist blocks")
+    log.info("├── map and persist blocks")
     mapped = new.map_blocks(
         correlate_spectrograms,
         args=[root],
@@ -424,11 +424,11 @@ def spectrogram_timelapse_on_client(
     new = client.persist(mapped)
 
     # await async
-    log.info(".. await async")
+    log.info("├── await async")
     distributed.wait(new)
 
     # gather blocks
-    log.info(".. gather blocks")
+    log.info("├── gather blocks")
     new = client.gather(new)
 
     # load results from Dask-array
@@ -437,19 +437,19 @@ def spectrogram_timelapse_on_client(
 
     # plot?
     if debug and plot:
-        log.info(".. plot processed dataset")
+        log.info("├── plot processed dataset")
         plot_timelapse(new)
 
     # merge
-    log.info(".. merge results")
+    log.info("├── merge results")
     ds = new.combine_first(ds)
 
     # fill upper triangle
-    log.info(".. fill mirrored upper triangle")
+    log.info("├── fill mirrored upper triangle")
     fill_upper_triangle(ds)
 
     # load results from Dask-arrays
-    log.info(".. load results")
+    log.info("└── load results")
     ds.load()
 
     return ds
@@ -670,7 +670,7 @@ def main():
         raise SystemExit()
 
     # process on client
-    log.info("Start spectrogram time lapse")
+    log.info("Start spectrogram ti:")
     ds = spectrogram_timelapse_on_client(ds, client, args.root,
                                          args.chunk, args.debug, args.plot)
     log.info("Spectrogram time lapse completed")
