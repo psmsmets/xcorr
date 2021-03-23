@@ -670,7 +670,7 @@ def main():
         raise SystemExit()
 
     # process on client
-    log.info("Start spectrogram ti:")
+    log.info("Start spectrogram time lapse:")
     ds = spectrogram_timelapse_on_client(ds, client, args.root,
                                          args.chunk, args.debug, args.plot)
     log.info("Spectrogram time lapse completed")
@@ -686,7 +686,7 @@ def main():
         plot_timelapse(ds)
 
     # close dask client and cluster
-    log.info("Close Dask")
+    log.info("Close Dask client")
     client.close()
     if cluster is not None:
         cluster.close()

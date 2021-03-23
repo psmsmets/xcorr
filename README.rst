@@ -89,11 +89,11 @@ Entry points
 Core scripts to (re)produce the manuscript results are implemented as entry points
 and can be accessed from the command line:
 
-- ``xcorr-snr``: Signal-to-noise ratio estimation of cross-crorrelationss.
 - ``xcorr-ct``: Coincidence triggers of cross-crorrelations signal-to-noise ratios.
-- ``xcorr-psd``: Spectrogram estimation of signal-to-noise ratio triggered periods.
-- ``xcorr-timelapse`` Two-dimensional cross-correlation of cross-correlation spectrograms.
 - ``xcorr-beamform`` Plane wave beamforming of cross-correlation functions.
+- ``xcorr-psd``: Spectrogram estimation of signal-to-noise ratio triggered periods.
+- ``xcorr-snr``: Signal-to-noise ratio estimation of cross-crorrelationss.
+- ``xcorr-timelapse`` Two-dimensional cross-correlation of cross-correlation spectrograms.
 
 
 Installation
@@ -116,10 +116,11 @@ Install xcorr via ``pip``:
    pip install -e .
 
 
-Required are Python version 3.6 or higher and the modules `NumPy`, `SciPy`,
+Required are Python version 3.7 or higher and the modules `NumPy`, `SciPy`,
 `ObsPy`, `Pandas`, and `Xarray`.
+`Dask` is required to run the scripts but needed for the base functionality.
 
-Create a Python 3.8 environment in conda as follows:
+Create a conda environment named ``xcorr`` with Python 3.8 and all required packages:
 
 .. code-block:: console
 
@@ -130,11 +131,11 @@ Acknowledgements
 ================
 
 If you publish results for which you used xcorr, please give credit by citing
-`Smets et al. (2020)  <#>`_:
+`Smets et al. (2021)  <#>`_:
 
-    Smets, P. S. M., ... (2020),
-    Long-range hydroacoustic observations of the Monowai Volcanic Centre:
-    a proxy for variations in deep-ocean temperature,
+    Smets, Weemstra and Evers (2021),
+    Stationary phase travel time variations as a proxy for passive deep-ocean
+    thermometry – a cookbook,
     Journal (number), pages, DOI: `doi <#>`_.
 
 All stable releases have a Zenodo-DOI, which can be found on `Zenodo-DOI <#>`_.
@@ -149,7 +150,7 @@ Only accepts pull requests that fixes bugs / fixes typos / improves existing con
 License
 =======
 
-Copyright 2020 Pieter Smets.
+Copyright 2021 Pieter Smets.
 
 Licensed under the GNU GPLv3 License. See the ``LICENSE``- and ``NOTICE``-files
 or the documentation for more information.

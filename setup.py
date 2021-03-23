@@ -13,7 +13,7 @@ NAME = 'xcorr'
 
 setup(
     name=NAME,
-    python_requires='>3.5.0',
+    python_requires='>3.6.0',
     description=DESCRIPTION,
     long_description=README,
     author='Pieter Smets',
