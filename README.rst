@@ -46,7 +46,7 @@ Main `xcorr` features listed per submodule:
 
 - **signal**: Postprocess cross-correlation estimates, or any `xarray.DataArray`
   with a (lag) time dimension. Each signal routine is **Dask** capable for
-  large datasets.
+  large datasets. Functions are available as `.signal` accessor.
 
   - ``beamform``: Least-squares plane wave beamforming.
   - ``correlate``: frequency domain correlation estimator with zero-padding 1d or 2d data.
