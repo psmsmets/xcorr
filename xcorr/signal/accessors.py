@@ -28,7 +28,7 @@ from ..signal.snr import snr
 from ..signal.spectrogram import spectrogram
 from ..signal.taper import taper
 from ..signal.timeshift import timeshift
-from ..signal.tri import tri_mask, tri_mirror
+from ..signal.tri import tri_mirror
 from ..signal.trigger import coincidence_trigger
 from ..signal.unbias import unbias
 from ..signal.window import window
@@ -241,15 +241,6 @@ class SignalAccessor():
         Do not edit here.
         """
         return timeshift(self._da, *args, **kwargs)
-
-    @wraps(tri_mask)
-    def tri_mask(self, *args, **kwargs):
-        """
-        The docstring and signature are taken from
-        :func:`~xcorr.signal.tri_mask`.
-        Do not edit here.
-        """
-        return tri_mask(self._da, *args, **kwargs)
 
     @wraps(tri_mirror)
     def tri_mirror(self, *args, **kwargs):
