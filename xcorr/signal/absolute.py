@@ -15,6 +15,7 @@ try:
     import dask
 except ModuleNotFoundError:
     dask = False
+from functools import wraps
 
 
 # Relative imports
@@ -78,27 +79,11 @@ def absolute(
 
     return y
 
-
+@wraps(absolute)
 def abs(x: xr.DataArray, **kwargs):
-    r"""Calculate the absolute value element-wise.
-
-    ``abs`` is a shorthand for this function.
-
-    Parameters
-    ----------
-    x : :class:`xarray.DataArray`
-        The array of data to calculate the absolute value.
-
-    **kwargs :
-        Any additional keyword arguments will be passed to
-        :func:`np.absolute`.
-
-    Returns
-    -------
-    y : :class:`xarray.DataArray`
-        An ndarray containing the absolute value of
-        each element in `x`.  For complex input, ``a + ib``, the
-        absolute value is :math:`\sqrt{ a^2 + b^2 }`.
-        This is a scalar if `x` is a scalar.
+    """
+    The docstring and signature are taken from
+    :func:`~xcorr.signal.absolute`. Do not edit
+    here.
     """
     return absolute(x, **kwargs)
