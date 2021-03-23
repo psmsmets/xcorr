@@ -8,7 +8,7 @@ from ..signal.absolute import abs, absolute
 from ..signal.beamform import plane_wave
 from ..signal.correlate import correlate1d, correlate2d
 from ..signal.detrend import detrend, demean
-from ..signal.fft import *
+from ..signal.fft import fft, ifft, rfft, irfft
 from ..signal.filter import filter
 from ..signal.hilbert import hilbert
 from ..signal.lombscargle import lombscargle
@@ -23,6 +23,9 @@ from ..signal.tri import tri_mask, tri_mirror
 from ..signal.trigger import coincidence_trigger
 from ..signal.unbias import unbias
 from ..signal.window import window
+
+# Import accessor classes
+from ..signal.accessors import SignalAccessor
 
 
 __all__ = []
