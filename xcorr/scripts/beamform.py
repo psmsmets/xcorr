@@ -60,12 +60,14 @@ def process(ds):
         if xr.ufuncs.isnan(cc).any():
             return
         delay = -(ds.pair_offset + ds.time_offset)
-        cc = xcorr.signal.unbias(cc)
-        cc = xcorr.signal.demean(cc)
-        cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrapping
-        cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
-        cc = xcorr.signal.filter(cc, frequency=3., btype='highpass', order=2)
-        cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
+        cc = (cc
+              .signal.unbias()
+              .signal.demean()
+              .signal.taper(max_length=5.)  # timeshift phase-wrapping
+              .signal.timeshift(delay=delay, dim='lag', fast=True)
+              .signal.filter(frequency=3., btype='highpass', order=2)
+              .signal.taper(max_length=3/2)  # filter artefacts
+              )
     except Exception as e:
         print('Error @ process:', e)
         return
@@ -80,8 +82,8 @@ def lse_fit(cc, xy, envelope, attrs):
     if cc is None:
         return
     try:
-        fit = xcorr.signal.beamform.plane_wave(
-            s=cc, x=xy.x, y=xy.y,
+        fit = cc.signal.plane_wave_estimate(
+            x=xy.x, y=xy.y,
             dim='lag',
             dtype='float64',
             envelope=envelope,

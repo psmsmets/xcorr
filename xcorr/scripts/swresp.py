@@ -63,12 +63,14 @@ def process(ds):
         if xr.ufuncs.isnan(cc).any():
             return
         delay = -(ds.pair_offset + ds.time_offset)
-        cc = xcorr.signal.unbias(cc)
-        cc = xcorr.signal.demean(cc)
-        cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrapping
-        cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
-        cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
-        cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
+        cc = (cc
+              .signal.unbias()
+              .signal.demean()
+              .signal.taper(max_length=5.)  # timeshift phase-wrapping
+              .signal.timeshift(delay=delay, dim='lag', fast=True)
+              .signal.filter(frequency=1.5, btype='highpass', order=4)
+              .signal.taper(max_length=3/2)  # filter artefacts
+              )
     except Exception:
         cc = None
 
@@ -83,9 +85,9 @@ def surface_wave_response(cc, normalize: bool = True, **kwargs):
         return
     try:
         if normalize:
-            cc = xcorr.signal.norm1d(cc, dim='lag')
+            cc = cc.signal.norm1d(dim='lag')
 
-        Y = xcorr.signal.rfft(cc)
+        Y = cc.signal.rfft()
         F = Y.isel(pair=1) * xr.ufuncs.conj(Y.isel(pair=0))  # Vertical first
 
         resp = xr.Dataset()

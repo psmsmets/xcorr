@@ -86,11 +86,12 @@ def extract_period(ds, period):
 def preprocess(ds):
     """Preprocess cc
     """
-    cc = ds.cc
-    cc = xcorr.signal.unbias(cc)
-    cc = xcorr.signal.demean(cc)
-    cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
-    cc = xcorr.signal.taper(cc, max_length=2/3)
+    cc = (ds.cc
+          .signal.unbias()
+          .signal.demean()
+          .signal.filter(frequency=1.5, btype='highpass', order=4)
+          .signal.taper(max_length=2/3)
+          )
 
     return cc
 
@@ -99,7 +100,7 @@ def preprocess(ds):
 def spectrogram(cc):
     """Calculate spectrogram
     """
-    psd = xcorr.signal.spectrogram(cc, duration=2., padding_factor=4)
+    psd = cc.signal.spectrogram(duration=2., padding_factor=4)
     psd = psd.where((psd.freq >= 1.5) & (psd.freq <= 18.), drop=True)
     return psd
 
