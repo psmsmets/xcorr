@@ -34,7 +34,7 @@ def correlate1d(
     dtype: np.dtype = None, dim: str = None, **kwargs
 ):
     """
-    One-dimensional crosscorrelate two N-D labelled arrays of data.
+    One-dimensional cross-correlate two N-D labelled arrays of data.
 
     Parameters
     ----------
@@ -164,7 +164,7 @@ def correlate2d(
     dtype: np.dtype = None, dims: tuple = None, **kwargs
 ):
     """
-    Two-dimensional crosscorrelate two N-D labelled arrays of data.
+    Two-dimensional cross-correlate two N-D labelled arrays of data.
 
     Parameters
     ----------
