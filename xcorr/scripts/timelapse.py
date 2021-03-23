@@ -192,16 +192,16 @@ def get_spectrogram(pair, time, root):
     # extract time_offset and pair_offset
     delay = -(ds.pair_offset + ds.time_offset)
 
-    # process cc
-    cc = xcorr.signal.unbias(cc)
-    cc = xcorr.signal.demean(cc)
-    cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase wrapping
-    cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
-    cc = xcorr.signal.filter(cc, frequency=1.5, btype='highpass', order=4)
-    cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
-
-    # spectrogram
-    psd = xcorr.signal.spectrogram(cc, duration=2.5, padding_factor=4)
+    # process cc and obtain spectrogram
+    psd = (cc
+           .signal.unbias()
+           .signal.demean()
+           .signal.taper(max_length=5.)  # timeshift phase wrapping
+           .signal.timeshift(delay=delay, dim='lag', fast=True)
+           .signal.filter(frequency=1.5, btype='highpass', order=4)
+           .signal.taper(max_length=3/2)  # filter artefacts
+           .signal.spectrogram(duration=2.5, padding_factor=4)
+           )
 
     # clean
     del cc
@@ -351,10 +351,10 @@ def fill_upper_triangle(ds):
     """In-place fill the upper diagonal (one off-diagonal).
     """
     mask = xcorr.signal.tri_mask(ds.time1, ds.time2, 1)
-    ds['status'] = xcorr.signal.tri_mirror(ds.status, mask, False)
-    ds['cc2'] = xcorr.signal.tri_mirror(ds.cc2, mask, False)
-    ds['delta_freq'] = xcorr.signal.tri_mirror(ds.delta_freq, mask, True)
-    ds['delta_lag'] = xcorr.signal.tri_mirror(ds.delta_lag, mask, True)
+    ds['status'] = ds.status.signal.tri_mirror(mask, False)
+    ds['cc2'] = ds.cc2.signal.tri_mirror(mask, False)
+    ds['delta_freq'] = ds.delta_freq.signal.tri_mirror(mask, True)
+    ds['delta_lag'] = ds.delta_lag.signal.tri_mirror(mask, True)
 
 
 def spectrogram_timelapse_on_client(
