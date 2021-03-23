@@ -49,21 +49,22 @@ def estimate_snr_for_day(
             if xr.ufuncs.isnan(cc).any():
                 continue
             delay = -(ds.pair_offset + ds.time_offset)
-            cc = xcorr.signal.unbias(cc)
-            cc = xcorr.signal.demean(cc)
-            cc = xcorr.signal.taper(cc, max_length=5.)  # timeshift phase-wrap
-            cc = xcorr.signal.timeshift(cc, delay=delay, dim='lag', fast=True)
-            cc = xcorr.signal.filter(cc, frequency=3., btype='highpass',
-                                     order=2)
-            cc = xcorr.signal.taper(cc, max_length=3/2)  # filter artefacts
+            cc = (cc
+                  .signal.unbias()
+                  .signal.demean()
+                  .signal.taper(max_length=5.)  # timeshift phase-wrap
+                  .signal.timeshift(delay=delay, dim='lag', fast=True)
+                  .signal.filter(frequency=3., btype='highpass', order=2)
+                  .signal.taper(max_length=3/2)  # filter artefacts
+                  )
         except Exception as e:
             print(f'Error @ process cc {str(pair.values)} {day}:', e)
             continue
         try:
             s = (cc.lag >= ds.distance/1.50) & (cc.lag <= ds.distance/1.46)
             n = (cc.lag >= 6*3600) & (cc.lag <= 9*3600)
-            sn = xcorr.signal.snr(
-                cc, s, n,
+            sn = cc.signal.snr(
+                s, n,
                 dim='lag',
                 extend=True,
                 envelope=envelope,

@@ -32,7 +32,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog='xcorr-ct',
-        description=('Coincidence triggers of crosscrorrelation '
+        description=('Coincidence triggers of cross-crorrelation '
                      'signal-to-noise ratios.'),
         epilog='See also xcorr-snr xcorr-timelapse xcorr-psd xcorr-beamform',
     )
@@ -117,8 +117,8 @@ def main():
 
     # get confindence triggers
     print('.. get coincidence triggers', end=', ')
-    ds['ct'] = xcorr.signal.coincidence_trigger(
-        ds.snr, thr_on=args.threshold, extend=0, thr_coincidence_sum=None,
+    ds['ct'] = ds.snr.signal.coincidence_trigger(
+        thr_on=args.threshold, extend=0, thr_coincidence_sum=None,
     )
     print(f'periods = {ds.ct.attrs["nperiods"]}')
 
