@@ -79,6 +79,7 @@ def absolute(
 
     return y
 
+
 @wraps(absolute)
 def abs(x: xr.DataArray, **kwargs):
     """
