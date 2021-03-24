@@ -92,7 +92,7 @@ and can be accessed from the command line:
 - ``xcorr-ct``: Coincidence triggers of cross-crorrelations signal-to-noise ratios.
 - ``xcorr-beamform`` Plane wave beamforming of cross-correlation functions.
 - ``xcorr-psd``: Spectrogram estimation of signal-to-noise ratio triggered periods.
-- ``xcorr-snr``: Signal-to-noise ratio estimation of cross-crorrelationss.
+- ``xcorr-snr``: Signal-to-noise ratio estimation of cross-crorrelations.
 - ``xcorr-timelapse`` Two-dimensional cross-correlation of cross-correlation spectrograms.
 
 
