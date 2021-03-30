@@ -3,7 +3,7 @@ r"""
 :mod:`signal.window` -- Window
 ==============================
 
-Create a window for an N-D labeled array of data.
+Create a window for an N-D labelled array of data.
 
 """
 
@@ -11,7 +11,7 @@ Create a window for an N-D labeled array of data.
 # Mandatory imports
 import xarray as xr
 import numpy as np
-from scipy import signal
+import scipy as sp
 
 
 # Relative imports
@@ -29,7 +29,7 @@ def window(
     max_length: float = None, side: str = None
 ):
     """
-    Return a window for the given coordinate of N-D labeled array of data.
+    Return a window for the given coordinate of N-D labelled array of data.
 
     Parameters
     ----------
@@ -64,7 +64,7 @@ def window(
         raise ValueError('x has no attribute "sampling_rate"!')
 
     wtype = wtype or 'hann'
-    if wtype not in signal.windows.__all__:
+    if wtype not in sp.signal.windows.__all__:
         raise ValueError('wtype should be a :func:`scipy.signal.windows`!')
 
     side = side or 'both'
@@ -89,7 +89,7 @@ def window(
 
     nmax = int(round(nmax))
 
-    win = eval(f'signal.windows.{wtype}({nmax}*2, False)')
+    win = eval(f'sp.signal.windows.{wtype}({nmax}*2, False)')
 
     w = xr.DataArray(
         data=np.ones((len(x)), dtype=np.float64),

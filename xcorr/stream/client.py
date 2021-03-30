@@ -1,7 +1,7 @@
 r"""
 
-:mod:`clients.client` -- Client
-===============================
+:mod:`stream.client` -- Stream client
+=====================================
 
 Load waveform data from a primary local sds archive, and automatically
 retrieve missing daily waveforms using fdsn and vdms web request services.
@@ -38,9 +38,11 @@ except ModuleNotFoundError:
 
 
 # Relative imports
-from .preprocess import preprocess as xcorr_preprocess
-from .preprocess import operations_to_json
-from . import util
+from .process import process as stream_process
+from .process import operations_to_json
+from .duration import duration as stream_duration
+from .to_SDS import to_SDS as stream_to_SDS
+from .. import util
 
 
 __all__ = ['Client']
@@ -268,7 +270,7 @@ class Client(object):
     def _sds_write_daystream(
         self, stream: Stream, force_write: bool = None,
         parallel: bool = None, verb: int = 0
-    ):
+    ) -> bool:
         """
         Wrapper to write a day stream of data to the local SDS archive.
 
@@ -327,7 +329,7 @@ class Client(object):
                 warnings.simplefilter('ignore')
 
                 # write to sds archive
-                util.stream.stream2SDS(
+                stream_to_SDS(
                     stream,
                     sds_path=self.sds_root_write,
                     method='overwrite',
@@ -337,8 +339,10 @@ class Client(object):
 
             success = True
 
-        except Exception as e:
+        except (KeyboardInterrupt, SystemExit):
+            raise
 
+        except Exception as e:
             if verb > 0:
                 print(f'Intercepted error @ sds write daystream: {e}')
 
@@ -365,7 +369,7 @@ class Client(object):
     def check_duration(
         self, stream: Stream, duration: float = None, receiver: str = None,
         verb: int = 0, **kwargs
-    ):
+    ) -> bool:
         """
         Wrapper to write a day stream of data to the local SDS archive.
 
@@ -401,12 +405,10 @@ class Client(object):
             return False
 
         duration = duration or 86400.
+        if not isinstance(duration, float):
+            raise TypeError("duration should be float seconds.")
 
-        assert isinstance(duration, float), (
-            '``duration`` should be float seconds.'
-        )
-
-        d = util.stream.duration(stream, receiver, **kwargs)
+        d = stream_duration(stream, receiver, **kwargs)
 
         if len(d) == 0:
             return False
@@ -425,7 +427,7 @@ class Client(object):
         duration: float = None, buffer: float = None,
         allow_wildcards: bool = False, download: bool = True,
         verb: int = 0, **kwargs
-    ):
+    ) -> Stream:
         """
         Get waveforms from the clients given a SEED-id.
 
@@ -512,10 +514,7 @@ class Client(object):
             t1 += pd.offsets.DateOffset(seconds=buffer)
 
         if verb > 0:
-            print(
-                'Get waveforms for {} from {} until {}'
-                .format(receiver, t0, t1)
-            )
+            print(f"Get waveforms for {receiver} from {t0} until {t1}")
 
         # UTCDatetime
         t0_obspy = util.time.to_UTCDateTime(t0)
@@ -555,7 +554,7 @@ class Client(object):
 
     def _get_sds_waveforms(
         self, verb: int = 0, parallel: bool = None, **kwargs
-    ):
+    ) -> Stream:
         """
         Get the local waveforms from any of the local sds_read archives.
 
@@ -649,7 +648,7 @@ class Client(object):
     def _get_waveforms_for_date(
         self, receiver: dict, date: pd.Timestamp, scan_sds: bool = True,
         download: bool = True, force_write: bool = False, verb: int = 0
-    ):
+    ) -> Stream:
         """
         Get the waveforms for a receiver and date.
 
@@ -786,7 +785,7 @@ class Client(object):
 
         return Stream()
 
-    def _test_waveforms_for_date(self, **kwargs):
+    def _test_waveforms_for_date(self, **kwargs) -> int:
         """
         Test get_waveforms_for_date.
 
@@ -831,15 +830,29 @@ class Client(object):
         return 1 if passed else -1
 
     def get_preprocessed_waveforms(
-        self, receiver: str, time: pd.Timestamp, preprocess: dict,
+        self, *args, preprocess: dict, **kwargs
+    ) -> Stream:
+        """
+        Get processed waveforms from the clients given a SEED-id and an
+        operations dictionary.
+        """
+        raise DeprecationWarning(
+            "Client.get_preprocessed_waveforms is deprecated. "
+            "Use Client.get_processed_waveforms instead. "
+        )
+        return self.get_processed_waveforms(*args, operations=preprocess,
+                                            **kwargs)
+
+    def get_processed_waveforms(
+        self, receiver: str, time: pd.Timestamp, operations: dict,
         duration: float = 86400., centered: bool = True,
         inventory: Inventory = None, substitute: bool = True,
         three_components: str = '12Z',  duration_check: bool = True,
         strict: bool = True, raise_error: bool = False, verb: int = 0,
         **kwargs
-    ):
+    ) -> Stream:
         """
-        Get preprocessed waveforms from the clients given a SEED-id and an
+        Get processed waveforms from the clients given a SEED-id and an
         operations dictionary.
 
         Parameters
@@ -850,12 +863,12 @@ class Client(object):
         time : `pd.Timestamp`
             Center time of the waveform time window.
 
-        preprocess : `dict`
-            Preprocessing operations dictionary, containing a list of
-            operations per SEED channel as key. Each list item should be a
-            tuple ('operation', {parameters}).
-            Use :func:`xcorr.preprocess.help` to list all valid operations and
-            their documentation.
+        operations : `dict`
+            Generic channel-based stream processing. Dictionary of SEED channel
+            as key containing the list of operations to apply sequentially.
+            Each operation should be a tuple ('operation', {parameters}).
+            Use :func:`xcorr.stream.process.help` to list all valid operations
+            and their documentation.
 
         duration : `float`, optional
             Set the duration of the waveform time window, in seconds. Defaults
@@ -875,7 +888,7 @@ class Client(object):
             Is no longer needed. All orientations '12ZNE' are evaluated.
 
         duration_check: `bool`, optional
-            If `True` (default), verify the preprocessed stream duration using
+            If `True` (default), verify the processed stream duration using
             the ``strict`` method if enabled.
 
         strict: `bool`, optional
@@ -897,7 +910,7 @@ class Client(object):
         Returns
         -------
         stream : :class:`obspy.Stream`
-            The requested waveforms after preprocessing.
+            The processed stream.
 
         """
         # check if receiver SEED-id is valid
@@ -906,11 +919,14 @@ class Client(object):
 
         # No longer needed. Test all '12NEZ' components
         # three_components = three_components or '12Z'
-        # assert three_components == '12Z' or three_components == 'NEZ', (
-        #     '``three_components`` should be either "12Z" or "NEZ"!'
-        # )
+        # if three_components not in ('12Z', 'NEZ'):
+        #     raise ValueError(
+        #         "three_components should be either '12Z' or 'NEZ'!"
+        #     )
 
         ch = receiver.split('.')[-1]
+        if ch not in operations.keys():
+            raise KeyError(f"operations has no channel '{ch}'")
 
         # radial or transverse component? Request all channels manually.
         if substitute and ch[-1] in 'RT':
@@ -930,12 +946,22 @@ class Client(object):
 
             # Get horizontal components 'NE' or '12'
             for h in ('12', 'NE'):
+                # Add channels
                 for c in h:
                     tr = _get_waveforms(c)
                     if tr:
                         st += tr
                     else:
                         break
+                # stream completed?
+                if len(st) == 3:
+                    break
+
+            # Check if all three components are present
+            if len(st) != 3:
+                raise ValueError(
+                    "Three-component stream expected with substitute=True"
+                )
 
         else:
             st = self.get_waveforms(
@@ -961,9 +987,9 @@ class Client(object):
 
         t1 = t0 + duration
 
-        st = xcorr_preprocess(
+        st = stream_process(
             waveforms=st,
-            operations=preprocess[ch],
+            operations=operations[ch],
             inventory=inventory,
             starttime=t0,
             endtime=t1,
@@ -975,8 +1001,9 @@ class Client(object):
         if not isinstance(st, Stream) or len(st) != 1:
 
             if raise_error:
-                raise ValueError('No stream with single trace returned '
-                                 'after preprocessing.')
+                raise ValueError(
+                    'No stream with single trace returned after processing.'
+                )
 
             return Stream()
 
@@ -990,7 +1017,7 @@ class Client(object):
                 if raise_error:
 
                     raise ValueError(
-                        ('Preprocessed stream fails {}duration check: '
+                        ('Processed stream fails {}duration check: '
                          '{} sample difference.')
                         .format('strict ' if strict else '', diff)
                     )
@@ -999,10 +1026,11 @@ class Client(object):
 
         return st
 
-    def _test_preprocessed_waveforms(self, sampling_rate: float = None,
-                                     **kwargs):
+    def _test_processed_waveforms(
+        self, sampling_rate: float = None, **kwargs
+    ) -> int:
         """
-        Test get_preprocessed_waveforms.
+        Test get_processed_waveforms.
 
         Parameters
         ----------
@@ -1010,7 +1038,7 @@ class Client(object):
             The desired final sampling rate of the stream (in Hz).
 
         **kwargs :
-            Parameters passed :meth:`get_preprocessed_waveforms`.
+            Parameters passed :meth:`get_processed_waveforms`.
 
         Returns
         -------
@@ -1026,7 +1054,7 @@ class Client(object):
         kwargs['duration_check'] = False
 
         try:
-            stream = self.get_preprocessed_waveforms(**kwargs)
+            stream = self.get_processed_waveforms(**kwargs)
 
         except (KeyboardInterrupt, SystemExit):
             raise
@@ -1034,18 +1062,38 @@ class Client(object):
         except RuntimeError:
             return -2
 
-        passed = self.check_duration(stream, duration=kwargs['duration'],
-                                     receiver=kwargs['receiver'],
-                                     sampling_rate=sampling_rate)
+        passed = self.check_duration(
+            stream,
+            duration=kwargs['duration'],
+            receiver=kwargs['receiver'],
+            sampling_rate=sampling_rate
+        )
 
         return 1 if passed else -1
 
     def get_pair_preprocessed_waveforms(
-        self, pair, **kwargs
-    ):
+        self, pair, preprocess: dict, **kwargs
+    ) -> Stream:
         """
-        Get preprocessed waveforms from the clients given a receiver couple
-        SEED-id and an operations dictionary.
+        Get the processed waveforms from the clients given a receiver couple
+        SEED-ids and an operations dictionary.
+
+        See :func:`self.get_pair_processed_waveforms`.
+        """
+        raise DeprecationWarning(
+            "Client.get_pair_preprocessed_waveforms is deprecated. "
+            "Use Client.get_pair_processed_waveforms instead. "
+        )
+        return self.get_pair_processed_waveforms(
+            pair, operations=preprocess, **kwargs
+        )
+
+    def get_pair_processed_waveforms(
+        self, pair, **kwargs
+    ) -> Stream:
+        """
+        Get the processed waveforms from the clients given a receiver couple
+        SEED-ids and an operations dictionary.
 
         Parameters
         ----------
@@ -1056,12 +1104,12 @@ class Client(object):
 
         **kwargs :
             Parameters passed to :meth:`get_waveforms` via
-            :meth:`get_preprocessed_waveforms`.
+            :meth:`get_processed_waveforms`.
 
         Returns
         -------
         stream : :class:`obspy.Stream`
-            The requested waveforms after preprocessing.
+            The requested waveforms after processing.
 
         """
         # split
@@ -1069,18 +1117,18 @@ class Client(object):
 
         # get streams per receiver
         stream = (
-            self.get_preprocessed_waveforms(rA, **kwargs) +
-            self.get_preprocessed_waveforms(rB, **kwargs)
+            self.get_processed_waveforms(rA, **kwargs) +
+            self.get_processed_waveforms(rB, **kwargs)
         )
 
         return stream
 
-    def data_availability(
+    def verify_waveform_availability(
         self, pairs_or_receivers: list, times: pd.DatetimeIndex,
         extend_days: int = None, substitute: bool = False,
         three_components: str = None, parallel: bool = None,
         verb: int = 0, **kwargs
-    ):
+    ) -> xr.DataArray:
         """
         Verify the waveform data availability for receivers and times.
 
@@ -1126,24 +1174,21 @@ class Client(object):
             ``times`` and ``receivers``.
 
         """
-        assert isinstance(times, pd.DatetimeIndex) and times.freqstr == 'D', (
-            '``times`` should be a pandas.DatetimeIndex with freq="D"!'
-        )
-        extend_days = extend_days or 0
+        if isinstance(times, pd.DatetimeIndex) and times.freqstr != 'D':
+            raise ValueError("times should be a pandas.DatetimeIndex "
+                             "with freq='D'!")
 
-        assert isinstance(extend_days, int), (
-            '``extend_days`` should be of type `int`!'
-        )
+        extend_days = extend_days or 0
+        if not isinstance(extend_days, int):
+            raise TypeError("extend_days should be of type `int`!")
 
         parallel = self.parallel if parallel is None else parallel
-
         if parallel and not dask:
-
-            raise RuntimeError('Dask is required but cannot be found!')
+            raise RuntimeError("Dask is required but cannot be found!")
 
         # verbose
         if verb > 0:
-            print('Verify availability')
+            print('Verify waveform availability')
             print(f'    Parallel : {parallel}')
 
         # get all receivers from pairs
@@ -1249,14 +1294,14 @@ class Client(object):
 
         return status
 
-    def data_preprocessing(
-        self, pairs_or_receivers: list, time: pd.Timedelta,
-        preprocess: dict, inventory: Inventory, substitute: bool = False,
+    def verify_waveform_processing(
+        self, pairs_or_receivers: list, time: pd.Timestamp,
+        operations: dict, inventory: Inventory, substitute: bool = False,
         three_components: str = None, parallel: bool = None,
         verb: int = 0, **kwargs
-    ):
+    ) -> xr.DataArray:
         """
-        Verify the waveform data preprocessing for receivers and time.
+        Verify waveform processing given receivers and a time.
 
         Parameters
         ----------
@@ -1266,14 +1311,14 @@ class Client(object):
             '{network}.{station}.{location}.{channel}'.
 
         time : `pd.Timestamp`
-            Date of the waveform to test the ``preprocess`` operations.
+            Date of the waveform to test the ``process`` operations.
 
-        preprocess : `dict`
-            Preprocessing operations dictionary, containing a list of
-            operations per SEED channel as key. Each list item should be a
-            tuple ('operation', {parameters}).
-            Use :func:`xcorr.preprocess.help` to list all valid operations and
-            their documentation.
+        operations : `dict`
+            Generic channel-based stream processing. Dictionary of SEED channel
+            as key containing the list of operations to apply sequentially.
+            Each operation should be a tuple ('operation', {parameters}).
+            Use :func:`xcorr.stream.process.help` to list all valid operations
+            and their documentation.
 
         inventory : :class:`obspy.Inventory`, optional
             Inventory object, including the instrument response.
@@ -1303,14 +1348,14 @@ class Client(object):
         Returns
         -------
         status : :class:`xarray.DataArray`
-            Data preprocessing status N-D labelled array with dimensions
+            Stream processing status as an N-D labelled array with dimensions
             ``time`` and ``receiver``.
 
         """
 
-        assert isinstance(preprocess, dict), (
-            '``preprocess`` should be of type `dict`.'
-        )
+        if not isinstance(operations, dict):
+            raise TypeError('operations should be of type `dict`.')
+
         time = pd.to_datetime(time)
 
         parallel = self.parallel if parallel is None else parallel
@@ -1320,7 +1365,7 @@ class Client(object):
 
         # verbose
         if verb > 0:
-            print('Verify preprocessing')
+            print('Verify waveform processing')
             print(f'    Parallel : {parallel}')
 
         # get all receivers from pairs
@@ -1347,8 +1392,8 @@ class Client(object):
             dims=('receiver', 'time'),
             name='status',
             attrs={
-                'long_name': 'Data preprocessing status',
-                'standard_name': 'data_preprocessing_status',
+                'long_name': 'Stream processing status',
+                'standard_name': 'stream_processing_status',
                 'units': '-',
                 'valid_range': np.int8([-2, 1]),
                 'flag_values': np.int8([-2, -1, 0, 1]),
@@ -1361,7 +1406,7 @@ class Client(object):
             'units': '-',
             'substitute': np.byte(substitute),
             'three_components': three_components,
-            'preprocess': operations_to_json(preprocess),
+            'operations': operations_to_json(operations),
         }
 
         if verb:
@@ -1385,7 +1430,7 @@ class Client(object):
                 args = dict(
                     receiver=str(receiver.values),
                     time=time.values,
-                    preprocess=preprocess,
+                    operations=operations,
                     inventory=inventory,
                     substitute=receiver.attrs['substitute'] == 1,
                     three_components=receiver.attrs['three_components'],
@@ -1397,11 +1442,11 @@ class Client(object):
 
                 if parallel:
                     lazy_flags.append(
-                        dask.delayed(self._test_preprocessed_waveforms)(**args)
+                        dask.delayed(self._test_processed_waveforms)(**args)
                     )
                 else:
                     status.loc[{'receiver': receiver, 'time': time}] = (
-                        self._test_preprocessed_waveforms(**args)
+                        self._test_processed_waveforms(**args)
                     )
 
         if parallel:
@@ -1414,9 +1459,9 @@ class Client(object):
             pcnt = 100 * verified / status.size
             print('    Verified : {} of {} ({:.1f}%)'
                   .format(verified, status.size, pcnt))
-            print('    Overall preprocessing : {:.2f}% passed'
+            print('    Overall processing : {:.2f}% passed'
                   .format(100 * np.sum(status.values == 1) / status.size))
-            print('    Receiver preprocessing')
+            print('    Receiver processing')
             for rec in status.receiver:
                 passed = np.all(status.loc[{'receiver': rec}].values == 1)
                 print('        {} :'.format(rec.values),

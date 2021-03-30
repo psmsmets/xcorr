@@ -22,7 +22,7 @@ except ModuleNotFoundError:
 
 
 # Relative imports
-from ..signal.normalize import norm1d, norm2d
+from .normalize import norm1d, norm2d
 from ..util.history import historicize
 
 
@@ -52,7 +52,7 @@ def correlate1d(
         Set the dtype. If `None` (default), the dtype of ``in1`` is used.
 
     dim : `str`, optional
-        Coordinates name of ``in1`` and ``in2`` to crosscorrelate.
+        Coordinates name of ``in1`` and ``in2`` to cross-correlate.
         Defaults to the last dimension of ``in1``.
 
     **kwargs :
@@ -183,7 +183,7 @@ def correlate2d(
 
     dims : `tuple`, optional
         A tuple pair with the coordinates name of ``in1`` and ``in2`` to
-        crosscorrelate. Defaults to the last two dimensions of ``in1``.
+        cross-correlate. Defaults to the last two dimensions of ``in1``.
 
     **kwargs :
         Any additional keyword arguments will be passed to

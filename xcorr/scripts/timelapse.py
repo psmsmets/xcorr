@@ -20,10 +20,10 @@ import argparse
 
 # relative imports
 import xcorr
-from ..scripts import helpers
-from ..scripts.helpers import logging as log
-from ..scripts.helpers import logging_arg_info as arg_info
-from ..scripts.helpers import logging_arg_debug as arg_debug
+from . import utils
+from .utils import logging as log
+from .utils import logging_arg_info as arg_info
+from .utils import logging_arg_debug as arg_debug
 
 __all__ = []
 
@@ -143,7 +143,7 @@ def get_spectrogram(pair, time, root):
     """Load spectrogram for a pair and time.
     """
     # construct abs path and filename
-    nc = xcorr.util.ncfile(pair, time, root)
+    nc = xcorr.io.ncfile(pair, time, root)
     f = os.path.split(nc)[-1]
 
     # exists?
@@ -300,7 +300,7 @@ def _all_ncfiles(pair, time, root):
     ncfiles = []
     for p in pair:
         for t in time:
-            nc = xcorr.util.ncfile(p, t, root)
+            nc = xcorr.io.ncfile(p, t, root)
             if nc not in ncfiles:
                 ncfiles.append(nc)
     return ncfiles
@@ -519,20 +519,21 @@ def main():
         '-c', '--chunk', metavar='..', type=int, default=10,
         help=('Set dask chunks for time dimension (default: 10)')
     )
-    helpers.add_common_arguments(parser)
-    helpers.add_attrs_group(parser)
+    utils.add_common_arguments(parser)
+    utils.add_attrs_group(parser)
 
     # parse arguments
     args = parser.parse_args()
+    args.attrs = utils.parse_attrs_group(args)
 
     # init logging
-    helpers.init_logging(args.debug)
+    utils.init_logging(args.debug)
 
     # header
     log.info(f"xcorr-timelapse v{xcorr.__version__}")
 
     # init dask cluster and client
-    cluster, client = helpers.init_dask(
+    cluster, client = utils.init_dask(
          n_workers=args.nworkers, scheduler_file=args.scheduler, logger=True
     )
 
@@ -548,7 +549,7 @@ def main():
         ds.close()
     log.debug(ds)
 
-    # update arguments
+    # update some arguments
     if args.start:
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
@@ -558,7 +559,6 @@ def main():
     else:
         args.frequency = np.array([ds.freq.values - ds.freq_bw.values/2,
                                    ds.freq.values + ds.freq_bw.values/2])
-    args.attrs = helpers.parse_attrs_group(args)
 
     # print core parameters
     log.info("Parameters:")
@@ -651,8 +651,8 @@ def main():
         ds['status'] = ds['status'].fillna(0).astype(np.byte)
 
     # set output file
-    args.out = helpers.ncfile('timelapse', args.pair, args.start, args.end,
-                              args.prefix, args.suffix)
+    args.out = utils.ncfile('timelapse', args.pair, args.start, args.end,
+                            args.prefix, args.suffix)
 
     # log
     log.info("Time lapse dimensions:")

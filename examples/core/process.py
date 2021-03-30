@@ -1,16 +1,15 @@
 """
-Correlate
-=========
+Process
+=======
 
-xcorr correlation.
+xcorr correlation processing.
 
 """
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 import matplotlib.pyplot as plt
-from obspy import UTCDateTime, read_inventory
+from obspy import read_inventory
 import os
 import xcorr
 
@@ -42,7 +41,23 @@ attrs = {
     'source': 'CTBTO/IMS hydroacoustic data and IRIS/USGS seismic data',
 }
 
-# preprocessing settings per channel
+# pairs and time range
+pairs = [
+    'IM.H10N1..EDH-IU.RAR.10.BHZ',
+    'IM.H10N1..EDH-IU.RAR.10.BHR',
+    'IM.H10N1..EDH-IU.RAR.10.BHT',
+    'IM.H03S1..EDH-IU.RAR.10.BHZ',
+    'IM.H03S1..EDH-IU.RAR.10.BHR',
+    'IM.H03S1..EDH-IU.RAR.10.BHT',
+]
+times = pd.date_range('2015-01-15', '2015-01-17', freq='1D')
+
+# inventory, filtered for pairs and range
+inv = xcorr.util.receiver.get_pair_inventory(
+    pairs, read_inventory('../../data/Monowai.xml'), times
+)
+
+# Stream operations
 preprocess = {
     'BHZ': [
         ('merge', {
@@ -93,6 +108,32 @@ preprocess = {
             'max_length': 30.,
         }),
     ],
+    'BHT': [
+        ('merge', {
+            'method': 1,
+            'fill_value': 'interpolate',
+            'interpolation_samples': 0,
+        }),
+        ('filter', {'type': 'highpass', 'freq': .05}),
+        ('detrend', {'type': 'demean'}),
+        ('remove_response', {'output': 'VEL'}),
+        ('rotate', {'method': '->ZNE'}),
+        ('rotate', {'method': 'NE->RT', 'back_azimuth': 250.39}),
+        ('select', {'channel': 'BHT'}),
+        ('interpolate', {
+            'sampling_rate': 50,
+            'method': 'lanczos',
+            'a': 20,
+        }),
+        ('filter', {'type': 'lowpass', 'freq': 20.}),
+        ('trim', {}),
+        ('detrend', {'type': 'demean'}),
+        ('taper', {
+            'type': 'cosine',
+            'max_percentage': 0.05,
+            'max_length': 30.,
+        }),
+    ],
     'EDH': [
         ('merge', {
             'method': 1,
@@ -112,21 +153,6 @@ preprocess = {
         }),
     ],
 }
-
-# pairs and time range
-pairs = [
-    'IM.H10N1..EDH-IU.RAR.10.BHZ',
-    'IM.H10N1..EDH-IU.RAR.10.BHR',
-    'IM.H03S1..EDH-IU.RAR.10.BHZ',
-    'IM.H03S1..EDH-IU.RAR.10.BHR',
-]
-times = pd.date_range('2015-01-15', '2015-01-18', freq='1D')
-
-# inventory, filtered for pairs and range
-inv = xcorr.util.receiver.get_pair_inventory(
-    pairs, read_inventory('../Monowai.xml'), times
-)
-
 
 ###############################################################################
 # One day of data
@@ -180,12 +206,12 @@ for pair in pairs:
 
     for time in times:
 
-        ncfile = xcorr.util.ncfile(pair, time, root)
+        nc = xcorr.io.ncfile(pair, time, root)
         ds = False
 
-        if os.path.isfile(ncfile):
+        if os.path.isfile(nc):
 
-            ds = xr.open_dataset(ncfile)
+            ds = xcorr.read(nc, fast=True)
 
             if ds and np.all(ds.status.values == 1):
 
@@ -194,7 +220,7 @@ for pair in pairs:
 
         if not ds:
 
-            ds = xcorr.init_dataset(
+            ds = xcorr.init(
                 pair=pair,
                 starttime=time,
                 endtime=time + pd.offsets.DateOffset(1),
@@ -211,15 +237,7 @@ for pair in pairs:
 
         try:
 
-            xcorr.cc_dataset(
-                ds,
-                inventory=inv.select(
-                    starttime=UTCDateTime(time),
-                    endtime=UTCDateTime(time + pd.offsets.DateOffset(1))
-                ),
-                client=client,
-                retry_missing=True,
-            )
+            xcorr.process(ds, inventory=inv, client=client, retry_missing=True)
 
         except (KeyboardInterrupt, SystemExit):
 
@@ -233,4 +251,4 @@ for pair in pairs:
 
         if ds and np.any(ds.status.values != 0):
 
-            xcorr.write_dataset(ds, ncfile)
+            xcorr.write(ds, nc)

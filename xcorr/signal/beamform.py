@@ -3,7 +3,7 @@ r"""
 :mod:`signal.beamform` -- Beamform
 ==================================
 
-Least-squares plane wave beamforming to an N-D labeled array of data.
+Least-squares plane wave beamforming to an N-D labelled array of data.
 
 """
 
@@ -13,9 +13,9 @@ import xarray as xr
 import numpy as np
 
 # Relative imports
-from ..signal.absolute import absolute
-from ..signal.correlate import correlate1d
-from ..signal.hilbert import hilbert
+from .absolute import absolute
+from .correlate import correlate1d
+from .hilbert import hilbert
 from ..util.metadata import global_attrs
 
 
@@ -28,7 +28,7 @@ def plane_wave(
 ):
     """
     Return the least-squares estimated plane wave given a signal and
-    xy-coordinates, all N-D labeled data arrays.
+    xy-coordinates, all N-D labelled data arrays.
 
     Parameters
     ----------

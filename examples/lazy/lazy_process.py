@@ -96,6 +96,32 @@ xcorr_init_args = {
                 'max_length': 30.,
             }),
         ],
+        'BHT': [
+            ('merge', {
+                'method': 1,
+                'fill_value': 'interpolate',
+                'interpolation_samples': 0,
+            }),
+            ('detrend', {'type': 'demean'}),
+            ('filter', {'type': 'highpass', 'freq': .05}),
+            ('remove_response', {'output': 'VEL'}),
+            ('rotate', {'method': '->ZNE'}),
+            ('rotate', {'method': 'NE->RT', 'back_azimuth': 250.39}),
+            ('select', {'channel': 'BHT'}),
+            ('interpolate', {
+                'sampling_rate': 50,
+                'method': 'lanczos',
+                'a': 20,
+            }),
+            ('filter', {'type': 'lowpass', 'freq': 20.}),
+            ('trim', {}),
+            ('detrend', {'type': 'demean'}),
+            ('taper', {
+                'type': 'cosine',
+                'max_percentage': 0.05,
+                'max_length': 30.,
+            }),
+        ],
         'EDH': [
             ('merge', {
                 'method': 1,
@@ -131,25 +157,19 @@ xcorr_client_args = {
 #     by a dash ('-').
 # -----------------------------------------------------------------------------
 pairs = [
+    'IM.H03S1..EDH-IU.RAR.10.BHZ',
+    'IM.H03S1..EDH-IU.RAR.10.BHR',
+    'IM.H03S1..EDH-IU.RAR.10.BHT',
     'IM.H10N1..EDH-IU.RAR.10.BHZ',
-    # 'IM.H10N2..EDH-IU.RAR.10.BHZ',
-    # 'IM.H10N3..EDH-IU.RAR.10.BHZ',
-    # 'IM.H03S1..EDH-IU.RAR.10.BHZ',
-    # 'IM.H03S2..EDH-IU.RAR.10.BHZ',
-    # 'IM.H03S3..EDH-IU.RAR.10.BHZ',
-    # 'IM.H10N1..EDH-IU.RAR.10.BHR',
-    # 'IM.H10N2..EDH-IU.RAR.10.BHR',
-    # 'IM.H10N3..EDH-IU.RAR.10.BHR',
-    # 'IM.H03S1..EDH-IU.RAR.10.BHR',
-    # 'IM.H03S2..EDH-IU.RAR.10.BHR',
-    # 'IM.H03S3..EDH-IU.RAR.10.BHR',
+    'IM.H10N1..EDH-IU.RAR.10.BHR',
+    'IM.H10N1..EDH-IU.RAR.10.BHT',
 ]
 
 # -----------------------------------------------------------------------------
 # times : `pandas.data_range`
 #     Date range from start to end with ``freq``='D'.
 # -----------------------------------------------------------------------------
-times = date_range(start='2015-01-15', end='2015-01-16', freq='1D')
+times = date_range(start='2015-01-15', end='2015-01-18', freq='1D')
 
 # -----------------------------------------------------------------------------
 # inventory : :class:`obspy.Inventory`, optional

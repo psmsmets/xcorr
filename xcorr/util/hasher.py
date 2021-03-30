@@ -245,7 +245,7 @@ def hash_Dataset(
     Returns
     -------
     hash : `str` or `None`
-        Hexdigested hash of ``stream`` (default). If a ``hashlib_obj``
+        Hexdigested hash of ``dataset`` (default). If a ``hashlib_obj``
         is provided `None` is returned.
 
     """

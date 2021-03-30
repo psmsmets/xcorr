@@ -3,7 +3,7 @@ r"""
 :mod:`signal.snr` -- SNR
 ========================
 
-Estimate the signal-to-noise ratio of an N-D labeled array of data.
+Estimate the signal-to-noise ratio of an N-D labelled array of data.
 
 """
 
@@ -16,9 +16,9 @@ import numpy as np
 # Relative imports
 from ..util.history import historicize
 from ..util.metadata import global_attrs
-from ..signal.rms import rms
-from ..signal.hilbert import hilbert
-from ..signal.absolute import absolute
+from .rms import rms
+from .hilbert import hilbert
+from .absolute import absolute
 
 
 __all__ = ['snr']
@@ -30,7 +30,7 @@ def snr(
     extend: bool = False, envelope: bool = False, **kwargs
 ):
     """
-    Compute the signal-to-noise ratio (SNR or S/N) of an N-D labeled array of
+    Compute the signal-to-noise ratio (SNR or S/N) of an N-D labelled array of
     data given a signal mask and a noise mask.
 
     Parameters

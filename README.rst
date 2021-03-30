@@ -10,77 +10,29 @@ guidelines. Data and metadata are stored as a `NetCDF Dataset` to be easily
 read / postprocessed by other packages, using different languages or on other 
 platforms.
 
-**xcorr** exists of various submodules to create a simple workflow from fetching / 
-archiving / preprocessing raw waveforms to cross-correlation functions followed by 
-various postprocessing and analysis tools. 
-
 
 Features
 ========
 
 Main `xcorr` features listed per submodule:
 
-- **core**: Main functions of xcorr are ``init``, ``process``, ``bias_correct``,
-  ``read``, ``write`` and ``merge``. All of these return or are applied on an
-  `xarray.Dataset`.
-  Batch process cross-correlations by ``lazy_process``: multithreading and lazy
-  scheduling using `dask <https://dask.org>`_ after first verifying both data
-  availability and preprocessing.
-  ``mread`` is a multi-file merge and read combining the `xcorr.read` with
-  `xarray.open_mfdataset` including **Dask** features like parallelization
-  and memory chunking.
+- **core**: initiate and process an N-D labelled
+  cross-correlation dataset via accessors.
+  Batch process by `Dask <https://dask.org>`_ after verifying both waveform
+  availability and stream preprocessing operations.
+  Output files are structered in an SDS-like folder structure
+  (year/pair/ncfile) and can easily be read and merged in parallel.
 
-- **client**: A waterfall-based client wrapping various getters from both 
-  local archives and remote services. Load waveform data from a local SeisComP 
-  Data Structure (SDS) archive and automatically download missing or incomplete 
-  waveforms by the FDSN web service and the `CTBTO <https://www.ctbto.org>`_ 
-  Verification Data Messaging System (VDMS, via `pyvdms` wrapping the command 
-  line client).
+- **stream**: fetch and archive waveforms using the waterfall-base ``Client``,
+  wrapping various getters from both local archives and remote services.
+  Generalized SEED-channel based waveform processing.
 
-- **preprocess**: Generalized waveform preprocessing using `obspy` given a dictionary
-  with operations per channel id. Channel operations and parameters are added to the
-  `pair` as attribute containing id as key.
+- **signal**: signal processing of an `xarray.DataArray` timeseries.
+  Each signal routine is **Dask** capable for large datasets.
+  Functions are available as `.signal` accessor.
 
-- **cc**: Crosscorrelation functions and constructors for `lag` time and
-  unbiased `weight` vectors.
 
-- **signal**: Postprocess cross-correlation estimates, or any `xarray.DataArray`
-  with a (lag) time dimension. Each signal routine is **Dask** capable for
-  large datasets. Functions are available as `.signal` accessor.
-
-  - ``beamform``: Least-squares plane wave beamforming.
-  - ``correlate``: frequency domain correlation estimator with zero-padding 1d or 2d data.
-  - ``detrend``: demean and linear detrend.
-  - ``fft``: apply forward and inverse fourier transform along a single-dimension.
-  - ``filter``: time-domain filter using a forward-backward (zero-phase) digital
-    butterworth filter by cascaded second-order sections.
-  - ``mask``: mask coordinates of interest (one or two-dimensional).
-  - ``normalize``: broadcast normalize a vector or 2d matrix.
-  - ``rms``: root-mean-square.
-  - ``snr``: signal-to-noise ratio.
-  - ``spectrogram``: compute the power spectrogram (density or spectrum).
-    year-day, year-month. 
-  - ``taper``: apply a ``window`` to a dimension.
-  - ``timeshift``: apply a ``timeshift`` using fft to a dimension.
-  - ``trigger``: perform a coincidence trigger on a precomputed characteristic
-    function, for example, the signal-to-noise ratio.
-  - ``unbias``: bias correct the correlation estimate.
-  - ``window``: construct a taper window for a coordinate using any window of
-    `scipy.signal.windows <https://docs.scipy.org/doc/scipy/reference/signal.windows.html>`_ 
-    in an `obspy.Trace.taper <https://docs.obspy.org/master/packages/autogen/obspy.core.trace.Trace.taper.html>`_
-    like way.
-
-- **util**: Various utilities.
-
-  - Hash utilities for python `list` and `dict` types, and entire objects such
-    as `obspy.Trace`, `obspy.Stream`, `xarray.DataArray`, and `xarray.Dataset`.
-  - Time utilities to convert between various datetime types and between
-    timedelta and seconds. Functions to get the number of days per month and
-    year depending on the calendar type.
-  - Receiver utilities such as SEED-id name checks, type conversions, receiver
-    pair handlers and geodetic operations.
-
-- **scripts**: Core scripts to (re)produce the manuscript results. See entry points.
+See the examples, scripts and documentation for the full functionality.
 
 
 Entry points

@@ -10,7 +10,7 @@ Filter an N-D labelled array of data.
 
 # Mandatory imports
 import xarray as xr
-from scipy import signal
+import scipy as sp
 try:
     import dask
 except ModuleNotFoundError:
@@ -44,7 +44,7 @@ def filter(
         The corner frequency (pair) of the filter, in Hz.
 
     btype : `str` {‘lowpass’, ‘highpass’, ‘bandpass’, ‘bandstop’}, optional
-       The type of filter. Default is ‘lowpass’.
+       The type of filter. Default is ‘highpass’.
 
     order : `int`, optional
         The order of the filter. Default is 2.
@@ -79,8 +79,11 @@ def filter(
         raise ValueError('Corner frequency should be a `float` or tuple-pair '
                          'with (min, max)!')
 
+    # default filter type
+    btype = btype or 'highpass'
+
     # construct digital sos filter coefficients
-    sos = signal.butter(
+    sos = sp.signal.butter(
         N=order,
         Wn=frequency,
         btype=btype,
@@ -90,7 +93,7 @@ def filter(
 
     # wrapper to simplify ufunc input
     def _filter(obj):
-        return signal.sosfiltfilt(sos, obj, axis=-1).astype(x.dtype)
+        return sp.signal.sosfiltfilt(sos, obj, axis=-1).astype(x.dtype)
 
     # dask collection?
     dargs = {}

@@ -20,8 +20,7 @@ from glob import glob
 
 # Relative imports
 import xcorr
-from .helpers import (init_dask, ncfile, add_common_arguments,
-                      add_attrs_group, parse_attrs_group)
+from . import utils
 
 __all__ = []
 
@@ -36,7 +35,7 @@ def load(pairs, time, root):
     """
     try:
         ds = xcorr.merge(
-            [xcorr.util.ncfile(pair, time, root) for pair in pairs],
+            [xcorr.io.ncfile(pair, time, root) for pair in pairs],
             fast=True
         )
     except Exception:
@@ -185,22 +184,22 @@ def main():
         help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
+    utils.add_common_arguments(parser)
+    utils.add_attrs_group(parser)
 
-    add_common_arguments(parser)
-    add_attrs_group(parser)
-
+    # parse arguments
     args = parser.parse_args()
+    args.attrs = utils.parse_attrs_group(args)
 
-    # update args
+    # update some arguments
     args.root = os.path.abspath(args.root)
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = (pd.to_datetime(args.end, format=args.format)
                 if args.end else args.start)
     args.channels = 'ZT' if args.transverse else 'ZR'
     args.normalize = not args.disable_norm
-    args.out = ncfile('swresp', f'{args.station}_{args.channels}',
-                      args.start, args.end, args.prefix, args.suffix)
-    args.attrs = parse_attrs_group(args)
+    args.out = utils.ncfile('swresp', f'{args.station}_{args.channels}',
+                            args.start, args.end, args.prefix, args.suffix)
     args.pairs = sorted(list(set([
         p.split(os.path.sep)[-1]
         for p in glob(os.path.join(args.root, '*', f'*{args.station}*'))
@@ -245,8 +244,8 @@ def main():
         print(pair)
 
     # init dask cluster and client
-    cluster, client = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
+    cluster, client = utils.init_dask(n_workers=args.nworkers,
+                                      scheduler_file=args.scheduler)
 
     # surface wave response
     print('.. compute surface wave response per day for period')

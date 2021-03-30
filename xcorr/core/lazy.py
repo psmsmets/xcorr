@@ -17,9 +17,7 @@ import distributed
 
 # Relative imports
 from ..version import version
-from ..core import core
-from ..client import Client
-from .. import util
+from .. import io, core, stream, util
 
 
 __all__ = ['lazy_process']
@@ -28,7 +26,7 @@ __all__ = ['lazy_process']
 @dask.delayed
 def single_threaded_process(
     pair: str, time: pd.Timestamp, init_args: dict,
-    client: Client, inventory: Inventory,
+    client: stream.Client, inventory: Inventory,
     root: str, force_fresh: bool = False, verb: int = 0,
     **kwargs
 ):
@@ -46,11 +44,11 @@ def single_threaded_process(
     data = None
 
     # filename
-    nc = util.ncfile(pair, time, root)
+    nc = io.ncfile(pair, time, root)
 
     # open and update
     if not force_fresh:
-        data = core.read(nc, fast=True)
+        data = io.read(nc, fast=True)
         if data and np.all(data.status.values == 1):
             data.close()
             return True
@@ -78,7 +76,7 @@ def single_threaded_process(
 
     # save
     if data and np.any(data.status.values == 1):
-        core.write(data, nc, verb=verb)
+        io.write(data, nc, verb=verb)
         return True
 
     return False
@@ -103,10 +101,10 @@ def lazy_processes(
         Date range from start to end with ``freq``='D'.
 
     availability : :class:`xarray.DataArray`
-        Data availability status N-D labelled array.
+        Waveform availability status N-D labelled array.
 
     preprocessing : :class:`xarray.DataArray`
-        Data preprocessing status N-D labelled array.
+        Waveform preprocessing status N-D labelled array.
 
     init_args : `dict`
         Dictionary with input arguments passed to :class:`xcorr.init`.
@@ -218,7 +216,7 @@ def lazy_process(
         Dictionary with input arguments passed to :class:`xcorr.init`.
 
     client_args : `dict`
-        Dictionary with input arguments passed to :class:`xcorr.Client`.
+        Dictionary with input arguments passed to :class:`xcorr.stream.Client`.
 
     inventory : :class:`obspy.Inventory`, optional
         Inventory object, including the instrument response.
@@ -272,11 +270,11 @@ def lazy_process(
     client_args['parallel'] = True
 
     # init the waveform client
-    xcorr_client = Client(**client_args)
+    xcorr_client = stream.Client(**client_args)
 
     if verb > 0:
         print('-'*79)
-        print('Client')
+        print('Stream Client')
         print(xcorr_client)
 
     # Read and filter inventory
@@ -301,12 +299,12 @@ def lazy_process(
         print('        extend : {} day(s)'.format(extend_days))
 
     # -------------------------------------------------------------------------
-    # Evaluate data availability (parallel), and try to download missing data
+    # Evaluate waveform availability (parallel) and try to add missing data
     # -------------------------------------------------------------------------
     if verb > 0:
         print('-'*79)
 
-    availability = xcorr_client.data_availability(
+    availability = xcorr_client.verify_waveform_availability(
         pairs, times, extend_days=extend_days,
         substitute=True,
         parallel=True,
@@ -315,7 +313,7 @@ def lazy_process(
     )
 
     # -------------------------------------------------------------------------
-    # Data preprocessing (parallel)
+    # Waveform preprocessing (parallel)
     # -------------------------------------------------------------------------
     if verb > 0:
         print('-'*79)
@@ -333,9 +331,9 @@ def lazy_process(
 
     time = pd.to_datetime(time.values)
 
-    preprocessing = xcorr_client.data_preprocessing(
+    preprocessing = xcorr_client.verify_waveform_processing(
         pairs, time,
-        preprocess=init_args['preprocess'],
+        operations=init_args['preprocess'],
         inventory=inventory,
         substitute=True,
         duration=init_args['window_length'],

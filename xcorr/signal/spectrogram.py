@@ -11,7 +11,7 @@ Generate a spectrogram of an N-D labelled array of data.
 # Mandatory imports
 import xarray as xr
 import numpy as np
-from scipy import signal
+import scipy as sp
 try:
     import dask
 except ModuleNotFoundError:
@@ -122,7 +122,7 @@ def spectrogram(
 
     # wrapper to simplify ufunc input
     def _spectrogram(lag):
-        _f, _t, Sxx = signal.spectrogram(
+        _f, _t, Sxx = sp.signal.spectrogram(
             x=lag,
             fs=sampling_rate,
             nperseg=win_len,
@@ -268,7 +268,7 @@ def spectrogram_mtc(
     overlap = overlap if overlap and (0. < overlap < 1.) else .9
     win_shift = int(win_len*overlap)
 
-    f, t, Sxx = signal.spectrogram(
+    f, t, Sxx = sp.signal.spectrogram(
         x=x.values,
         fs=x[dim].attrs['sampling_rate'],
         nperseg=win_len,

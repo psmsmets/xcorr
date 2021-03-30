@@ -2,7 +2,7 @@
 Lazy client
 ===========
 
-xcorr lazy client data availability evaluation.
+xcorr lazy client waveform availability evaluation.
 
 """
 from pandas import date_range
@@ -36,20 +36,22 @@ print(xclient)
 
 
 ###############################################################################
-# Verify data availability
-# ------------------------
+# Verify waveform availability
+# ----------------------------
 
 # set pairs and times
 pairs = [
     'IM.H10N1..EDH-IU.RAR.10.BHZ',
     'IM.H10N1..EDH-IU.RAR.10.BHR',
+    'IM.H10N1..EDH-IU.RAR.10.BHT',
     'IM.H03S1..EDH-IU.RAR.10.BHZ',
     'IM.H03S1..EDH-IU.RAR.10.BHR',
+    'IM.H03S1..EDH-IU.RAR.10.BHT',
 ]
-times = date_range('2015-01-01', '2015-01-10', freq='1D')
+times = date_range('2015-01-15', '2015-01-18', freq='1D')
 
 # evaluate data status
-status = xclient.data_availability(
+status = xclient.verify_waveform_availability(
     pairs, times, verb=1, download=False, substitute=True
 )
 

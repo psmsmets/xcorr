@@ -1,7 +1,7 @@
 r"""
 
 :mod:`cc.cc` -- Cross-correlation
-================================
+=================================
 
 Cross-correlation functions for ``xcorr``.
 
@@ -24,7 +24,7 @@ def cc(
     pad: bool = True, unbiased: bool = True, dtype: np.dtype = None
 ):
     """
-    Crosscorrelate two vectors `x` and `y` in the frequency domain.
+    Cross-correlate two vectors `x` and `y` in the frequency domain.
 
     Parameters
     ----------

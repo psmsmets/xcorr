@@ -3,7 +3,7 @@ r"""
 :mod:`signal.hilbert` -- Hilbert
 ================================
 
-Hilbert transform of an N-D labeled array of data.
+Hilbert transform of an N-D labelled array of data.
 
 """
 
@@ -11,7 +11,7 @@ Hilbert transform of an N-D labeled array of data.
 # Mandatory imports
 import xarray as xr
 import numpy as np
-from scipy import signal
+import scipy as sp
 try:
     import dask
 except ModuleNotFoundError:
@@ -30,7 +30,7 @@ def hilbert(
 ):
     """
     Compute the analytic signal, using the Hilbert transform, of an N-D
-    labeled array of data.
+    labelled array of data.
 
     The transformation is done along the last axis by default.
 
@@ -65,7 +65,7 @@ def hilbert(
         dargs = dict(dask='allowed', output_dtypes=[np.complex128])
 
     # apply ufunc (and optional dask distributed)
-    y = xr.apply_ufunc(signal.hilbert, x,
+    y = xr.apply_ufunc(sp.signal.hilbert, x,
                        input_core_dims=[[dim]],
                        output_core_dims=[[dim]],
                        keep_attrs=True,

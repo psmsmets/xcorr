@@ -1,7 +1,7 @@
 r"""
 
-:mod:`scripts.helpers` -- Helpers
-=================================
+:mod:`scripts.utils` -- Utils
+=============================
 
 Xcorr scripts helper functions.
 
@@ -68,7 +68,8 @@ def init_dask(n_workers=None, scheduler_file=None, logger=None):
 
     # feedback
     c = repr(client)[9:-1].replace('\'', '').replace(',', '')
-    log(f"Dask - {c}")
+    log(f"Dask client: {c}")
+    log(f"Dask dashboard: {client.dashboard_link}")
 
     if n_workers and scheduler_file:
         log(f"Waiting for {n_workers} workers")

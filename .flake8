@@ -19,4 +19,4 @@ hang-closing = True
 # W503: line break before binary operator
 # W504: line break after binary operator
 ignore = E121, E123, E126, E133, E24, E226, E402, E704, W503, W504, 
-exclude = __init__.py
+exclude = __init__.py, *.egg-info, .DS_Store, .eggs, *.swp

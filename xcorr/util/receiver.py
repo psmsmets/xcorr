@@ -163,7 +163,7 @@ def split_pairs(pairs, **kwargs):
     Parameters
     ----------
     pairs : `list` or :class:`~xarray.DataArray`
-        List or N-D labeled array of receiver couple strings separated by
+        List or N-D labelled array of receiver couple strings separated by
         ``separator``. Each receiver is specified by a SEED-id string:
         '{network}.{station}.{location}.{channel}'.
 
@@ -284,6 +284,7 @@ def get_pair_inventory(
         receiver ``pair``.
 
     """
+    # set start and end time
     if times is not None:
         if not (
             isinstance(times, pd.DatetimeIndex) or
@@ -298,28 +299,28 @@ def get_pair_inventory(
     else:
         t0 = None
         t1 = None
+
+    # get receiver seed ids
     if isinstance(pair, list) or isinstance(pair, xr.DataArray):
         inv = Inventory([], [])
-        rr = []
+        seed_ids = []
         for p in pair:
-            rr += split_pair(p, separator, to_dict=False)
-        for r in set(rr):
-            d = receiver_to_dict(r)
-            if d['channel'][-1] in ('R', 'T'):
-                for h in ['1', '2', 'N', 'E', 'Z']:
-                    c = d['channel'][:-1] + h
-                    inv += inventory.select(
-                        **{**d, 'channel': c}, starttime=t0, endtime=t1
-                    )
-            else:
-                inv += inventory.select(**d, starttime=t0, endtime=t1)
-        return inv
+            seed_ids += split_pair(p, separator, to_dict=False)
     else:
-        r = split_pair(pair, separator, to_dict=True)
-        return (
-            inventory.select(**r[0], starttime=t0, endtime=t1) +
-            inventory.select(**r[1], starttime=t0, endtime=t1)
-        )
+        seed_ids = split_pair(pair, separator)
+
+    # substitute radial and transerve components
+    for seed_id in seed_ids:
+        if seed_id[-1] in '123NEZRT':
+            seed_ids.remove(seed_id)
+            seed_ids += [seed_id[:-1]+'?']
+
+    # lookup unique seed_id in inventory
+    for seed_id in set(seed_ids):
+        inv.extend(inventory.select(**receiver_to_dict(seed_id),
+                                    starttime=t0, endtime=t1))
+
+    return inv
 
 
 def get_receiver_coordinates(receiver: str, inventory: Inventory):

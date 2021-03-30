@@ -16,8 +16,7 @@ import sys
 
 # Relative imports
 import xcorr
-from .helpers import (ncfile, add_common_arguments,
-                      add_attrs_group, parse_attrs_group)
+from . import utils
 
 __all__ = []
 
@@ -63,11 +62,12 @@ def main():
         '-t', '--threshold', metavar='..', type=float, default=10.,
         help='Coincidence trigger threshold (default: 10.)'
     )
-    add_common_arguments(parser, dask=False)
-    add_attrs_group(parser)
+    utils.add_common_arguments(parser, dask=False)
+    utils.add_attrs_group(parser)
 
+    # parse arguments
     args = parser.parse_args()
-    args.attrs = parse_attrs_group(args)
+    args.attrs = utils.parse_attrs_group(args)
 
     # print header and core parameters
     print(f'xcorr-ct v{xcorr.__version__}')
@@ -133,8 +133,10 @@ def main():
     ds['snr'] = ds.snr.where(ds.snr <= peak)
 
     # timelapse filename
-    nc = ncfile('snr_ct', args.pair, ds.time[0].item(), ds.time[-1].item(),
-                args.prefix, args.suffix)
+    nc = utils.ncfile(
+        'snr_ct', args.pair, ds.time[0].item(), ds.time[-1].item(),
+        args.prefix, args.suffix
+    )
 
     # check if output file exists
     if os.path.exists(nc) and not args.overwrite:

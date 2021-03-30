@@ -1,30 +1,28 @@
 r"""
 
-:mod:`preprocess.operations` -- Preprocess operations
-=====================================================
+:mod:`stream.process` -- Stream process
+=======================================
 
-Preprocess a :class:`obspy.Stream` given a list of operations and parameters.
+Process a :class:`obspy.Stream` given a list of operations and parameters.
 
 """
 
 # Mandatory imports
 import warnings
-import xarray as xr
 import json
 from obspy import Inventory, Trace, Stream
 from obspy.core.util.obspy_types import ObsPyException
 
 
 # Relative imports
-from ..preprocess.running_rms import running_rms
+from .running_rms import running_rms
 from ..util.time import to_UTCDateTime
 from ..util.hasher import hash_obj
 
 
-__all__ = ['help', 'list_operations', 'is_operation', 'preprocess',
-           'example_preprocess_dict', 'hash_operations',
-           'check_operations_hash', 'operations_to_dict', 'operations_to_json',
-           'preprocess_operations_to_json', 'preprocess_operations_to_dict']
+__all__ = ['help', 'list_operations', 'is_operation', 'process',
+           'example_process_dict', 'hash_operations',
+           'check_operations_hash', 'operations_to_dict', 'operations_to_json']
 
 _self = 'obspy.core.stream.Trace'
 
@@ -296,12 +294,12 @@ def apply_operation(
     return waveforms
 
 
-def preprocess(
+def process(
     waveforms, operations: list, inventory: Inventory = None,
     starttime=None, endtime=None, raise_error: bool = False,
     verb: int = 0, **kwargs
 ):
-    r"""Preprocess waveforms given a list of operations.
+    r"""Process waveforms given a list of operations.
 
     Parameters
     ----------
@@ -340,7 +338,7 @@ def preprocess(
 
     """
     if verb > 0:
-        print('Apply preprocessing operations:')
+        print('Apply processing operations:')
 
     if not (isinstance(waveforms, Trace) or
             isinstance(waveforms, Stream)):
@@ -394,6 +392,8 @@ def preprocess(
                 verb=verb,
                 stdout_prefix=' * ',
             )
+        except (KeyboardInterrupt, SystemExit):
+            raise
         except Exception as error:
             msg = ('Failed to execute operation "{}". Error: {}'
                    .format(operation, error))
@@ -402,8 +402,6 @@ def preprocess(
             else:
                 warnings.warn(msg, UserWarning)
                 return None
-        except (KeyboardInterrupt, SystemExit):
-            raise
 
     if verb > 2:
         print(waveforms)
@@ -411,8 +409,8 @@ def preprocess(
     return waveforms
 
 
-def example_preprocess_dict(to_json: bool = False):
-    r"""Returns and example preprocessing operations dictionary, containing a
+def example_process_dict(to_json: bool = False):
+    r"""Returns and example processing operations dictionary, containing a
     list of operations per SEED channel as key.
     """
     operations = {
@@ -586,7 +584,7 @@ def check_operations_hash(
 
 
 def operations_to_dict(operations: str):
-    r"""Load preprocess operations `dict` from a JSON-encoded attribute `str`.
+    r"""Load process operations `dict` from a JSON-encoded attribute `str`.
     The sha256 hash is validated and ``operations`` keys are filtered for valid
     SEED channel codes.
     """
@@ -606,52 +604,8 @@ def operations_to_dict(operations: str):
 
 
 def operations_to_json(operations: dict):
-    r"""Convert preprocess operations from `dict` to a JSON `str`.
+    r"""Convert process operations from `dict` to a JSON `str`.
     ``operations`` keys are filtered for valid SEED channel codes and a
     sha256 hash is added or updated.
     """
     return json.dumps(hash_operations(operations))
-
-
-def preprocess_operations_to_dict(pair: xr.DataArray, attribute: str = None):
-    r"""Convert ``pair`` preprocess operations attribute inplace from a
-    JSON `str` to a `dict`. The operations hash is verified after loading
-    the json SEED channel codes and hashed.
-
-    Parameters
-    ----------
-    pair : :class:`xarray.DataArray`
-        Receiver pair couple separated by `separator`.
-        Each receiver is specified by a SEED-id string:
-        '{network}.{station}.{location}.{channel}'.
-
-    attribute : str, optional
-        Specify the operations attribute name. If None, ``attribute`` is
-        'preprocess' (default).
-
-    """
-    attribute = attribute or 'preprocess'
-    if attribute in pair.attrs and isinstance(pair.attrs[attribute], str):
-        pair.attrs[attribute] = operations_to_dict(pair.attrs[attribute])
-
-
-def preprocess_operations_to_json(pair: xr.DataArray, attribute: str = None):
-    r"""Convert ``pair`` preprocess operations attribute inplace from a `dict`
-    to a netCDF4 safe JSON `str`. Operations channels are first filtered for
-    valid SEED channel codes and hashed.
-
-    Parameters
-    ----------
-    pair : :class:`xarray.DataArray`
-        Receiver pair couple separated by `separator`.
-        Each receiver is specified by a SEED-id string:
-        '{network}.{station}.{location}.{channel}'.
-
-    attribute : str, optional
-        Specify the operations attribute name. If None, ``attribute`` is
-        'preprocess' (default).
-
-    """
-    attribute = attribute or 'preprocess'
-    if attribute in pair.attrs and isinstance(pair.attrs[attribute], dict):
-        pair.attrs[attribute] = operations_to_json(pair.attrs[attribute])

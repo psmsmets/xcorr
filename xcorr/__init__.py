@@ -2,7 +2,7 @@
 """
 xcorr
 
-**xcorr** is an open-source project containing tools to crosscorrelate
+**xcorr** is an open-source project containing tools to cross-correlate
 waveform timeseries as :class:`obspy.Stream` and stored as a self describing
 `xarray.Dataset`.
 
@@ -11,7 +11,7 @@ FAIR data guidelines.
 
 `xcorr` contains various modules such as waveform preprocessing, a client
 waterfall-based wrapping various getters from local archives as well as
-remote services, frequency domain crosscorrelationm and postprocessing/
+remote services, frequency domain cross-correlation and postprocessing/
 analysis tools.
 
 :author:
@@ -26,27 +26,28 @@ analysis tools.
     (https://www.gnu.org/licenses/gpl-3.0.en.html)
 """
 # Check for Dask
-import importlib
-__dask_spec = ((importlib.util.find_spec("dask") is not None) and
-               (importlib.util.find_spec("distributed") is not None))
+import importlib as _importlib
+__dask_spec = ((_importlib.util.find_spec("dask") is not None) and
+               (_importlib.util.find_spec("distributed") is not None))
 
 # Import main modules
-from xcorr import cc, preprocess, signal
+from . import signal, stream, util, io
 
 # Import all core functions
-from xcorr.core import (init, read, write, merge, mfread, process, bias_correct)
+from .core import (init, process, merge)
+from .io import (read, write, mfread)
 
 # Import client class
-from xcorr.client import Client
+from .stream.client import Client
 
 # Make only a selection available to __all__ to not clutter the namespace
 # Maybe also to discourage the use of `from xcorr import *`.
-__all__ = ['Client', 'cc', 'signal', 'preprocess', 'init', 'read',
-           'write', 'merge', 'mfread', 'process', 'bias_correct']
+__all__ = ['Client', 'signal', 'stream', 'util', 'io',
+           'init', 'read', 'write', 'merge', 'mfread', 'process']
 
 # Load optional functions related to Dask
 if __dask_spec:
-    from xcorr.core import lazy_process
+    from .core import lazy_process
     __all__ += ['lazy_process']
 
 # Version
@@ -54,7 +55,7 @@ try:
     # - Released versions just tags:       1.10.0
     # - GitHub commits add .dev#+hash:     1.10.1.dev3+g973038c
     # - Uncom. changes add timestamp: 1.10.1.dev3+g973038c.d20191022
-    from xcorr.version import version as __version__
+    from .version import version as __version__
 except ImportError:
     # If it was not installed, then we don't know the version.
     # We could throw a warning here, but this case *should* be

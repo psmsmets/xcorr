@@ -11,8 +11,8 @@ Detrend an N-D labelled array of data.
 # Mandatory imports
 import xarray as xr
 import numpy as np
+import scipy as sp
 import pandas as pd
-from scipy import stats
 try:
     import dask
 except ModuleNotFoundError:
@@ -87,7 +87,7 @@ def detrend(x: xr.DataArray, dim: str = None, type: str = None,
     def linear_detrend(x, y):
         def linear_detrend_axis(y, x):
             not_nan_ind = ~np.isnan(y)
-            m, b, r_val, p_val, std_err = stats.linregress(
+            m, b, r_val, p_val, std_err = sp.stats.linregress(
                 x[not_nan_ind] if skipna else x,
                 y[not_nan_ind] if skipna else y
             )

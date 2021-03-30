@@ -1,7 +1,7 @@
 r"""
 
-:mod:`preprocess.running_rms` -- Running RMS
-============================================
+:mod:`stream.process.running_rms` -- Running RMS
+================================================
 
 Running root-mean-square amplitude of a :class:`obspy.Trace` and
 :class:`obspy.Stream`.

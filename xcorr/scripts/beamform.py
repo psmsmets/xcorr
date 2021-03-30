@@ -20,8 +20,7 @@ from glob import glob
 
 # Relative imports
 import xcorr
-from .helpers import (init_dask, ncfile, add_common_arguments,
-                      add_attrs_group, parse_attrs_group)
+from . import utils
 
 __all__ = []
 
@@ -36,7 +35,7 @@ def load(pairs, time, root):
     """
     try:
         ds = xcorr.merge(
-            [xcorr.util.ncfile(pair, time, root) for pair in pairs],
+            [xcorr.io.ncfile(pair, time, root) for pair in pairs],
             fast=True
         )
     except Exception as e:
@@ -167,17 +166,20 @@ def main():
         help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
-    add_common_arguments(parser)
-    add_attrs_group(parser)
+    utils.add_common_arguments(parser)
+    utils.add_attrs_group(parser)
 
+    # parse arguments
     args = parser.parse_args()
+    args.attrs = utils.parse_attrs_group(args)
+
+    # update some arguments
     args.root = os.path.abspath(args.root)
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = (pd.to_datetime(args.end, format=args.format)
                 if args.end else args.start)
-    args.out = ncfile('beamform', args.name, args.start, args.end,
-                      args.prefix, args.suffix)
-    args.attrs = parse_attrs_group(args)
+    args.out = utils.ncfile('beamform', args.name, args.start, args.end,
+                            args.prefix, args.suffix)
 
     args.pairs = sorted(list(set([
         p.split(os.path.sep)[-1]
@@ -214,7 +216,7 @@ def main():
         dims=('pair'),
         coords={'pair': args.pairs},
         attrs={
-            'long_name': 'Crosscorrelation receiver pair',
+            'long_name': 'Cross-correlation receiver pair',
             'units': '-',
         },
         name='pair',
@@ -232,8 +234,8 @@ def main():
         print(xy)
 
     # init dask cluster and client
-    cluster, client = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
+    cluster, client = utils.init_dask(n_workers=args.nworkers,
+                                      scheduler_file=args.scheduler)
 
     # fit plane wave
     print('.. compute plane wave per day for period')
