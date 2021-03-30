@@ -3,7 +3,7 @@ r"""
 :mod:`signal.absolute` -- Absolute
 ==================================
 
-Calculate the absolute value element-wise of an N-D labeled array of data.
+Calculate the absolute value element-wise of an N-D labelled array of data.
 
 """
 
@@ -28,7 +28,7 @@ __all__ = ['abs', 'absolute']
 def absolute(
     x: xr.DataArray, **kwargs
 ):
-    r"""Calculate the absolute value element-wise of an N-D labeled
+    r"""Calculate the absolute value element-wise of an N-D labelled
     array of data.
 
     ``abs`` is a shorthand for this function.
@@ -45,7 +45,7 @@ def absolute(
     Returns
     -------
     y : :class:`xarray.DataArray`
-        An N-D labeled array of data containing the absolute value of each
+        An N-D labelled array of data containing the absolute value of each
         element in ``x``.  For complex input, ``a + ib``, the absolute value
         is :math:`\sqrt{ a^2 + b^2 }`.
         This is a scalar if ``x`` is a scalar.

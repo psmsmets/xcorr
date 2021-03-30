@@ -3,7 +3,7 @@ r"""
 :mod:`signal.trigger` -- Trigger
 ================================
 
-Estimate the coincidence trigger of an N-D labeled array of data.
+Estimate the coincidence trigger of an N-D labelled array of data.
 
 """
 
@@ -32,7 +32,7 @@ def coincidence_trigger(
     extend: int = None, dim: str = None
 ):
     """
-    Compute the triggered periods of an N-D labeled array of data with
+    Compute the triggered periods of an N-D labelled array of data with
     precomputed characteristic functions such as, for example, the
     signal-to-noise ratio.
 

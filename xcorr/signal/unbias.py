@@ -19,7 +19,7 @@ except ModuleNotFoundError:
 
 
 # Relative imports
-from ..cc import weight
+from ..util.cc import weight
 from ..util.time import update_lag_indices
 from ..util.history import historicize
 
@@ -70,7 +70,7 @@ def unbias(
         return x
 
     # get weight vector
-    wv = get_weights(x[dim]) if w is None else w
+    wv = unbias_weights(x[dim]) if w is None else w
 
     # check w
     if dim not in wv.dims:
@@ -103,7 +103,7 @@ def unbias(
     return y
 
 
-def get_weights(
+def unbias_weights(
     lag: xr.DataArray, name: str = 'w'
 ):
     """Construct the unbiased cross-correlation weight vector from the lag vector.

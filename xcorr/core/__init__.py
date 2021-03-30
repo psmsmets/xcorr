@@ -4,13 +4,14 @@ xcorr.core init
 """
 
 # Import main functions
-from ..core.core import (init, read, write, merge, mfread, process, 
-                         validate, validate_list, bias_correct)
+from .init import init
+from .merge import merge
+from .process import process
+
 try:
     from ..core.lazy import lazy_process
 except ModuleNotFoundError:
     lazy_process = None
 
 
-__all__ = ['init', 'read', 'write', 'merge', 'mfread', 'process',
-           'validate', 'validate_list', 'bias_correct', 'lazy_process']
+__all__ = ['init', 'merge', 'process', 'lazy_process']

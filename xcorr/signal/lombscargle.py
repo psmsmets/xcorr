@@ -11,7 +11,7 @@ Compute the Lomb-Scargle periodogram of an N-D labelled array of data.
 # Mandatory imports
 import xarray as xr
 import numpy as np
-from scipy import signal
+import scipy as sp
 try:
     import dask
 except ModuleNotFoundError:
@@ -111,7 +111,7 @@ def lombscargle(
             n = sum(valid)
             if nmin and n < nmin:
                 return np.full_like(w, np.nan)
-            pgram = signal.lombscargle(t[valid], x[valid], w, **kwargs)
+            pgram = sp.signal.lombscargle(t[valid], x[valid], w, **kwargs)
             return np.sqrt(pgram*4/n) if rescale else pgram
         pgram = np.apply_along_axis(
             _pgram_axis, -1, x, t, 2*np.pi*f if ordinary else f, **kwargs

@@ -3,7 +3,7 @@ r"""
 :mod:`signal.rms` -- RMS
 ========================
 
-Root-mean-square of an N-D labeled array of data.
+Root-mean-square of an N-D labelled array of data.
 
 """
 
@@ -23,7 +23,7 @@ def rms(
     x: xr.DataArray, dim: str = None
 ):
     """
-    Root-mean-square an N-D labeled array of data.
+    Root-mean-square an N-D labelled array of data.
 
     Parameters
     ----------

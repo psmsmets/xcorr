@@ -19,8 +19,7 @@ import argparse
 
 # Relative imports
 import xcorr
-from .helpers import (init_dask, ncfile, add_common_arguments,
-                      add_attrs_group, parse_attrs_group)
+from . import utils
 
 __all__ = []
 
@@ -42,7 +41,7 @@ def estimate_snr_for_day(
         if debug:
             print('.'*6, str(pair.values))
         try:
-            ds = xcorr.read(xcorr.util.ncfile(pair, day, root), fast=True)
+            ds = xcorr.read(xcorr.io.ncfile(pair, day, root), fast=True)
             if ds is None:
                 continue
             cc = ds.cc.where((ds.status == 1), drop=True)
@@ -106,7 +105,7 @@ def main():
     # arguments
     parser = argparse.ArgumentParser(
         prog='xcorr-snr',
-        description='Signal-to-noise ratio estimation of crosscrorrelations.',
+        description='Signal-to-noise ratio estimation of cross-crorrelations.',
         epilog='See also xcorr-ct xcorr-timelapse xcorr-psd xcorr-beamform',
     )
     parser.add_argument(
@@ -138,11 +137,12 @@ def main():
         help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
+    utils.add_common_arguments(parser)
+    utils.add_attrs_group(parser)
 
-    add_common_arguments(parser)
-    add_attrs_group(parser)
-
+    # parse arguments
     args = parser.parse_args()
+    args.attrs = utils.parse_attrs_group(args)
 
     # get pair list
     args.pairs = list(set([
@@ -150,14 +150,13 @@ def main():
         for p in glob(os.path.join(args.root, '*', args.pair))
     ]))
 
-    # update arguments
+    # update some arguments
     args.root = os.path.abspath(args.root)
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = pd.to_datetime(args.end, format=args.format)
-    args.out = ncfile('snr_envelope' if args.envelope else 'snr',
-                      args.pair, args.start, args.end,
-                      args.prefix, args.suffix)
-    args.attrs = parse_attrs_group(args)
+    args.out = utils.ncfile('snr_envelope' if args.envelope else 'snr',
+                            args.pair, args.start, args.end,
+                            args.prefix, args.suffix)
 
     # print header and core parameters
     print(f'xcorr-snr v{xcorr.__version__}')
@@ -179,8 +178,8 @@ def main():
                               ' and overwrite is False.')
 
     # init dask cluster and client
-    cluster, client = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
+    cluster, client = utils.init_dask(n_workers=args.nworkers,
+                                      scheduler_file=args.scheduler)
 
     # estimate snr
     print('.. estimate signal-to-noise per day for period')

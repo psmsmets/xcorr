@@ -1,8 +1,8 @@
 """
-Client
-======
+operations
+==========
 
-xcorr client.
+xcorr processed waveforms by SEED channel code.
 
 """
 import pandas as pd
@@ -16,30 +16,6 @@ import xcorr
 # Create a client object.
 client = xcorr.Client(sds_root='../../data/WaveformArchive')
 
-# Inspect the client summary
-print(client)
-
-
-###############################################################################
-# Get waveforms
-# -------------
-
-# Get waveforms for an entire day (default duration is 86400s)
-EDH = client.get_waveforms(
-    receiver='IM.H10N1..EDH',
-    time=pd.to_datetime('2015-01-15T00:00'),
-    centered=False,
-    verb=3,
-)
-# View the stream
-print(EDH)
-
-# Validate the duration
-client.check_duration(EDH, sampling_rate=250.)
-
-# Plot
-f = EDH.plot()
-
 
 ###############################################################################
 # Inventory
@@ -49,8 +25,8 @@ f = inv.plot(color=0., projection='local')
 
 
 ###############################################################################
-# Preprocess settings
-# -------------------
+# Stream operations
+# -----------------
 preprocess = {
     'BHZ': [
         ('merge', {
@@ -101,6 +77,32 @@ preprocess = {
             'max_length': 30.,
         }),
     ],
+    'BHT': [
+        ('merge', {
+            'method': 1,
+            'fill_value': 'interpolate',
+            'interpolation_samples': 0,
+        }),
+        ('filter', {'type': 'highpass', 'freq': .05}),
+        ('detrend', {'type': 'demean'}),
+        ('remove_response', {'output': 'VEL'}),
+        ('rotate', {'method': '->ZNE'}),
+        ('rotate', {'method': 'NE->RT', 'back_azimuth': 250.39}),
+        ('select', {'channel': 'BHT'}),
+        ('interpolate', {
+            'sampling_rate': 50,
+            'method': 'lanczos',
+            'a': 20,
+        }),
+        ('filter', {'type': 'lowpass', 'freq': 20.}),
+        ('trim', {}),
+        ('detrend', {'type': 'demean'}),
+        ('taper', {
+            'type': 'cosine',
+            'max_percentage': 0.05,
+            'max_length': 30.,
+        }),
+    ],
     'EDH': [
         ('merge', {
             'method': 1,
@@ -123,48 +125,58 @@ preprocess = {
 
 
 ###############################################################################
-# Preprocessed waveforms
-# ----------------------
-
-# EDH
-H10 = client.get_preprocessed_waveforms(
-    receiver='IM.H10N1..EDH',
-    time=pd.to_datetime('2015-01-15T12:00'),
-    preprocess=preprocess,
-    inventory=inv,
-    verb=0,
-)
-f = H10.plot()
-
-# BHZ
-BHZ = client.get_preprocessed_waveforms(
-    receiver='IU.RAR.10.BHZ',
-    time=pd.to_datetime('2015-01-15T12:00'),
-    preprocess=preprocess,
-    inventory=inv,
-    verb=True,
-)
-f = BHZ.plot()
+# Processed waveforms
+# -------------------
 
 # BHR
-BHR = client.get_preprocessed_waveforms(
+BHR = client.get_processed_waveforms(
     receiver='IU.RAR.10.BHR',
-    time=pd.to_datetime('2016-01-15T12:00'),
-    preprocess=preprocess,
+    time=pd.to_datetime('2015-01-15T12:00'),
+    operations=preprocess,
     inventory=inv,
     verb=2,
 )
 f = BHR.plot()
 
+# BHT
+BHT = client.get_processed_waveforms(
+    receiver='IU.RAR.10.BHT',
+    time=pd.to_datetime('2015-01-15T12:00'),
+    operations=preprocess,
+    inventory=inv,
+    verb=5,
+)
+f = BHT.plot()
+
+# BHZ
+BHZ = client.get_processed_waveforms(
+    receiver='IU.RAR.10.BHZ',
+    time=pd.to_datetime('2015-01-15T12:00'),
+    operations=preprocess,
+    inventory=inv,
+    verb=True,
+)
+f = BHZ.plot()
+
+# EDH
+EDH = client.get_processed_waveforms(
+    receiver='IM.H10N1..EDH',
+    time=pd.to_datetime('2015-01-15T12:00'),
+    operations=preprocess,
+    inventory=inv,
+    verb=0,
+)
+f = EDH.plot()
+
 
 ###############################################################################
-# Preprocessed pair stream
-# ------------------------
+# Processed pair stream
+# ---------------------
 
-pair = client.get_pair_preprocessed_waveforms(
+pair = client.get_pair_processed_waveforms(
     pair='IM.H10N1..EDH-IU.RAR.10.BHZ',
     time=pd.to_datetime('2015-01-15T12:00'),
-    preprocess=preprocess,
+    operations=preprocess,
     inventory=inv,
     verb=2,
 )
@@ -177,7 +189,9 @@ f = pair[1].plot()
 # ----
 
 # hash
-xcorr.util.hasher.hash_Stream(pair)
+h = xcorr.util.hasher.hash_Stream(pair)
+print(h)
 
 # or using the wrapper
-xcorr.util.hasher.hash(pair)
+h = xcorr.util.hasher.hash(pair)
+print(h)

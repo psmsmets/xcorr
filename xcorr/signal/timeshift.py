@@ -14,7 +14,7 @@ import xarray as xr
 
 # Relative imports
 from ..util.history import historicize
-from ..signal.fft import fft, ifft, rfft, irfft
+from .fft import fft, ifft, rfft, irfft
 
 
 __all__ = ['timeshift']

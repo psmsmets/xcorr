@@ -1,6 +1,6 @@
 """
 CC
-===
+==
 
 Cross-correlation using dask.
 

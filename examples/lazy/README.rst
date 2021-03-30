@@ -1,9 +1,8 @@
-Lazy process
-============
+Lazy examples
+=============
 
-Lazy examples to verify client data availability, per receiver preprocessing
-methods, and crosscorrelation processing.
-
+Lazy examples to verify client waveform availability, channel based stream
+processing and cross-correlation processing.
 
 Make sure that no subroutine (of ObsPy, SciPy, NumPy, ...) runs uncontrolled
 multithreaded.

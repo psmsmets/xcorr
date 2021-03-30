@@ -1,9 +1,9 @@
 r"""
 
-:mod:`util.path` -- Path Utilities
-==================================
+:mod:`io.filesystem` -- filesystem utilities
+============================================
 
-Utilities for ``xcorr`` for file naming.
+xcorr utilities for file naming.
 
 """
 

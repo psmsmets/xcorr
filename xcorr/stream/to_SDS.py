@@ -2,7 +2,7 @@
 """
 Python module for saving a stream in an SDS filesystem structure.
 
-.. module:: stream2SDS
+.. module:: to_SDS
 
 :author:
     Shahar Shani-Kadmiel (S.Shani-Kadmiel@tudelft.nl)
@@ -24,7 +24,7 @@ from obspy import UTCDateTime, read, Stream
 from obspy.core.util.testing import streams_almost_equal
 
 
-__all__ = ['stream2SDS']
+__all__ = ['to_SDS']
 
 
 # Pattern of the SDS filesystem structure
@@ -32,7 +32,7 @@ __all__ = ['stream2SDS']
 sdsPattern = os.path.join('*{}', '{}', '{}', '{}.*', '*.{}')
 
 
-def stream2SDS(
+def to_SDS(
     stream: Stream, sds_path: str, datatype: str = 'D',
     out_format: str = 'MSEED', method: str = 'merge',
     min_seconds: float = 3600., extra_samples: int = 10,

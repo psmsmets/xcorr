@@ -1,9 +1,9 @@
 r"""
 
-:mod:`signal.accessors` -- Accessors
-====================================
+:mod:`signal.accessor` -- Accessor
+==================================
 
-Xarray Dataset and DataArray accessors for xcorr.signal.
+Xarray DataArray accessor for xcorr.signal.
 
 """
 
@@ -14,24 +14,32 @@ from functools import wraps
 
 
 # Relative imports
-from ..signal.absolute import abs, absolute
-from ..signal.beamform import plane_wave
-from ..signal.correlate import correlate1d, correlate2d
-from ..signal.detrend import detrend, demean
-from ..signal.fft import fft, ifft, rfft, irfft
-from ..signal.filter import filter
-from ..signal.hilbert import hilbert
-from ..signal.lombscargle import lombscargle
-from ..signal.normalize import norm1d, norm2d
-from ..signal.rms import rms
-from ..signal.snr import snr
-from ..signal.spectrogram import spectrogram
-from ..signal.taper import taper
-from ..signal.timeshift import timeshift
-from ..signal.tri import tri_mirror
-from ..signal.trigger import coincidence_trigger
-from ..signal.unbias import unbias
-from ..signal.window import window
+from .absolute import abs as abs_
+from .absolute import absolute as absolute_
+from .beamform import plane_wave as plane_wave_
+from .correlate import correlate1d as correlate1d_
+from .correlate import correlate2d as correlate2d_
+from .detrend import detrend as detrend_
+from .detrend import demean as demean_
+from .fft import fft as fft_
+from .fft import ifft as ifft_
+from .fft import rfft as rfft_
+from .fft import irfft as irfft_
+from .filter import filter as filter_
+from .hilbert import hilbert as hilbert_
+from .lombscargle import lombscargle as lombscargle_
+from .normalize import norm1d as norm1d_
+from .normalize import norm2d as norm2d_
+from .rms import rms as rms_
+from .snr import snr as snr_
+from .spectrogram import spectrogram as spectrogram_
+from .taper import taper as taper_
+from .timeshift import timeshift as timeshift_
+from .tri import tri_mirror as tri_mirror_
+from .trigger import coincidence_trigger as coincidence_trigger_
+from .unbias import unbias as unbias_
+from .unbias import unbias_weights as unbias_weights_
+from .window import window as window_
 
 
 __all__ = []
@@ -39,232 +47,241 @@ __all__ = []
 
 @xr.register_dataarray_accessor('signal')
 class SignalAccessor():
-    """DataArray signal accessors
+    """DataArray signal accessor
     """
-    def __init__(self, da: xr.DataArray):
-        self._da = da
+    def __init__(self, xarray_obj: xr.DataArray):
+        self._obj = xarray_obj
 
-    @wraps(absolute)
+    @wraps(abs_)
     def abs(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.abs`.
         Do not edit here.
         """
-        return abs(self._da, *args, **kwargs)
+        return abs_(self._obj, *args, **kwargs)
 
-    @wraps(absolute)
+    @wraps(absolute_)
     def absolute(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.absolute`.
         Do not edit here.
         """
-        return absolute(self._da, *args, **kwargs)
+        return absolute_(self._obj, *args, **kwargs)
 
-    @wraps(coincidence_trigger)
+    @wraps(coincidence_trigger_)
     def coincidence_trigger(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.coincidence_trigger`.
         Do not edit here.
         """
-        return coincidence_trigger(self._da, *args, **kwargs)
+        return coincidence_trigger_(self._obj, *args, **kwargs)
 
-    @wraps(correlate1d)
+    @wraps(correlate1d_)
     def correlate1d(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.correlate1d`.
         Do not edit here.
         """
-        return correlate1d(self._da, *args, **kwargs)
+        return correlate1d_(self._obj, *args, **kwargs)
 
-    @wraps(correlate2d)
+    @wraps(correlate2d_)
     def correlate2d(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.correlate2d`.
         Do not edit here.
         """
-        return correlate2d(self._da, *args, **kwargs)
+        return correlate2d_(self._obj, *args, **kwargs)
 
-    @wraps(demean)
+    @wraps(demean_)
     def demean(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.demean`.
         Do not edit here.
         """
-        return demean(self._da, *args, **kwargs)
+        return demean_(self._obj, *args, **kwargs)
 
-    @wraps(detrend)
+    @wraps(detrend_)
     def detrend(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.detrend`.
         Do not edit here.
         """
-        return detrend(self._da, *args, **kwargs)
+        return detrend_(self._obj, *args, **kwargs)
 
-    @wraps(fft)
+    @wraps(fft_)
     def fft(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.fft`.
         Do not edit here.
         """
-        return fft(self._da, *args, **kwargs)
+        return fft_(self._obj, *args, **kwargs)
 
-    @wraps(ifft)
+    @wraps(ifft_)
     def ifft(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.ifft`.
         Do not edit here.
         """
-        return ifft(self._da, *args, **kwargs)
+        return ifft_(self._obj, *args, **kwargs)
 
-    @wraps(rfft)
+    @wraps(rfft_)
     def rfft(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.rfft`.
         Do not edit here.
         """
-        return rfft(self._da, *args, **kwargs)
+        return rfft_(self._obj, *args, **kwargs)
 
-    @wraps(irfft)
+    @wraps(irfft_)
     def irfft(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.irfft`.
         Do not edit here.
         """
-        return irfft(self._da, *args, **kwargs)
+        return irfft_(self._obj, *args, **kwargs)
 
-    @wraps(filter)
+    @wraps(filter_)
     def filter(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.filter`.
         Do not edit here.
         """
-        return filter(self._da, *args, **kwargs)
+        return filter_(self._obj, *args, **kwargs)
 
-    @wraps(hilbert)
+    @wraps(hilbert_)
     def hilbert(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.hilbert`.
         Do not edit here.
         """
-        return hilbert(self._da, *args, **kwargs)
+        return hilbert_(self._obj, *args, **kwargs)
 
-    @wraps(lombscargle)
+    @wraps(lombscargle_)
     def lombscargle(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.lombscargle`.
         Do not edit here.
         """
-        return lombscargle(self._da, *args, **kwargs)
+        return lombscargle_(self._obj, *args, **kwargs)
 
-    @wraps(norm1d)
+    @wraps(norm1d_)
     def norm1d(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.norm1d`.
         Do not edit here.
         """
-        return norm1d(self._da, *args, **kwargs)
+        return norm1d_(self._obj, *args, **kwargs)
 
-    @wraps(norm2d)
+    @wraps(norm2d_)
     def norm2d(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.norm2d`.
         Do not edit here.
         """
-        return norm2d(self._da, *args, **kwargs)
+        return norm2d_(self._obj, *args, **kwargs)
 
-    @wraps(plane_wave)
+    @wraps(plane_wave_)
     def plane_wave_estimate(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.plane_wave`.
         Do not edit here.
         """
-        return plane_wave(self._da, *args, **kwargs)
+        return plane_wave_(self._obj, *args, **kwargs)
 
-    @wraps(rms)
+    @wraps(rms_)
     def rms(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.rms`.
         Do not edit here.
         """
-        return rms(self._da, *args, **kwargs)
+        return rms_(self._obj, *args, **kwargs)
 
-    @wraps(snr)
+    @wraps(snr_)
     def snr(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.snr`.
         Do not edit here.
         """
-        return snr(self._da, *args, **kwargs)
+        return snr_(self._obj, *args, **kwargs)
 
-    @wraps(spectrogram)
+    @wraps(spectrogram_)
     def spectrogram(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.spectrogram`.
         Do not edit here.
         """
-        return spectrogram(self._da, *args, **kwargs)
+        return spectrogram_(self._obj, *args, **kwargs)
 
-    @wraps(taper)
+    @wraps(taper_)
     def taper(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.taper`.
         Do not edit here.
         """
-        return taper(self._da, *args, **kwargs)
+        return taper_(self._obj, *args, **kwargs)
 
-    @wraps(timeshift)
+    @wraps(timeshift_)
     def timeshift(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.timeshift`.
         Do not edit here.
         """
-        return timeshift(self._da, *args, **kwargs)
+        return timeshift_(self._obj, *args, **kwargs)
 
-    @wraps(tri_mirror)
+    @wraps(tri_mirror_)
     def tri_mirror(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.tri_mirror`.
         Do not edit here.
         """
-        return tri_mirror(self._da, *args, **kwargs)
+        return tri_mirror_(self._obj, *args, **kwargs)
 
-    @wraps(unbias)
+    @wraps(unbias_)
     def unbias(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.unbias`.
         Do not edit here.
         """
-        return unbias(self._da, *args, **kwargs)
+        return unbias_(self._obj, *args, **kwargs)
 
-    @wraps(window)
+    @wraps(unbias_weights_)
+    def unbias_weights(self, *args, **kwargs):
+        """
+        The docstring and signature are taken from
+        :func:`~xcorr.signal.unbias_weights`.
+        Do not edit here.
+        """
+        return unbias_weights_(self._obj, *args, **kwargs)
+
+    @wraps(window_)
     def window(self, *args, **kwargs):
         """
         The docstring and signature are taken from
         :func:`~xcorr.signal.window`.
         Do not edit here.
         """
-        return window(self._da, *args, **kwargs)
+        return window_(self._obj, *args, **kwargs)

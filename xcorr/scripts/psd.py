@@ -19,8 +19,7 @@ import argparse
 
 # Relative imports
 import xcorr
-from .helpers import (init_dask, add_common_arguments,
-                      add_attrs_group, parse_attrs_group)
+from . import utils
 
 __all__ = []
 
@@ -39,20 +38,14 @@ def load(pair, period, root):
 
     files = []
     for t in pd.date_range(t0, t1, freq='1D'):
-        files.append(xcorr.util.ncfile(str(pair.values), t, src))
+        files.append(xcorr.io.ncfile(str(pair.values), t, src))
 
     ds = xcorr.merge(files)
 
     # extract valid data
-    vel = dict(min=1.46, max=1.50)
     t0, t1 = np.datetime64(period.start), np.datetime64(period.end)
-    mask = xcorr.signal.multi_mask(
-        x=ds.lag,
-        y=ds.distance,
-        lower=vel['min'],
-        upper=vel['max'],
-        invert=True,
-    ) & (ds.status == 1) & (ds.time >= t0) & (ds.time <= t1)
+    mask = ((ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46) &
+            (ds.status == 1) & (ds.time >= t0) & (ds.time <= t1))
 
     # copy to avoid dimension blow-up
     distance = ds.distance
@@ -205,10 +198,11 @@ def main():
               'working directory)')
     )
 
-    add_common_arguments(parser)
-    add_attrs_group(parser)
+    utils.add_common_arguments(parser)
+    utils.add_attrs_group(parser)
 
     args = parser.parse_args()
+    args.attrs = utils.parse_attrs_group(args)
 
     # snr and ct file
     snr_ct = xr.open_dataset(args.snr_ct)
@@ -219,7 +213,6 @@ def main():
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
         args.end = pd.to_datetime(args.end, format=args.format)
-    args.attrs = parse_attrs_group(args)
 
     # print header and core parameters
     print(f'xcorr-psd v{xcorr.__version__}')
@@ -234,8 +227,8 @@ def main():
     args.end = args.end or pd.to_datetime(snr_ct.time[-1].item())
 
     # init dask client
-    cluster, client = init_dask(n_workers=args.nworkers,
-                                scheduler_file=args.scheduler)
+    cluster, client = utils.init_dask(n_workers=args.nworkers,
+                                      scheduler_file=args.scheduler)
 
     # filter snr and ct
     print('.. filter snr and ct')

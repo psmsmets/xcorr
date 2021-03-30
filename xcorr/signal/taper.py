@@ -3,7 +3,7 @@ r"""
 :mod:`signal.taper` -- Taper
 ============================
 
-Taper an N-D labeled array of data.
+Taper an N-D labelled array of data.
 
 """
 
@@ -13,7 +13,7 @@ import xarray as xr
 
 
 # Relative imports
-from ..signal.window import window
+from .window import window
 from ..util.history import historicize
 
 
@@ -26,7 +26,7 @@ def taper(
 
 ):
     """
-    Taper an N-D labeled array of data.
+    Taper an N-D labelled array of data.
 
     Parameters
     ----------
