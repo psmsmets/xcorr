@@ -16,7 +16,8 @@ from functools import wraps
 
 # Relative imports
 from .merge import merge
-from .plot import postprocess, plot_ccfs, plot_ccf
+from .plot import plot_ccfs, plot_ccf
+from .postprocess import postprocess
 from .process import process
 from ..io import write
 from .. import util, version
