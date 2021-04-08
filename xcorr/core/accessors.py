@@ -16,6 +16,7 @@ from functools import wraps
 
 # Relative imports
 from .merge import merge
+from .plot import postprocess, plot_ccfs, plot_ccf
 from .process import process
 from ..io import write
 from .. import util, version
@@ -44,7 +45,7 @@ class XcorrAccessor():
         # check dimensions and variables
         dim = ['lag', 'pair', 'time']
         var = ['cc', 'distance', 'pair_offset', 'status', 'time_offset']
-        if (dim != list(obj.dims)) or (var != list(obj.data_vars)):
+        if (dim != sorted(obj.dims)) or (var != sorted(obj.data_vars)):
             raise AttributeError("Dataset is not an xcorr cc product.")
 
         self._obj = obj
@@ -60,6 +61,24 @@ class XcorrAccessor():
         """Return current the dependencies version
         """
         return util.metadata.list_versions(as_str=True)
+
+    @wraps(plot_ccf)
+    def plot_ccf(self, *args, **kwargs):
+        """
+        """
+        return plot_ccf(self._obj.cc, self._obj.distance, *args, **kwargs)
+
+    @wraps(plot_ccfs)
+    def plot_ccfs(self, *args, **kwargs):
+        """
+        """
+        return plot_ccfs(self._obj.cc, self._obj.distance, *args, **kwargs)
+
+    @wraps(postprocess)
+    def postprocess(self, *args, **kwargs):
+        """
+        """
+        return postprocess(self._obj, *args, **kwargs)
 
     @wraps(process)
     def process(self, *args, **kwargs):
