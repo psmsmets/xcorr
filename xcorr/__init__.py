@@ -34,7 +34,7 @@ __dask_spec = ((_importlib.util.find_spec("dask") is not None) and
 from . import signal, stream, util, io
 
 # Import all core functions
-from .core import (init, process, postprocess, merge)
+from .core import (init, process, postprocess, merge, plot)
 from .io import (read, write, mfread)
 
 # Import client class
@@ -43,7 +43,7 @@ from .stream.client import Client
 # Make only a selection available to __all__ to not clutter the namespace
 # Maybe also to discourage the use of `from xcorr import *`.
 __all__ = ['Client', 'signal', 'stream', 'util', 'io', 'postprocess',
-           'init', 'read', 'write', 'merge', 'mfread', 'process']
+           'init', 'read', 'write', 'merge', 'mfread', 'process', 'plot']
 
 # Load optional functions related to Dask
 if __dask_spec:

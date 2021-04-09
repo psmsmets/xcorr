@@ -16,8 +16,11 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import AutoMinorLocator
 
+# Relative imports
+from ..signal.trigger import plot_trigs
 
-__all__ = ['plot_ccf', 'plot_ccfs']
+
+__all__ = ['plot_ccf', 'plot_ccfs', 'plot_snr_ct']
 
 
 # set fontsize
@@ -318,10 +321,10 @@ def plot_ccfs(
 
 
 def plot_snr_ct(
-    snr: xr.DataArray, ct: xr.DataArray = None, ax: mpl.axes.Axes=None,
+    snr: xr.DataArray, ct: xr.DataArray = None, ax: mpl.axes.Axes = None,
     *args, **kwargs
 ):
-    """Plot an xcorr CCF DataArray with a spectrogram.
+    """Plot the signal-to-noise ratio and coincidence triggers.
 
     Parameters
     ----------
@@ -335,9 +338,7 @@ def plot_snr_ct(
         Axis on which to plot this figure. By default, use the current axis.
 
     *args, **kwargs : optional
-        Additional arguments to snr.plot.line 
+        Additional arguments to snr.plot.line
     """
-    snr_ct.snr.plot.line(x='time', hue='pair', ax=ax, **kwargs)
-    xcorr.signal.trigger.plot_trigs(snr_ct.snr, snr_ct.ct, ax=ax)
-
-    return
+    snr.plot.line(x='time', hue='pair', ax=ax, **kwargs)
+    plot_trigs(snr, ct, ax=ax)
