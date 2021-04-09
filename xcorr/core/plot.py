@@ -11,7 +11,7 @@ Some predefined plotting routines
 # Mandatory imports
 import numpy as np
 import xarray as xr
-# import matplotlib as mpl
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import AutoMinorLocator
@@ -315,3 +315,29 @@ def plot_ccfs(
         axis.append(ax)
 
     return gs
+
+
+def plot_snr_ct(
+    snr: xr.DataArray, ct: xr.DataArray = None, ax: mpl.axes.Axes=None,
+    *args, **kwargs
+):
+    """Plot an xcorr CCF DataArray with a spectrogram.
+
+    Parameters
+    ----------
+    snr : :class:`xr.DataArray`
+        Signal-to-noise ratio data.
+
+    ct : :class:`xr.DataArray`, optional
+        Coincidence trigger data.
+
+    ax : :class:`mpl.axes.Axes`, optional
+        Axis on which to plot this figure. By default, use the current axis.
+
+    *args, **kwargs : optional
+        Additional arguments to snr.plot.line 
+    """
+    snr_ct.snr.plot.line(x='time', hue='pair', ax=ax, **kwargs)
+    xcorr.signal.trigger.plot_trigs(snr_ct.snr, snr_ct.ct, ax=ax)
+
+    return
