@@ -9,7 +9,9 @@ Predefined cc postproccessing
 
 
 # Mandatory imports
+import pandas as pd
 import xarray as xr
+import warnings
 
 
 __all__ = ['postprocess']
@@ -43,12 +45,15 @@ def postprocess(
         postprocessed and replaced.
 
     """
+    # check
+    if 'postprocess' in ds.cc.attrs:
+        warnings.warn(f"Dataset already postprocessed on {ds.cc.postprocess}")
+        return ds
+
     # set celerities
-    cmin = cmin or 1460
-    cmax = cmax or 1500
-    if ds.distance.units == 'km':
-        cmin /= 1000
-        cmax /= 1000
+    cmin = cmin or 1450
+    cmax = cmax or 1520
+    d_factor = 1000 if ds.distance.units == 'km' else 1
 
     # set filter arguments
     filter_kwargs = {
@@ -65,8 +70,8 @@ def postprocess(
     cc = (
         ds.cc.where(
             (ds.status == 1) &
-            (ds.lag >= ds.distance.min()/cmax) &
-            (ds.lag <= ds.distance.max()/cmin),
+            (ds.lag >= ds.distance.min()*d_factor/cmax) &
+            (ds.lag <= ds.distance.max()*d_factor/cmin),
             drop=True
         )
         .signal.unbias()
@@ -76,6 +81,9 @@ def postprocess(
         .signal.filter(**filter_kwargs)
         .signal.taper(max_length=3/2)  # filter artefacts
     )
+    cc.attrs['postprocess'] = f"{pd.to_datetime('now')}"
+    cc.lag.attrs['cmin'] = cmin
+    cc.lag.attrs['cmax'] = cmax
 
     # replace raw with processed cc
     ds = ds.drop_vars(('cc', 'lag'))
