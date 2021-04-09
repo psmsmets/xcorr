@@ -4,7 +4,7 @@ channels:
   - intel
   - defaults
 dependencies:
-  - python=3.8
+  - python=3.9
   - numpy
   - scipy
   - matplotlib
@@ -33,6 +33,7 @@ dependencies:
   - jupyter
   - flake8
   - scikit-learn
+  - scikit-image
   - python-slugify
   - pip
   - pip:
