@@ -45,8 +45,8 @@ class XcorrAccessor():
 
         # check dimensions and variables
         dim = ['lag', 'pair', 'time']
-        var = ['cc', 'distance', 'pair_offset', 'status', 'time_offset']
-        if (dim != sorted(obj.dims)) or (var != sorted(obj.data_vars)):
+        # var = ['cc', 'distance', 'pair_offset', 'status', 'time_offset']
+        if (dim != sorted(obj.dims)) or ('cc' not in obj.data_vars):
             raise AttributeError("Dataset is not an xcorr cc product.")
 
         self._obj = obj

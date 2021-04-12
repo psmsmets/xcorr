@@ -29,13 +29,15 @@ plt.rcParams.update({'font.size': 9})
 
 def plot_ccf(
     cc: xr.DataArray, distance=None, pair: int = 0, time: int = 0,
-    cmin: float = None, cmax: float = None, cmajor: float = None,
-    cminor: float = None, lag_lim: tuple = None, freq_lim: tuple = None,
-    spectrogram_db: bool = True, spectrogram_contourf: bool = True,
-    spectrogram_kwargs: dict = None, spectrogram_plot_kwargs: dict = None,
+    normalize: bool = False, cmin: float = None, cmax: float = None,
+    cmajor: float = None, cminor: float = None, lag_lim: tuple = None,
+    freq_lim: tuple = None, spectrogram_db: bool = True,
+    spectrogram_contourf: bool = True, spectrogram_kwargs: dict = None,
+    spectrogram_plot_kwargs: dict = None,
     cc_plot_kwargs: dict = None, cbar_kwargs: dict = None,
+    figure: mpl.figure.Figure = None
 ) -> GridSpec:
-    """Plot an xcorr CCF DataArray with a spectrogram.
+    """Plot a single-pair xcorr CCFs and it's spectrogram
 
     Parameters
     ----------
@@ -44,8 +46,9 @@ def plot_ccf(
         If depending on 'pair', the dimension is reduced with ``pair``.
 
     distance : :class:`xr.DataArray`, optional
-        Relative distance from the cross-correlation pair towards the POI used
-        to set the celerity ticks and range.
+        The distance used to set the celerity ticks and range. Can be the
+        geodetic distance between the cross-correlation pair or the relative
+        distance towards a POI.
         If depending on 'pair', the dimension is reduced with ``pair``.
 
     time : `int`, optional
@@ -53,6 +56,9 @@ def plot_ccf(
 
     pair : `int`, optional
         Set the pair coordinate index. Defaults to `0`.
+
+    normalize : `bool`, optional
+        Normalize the CCF and spectogram plots.
 
     cmin : `float`, optional
         Siginal window minimal celerity, in m/s. Defaults to 1460 m/s.
@@ -92,6 +98,10 @@ def plot_ccf(
     cbar_kwargs : `dict`, optional
         Dictionary of keyword arguments to pass to the colorbar.
 
+    figure : :class:`matplotlib.figure.Figure`, optional
+        User-defined figure object. If empty (default) a constrained layout
+        with figsize (7, 4) is created.
+
     Returns
     -------
     gs : :class:`matplotlib.gridspec.GridSpec`
@@ -107,9 +117,9 @@ def plot_ccf(
     if sorted(cc.dims) != ['lag', 'time']:
         raise ValueError("cc can only have dimensions 'time' and 'lag'")
 
-    ccf_lim = (-1.05, 1.05)
+    ccf_max = cc.signal.abs().max()
+    ccf_lim = (-1.05, 1.05) if normalize else (-1.05 * ccf_max, 1.05 * ccf_max)
     freq_lim = freq_lim or ()
-    factor = cc.signal.abs().max()
 
     cmin = cmin or 1460
     cmax = cmax or 1500
@@ -125,8 +135,7 @@ def plot_ccf(
         d = None
         lag_lim = lag_lim or (cc.lag.min().item(), cc.lag.max().item())
 
-    fig = plt.figure(constrained_layout=True, figsize=(7, 4))
-
+    fig = figure or plt.figure(constrained_layout=True, figsize=(7, 4))
     gs = GridSpec(2, 2, figure=fig, width_ratios=(40, 1))
     ax1 = fig.add_subplot(gs[0, 0])
     ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
@@ -141,15 +150,16 @@ def plot_ccf(
         'add_legend': False,
         **(cc_plot_kwargs or dict()),
     }
-    (cc/factor).plot.line(**cc_plot_kwargs)
+    (cc/ccf_max if normalize else cc).plot.line(**cc_plot_kwargs)
     ax1.set_title(None)
+    ax1.set_xlim(*lag_lim)
     ax1.set_xlabel(None)
     ax1.set_ylim(*ccf_lim)
+    ax1.ticklabel_format(axis='y', useOffset=False, style='plain')
     ax1.set_ylabel('CCF [-]')
     ax1.xaxis.set_minor_locator(AutoMinorLocator())
     ax1.tick_params(labelbottom=False)
     ax1.yaxis.set_ticks_position('both')
-    ax1.set_xlim(*lag_lim)
 
     if d:
         ax1_t = ax1.secondary_xaxis('top')
@@ -171,18 +181,18 @@ def plot_ccf(
         **(spectrogram_kwargs or dict())
     }
     p = (cc.isel(time=time)).signal.spectrogram(**spectrogram_kwargs)
-    p = p/p.max()
+    p = p/p.max() if (normalize or spectrogram_db) else p
+    p = (10 * xr.ufuncs.log10(p.where(p > 0))) if spectrogram_db else p
 
     # plot spectrogram
     spectrogram_plot_kwargs = {
         'cmap': 'afmhot_r',
-        'vmin': -70 if spectrogram_db else 0,
-        'vmax': -10 if spectrogram_db else .5,
+        'vmin': -36 if spectrogram_db else (0 if normalize else None),
+        'vmax': -0 if spectrogram_db else (.5 if normalize else None),
         'ax': ax2,
         **(spectrogram_plot_kwargs or dict()),
         'add_colorbar': False,
     }
-    p = (xr.ufuncs.log10(p.where(p > 0)) * 20) if spectrogram_db else p
     p = (p.plot.contourf(**spectrogram_plot_kwargs) if spectrogram_contourf
          else p.plot.imshow(**spectrogram_plot_kwargs))
 
@@ -214,9 +224,9 @@ def plot_ccfs(
     cc: xr.DataArray, distance: xr.DataArray = None,
     pairs: xr.DataArray = None, cmin: float = None, cmax: float = None,
     cmajor: float = None, cminor: float = None, lag_lim: tuple = None,
-    cc_plot_kwargs: dict = None,
+    cc_plot_kwargs: dict = None, figure: mpl.figure.Figure = None
 ) -> GridSpec:
-    """Plot an xcorr CCF DataArray with a spectrogram.
+    """Plot multi-pair xcorr CCFs in separate axis
 
     Parameters
     ----------
@@ -225,9 +235,9 @@ def plot_ccfs(
         If depending on 'pair', the dimension is reduced with ``pair``.
 
     distance : :class:`xr.DataArray`, optional
-        Relative distance from the cross-correlation pair towards the POI used
-        to set the celerity ticks and range.
-        If depending on 'pair', the dimension is reduced with ``pair``.
+        The distance used to set the celerity ticks and range. Can be the
+        geodetic distance between the cross-correlation pair or the relative
+        distance towards a POI.
 
     cmin : `float`, optional
         Siginal window minimal celerity, in m/s. Defaults to 1460 m/s.
@@ -242,10 +252,14 @@ def plot_ccfs(
         Celerity minor thick spacing, in m/s. Defaults to 1 m/s.
 
     lag_lim : `tuple`, optional
-        Set the lag lower and upper limit.
+        Set the time lag lower and upper limit.
 
     cc_plot_kwargs : `dict`, optional
         Dictionary of keyword arguments to pass to the cc line plot function.
+
+    figure : :class:`matplotlib.figure.Figure`, optional
+        User-defined figure object. If empty (default) a constrained layout
+        with figsize (7, len(pairs)+1) is created.
 
     Returns
     -------
@@ -271,7 +285,8 @@ def plot_ccfs(
     else:
         lag_lim = lag_lim or (cc.lag.min().item(), cc.lag.max().item())
 
-    fig = plt.figure(constrained_layout=True, figsize=(7, len(pairs) + 1))
+    fig = figure or plt.figure(constrained_layout=True,
+                               figsize=(7, len(pairs) + 1))
     gs = GridSpec(pairs.size, 1, figure=fig)
 
     cc_plot_kwargs = {
@@ -294,6 +309,7 @@ def plot_ccfs(
         if i != len(pairs)-1:
             ax.set_xlabel(None)
             ax.tick_params(labelbottom=False)
+            ax.ticklabel_format(axis='y', useOffset=False, style='plain')
 
         if isinstance(distance, xr.DataArray):
             d = distance.sel(pair=pair).item()*d_factor
@@ -342,3 +358,59 @@ def plot_snr_ct(
     """
     snr.plot.line(x='time', hue='pair', ax=ax, **kwargs)
     plot_trigs(snr, ct, ax=ax)
+
+
+def plot_ccfs_colored(
+    cc: xr.DataArray, sn: xr.DataArray = None, sn_threshold: float = None,
+    alpha: float = None, pairs: xr.DataArray = None, ax: mpl.axes.Axes = None,
+    **kwargs
+) -> mpl.axes.Axes:
+    """Plot multi-pair CCFs color-coded in a single axes.
+
+    Parameters
+    ----------
+    cc : :class:`xr.DataArray`
+        Cross-correlation data with dims 'lag' and 'time'.
+        If depending on 'pair', the dimension is reduced with ``pair``.
+
+    sn : :class:`xr.DataArray`, optional
+        Signal-to-noise ratio to filter CCFs with the minimal threshold.
+
+    sn_threshold : `float`, optional
+        Set the signal-to-noise ratio threshold to filter CCFs. Defaults to 1.
+
+    ax : :class:`mpl.axes.Axes`, optional
+        Axis on which to plot this figure. By default, use the current axis.
+
+    **kwargs : optional
+        Additional keyword arguments to cc.plot.line
+
+    Returns
+    -------
+    ax : :class:`matplotlib.axes.Axes`
+        The plot axes.
+
+    """
+    ax = ax or plt.gca()
+    alpha = alpha or .25
+
+    # filter CCFs by the signal-to-noise ratio?
+    sn_filt = isinstance(sn, xr.DataArray)
+
+    lines = []
+    for p, c in zip(cc.pair,  mpl.rcParams['axes.prop_cycle']()):
+        sn_pass = sn.loc[{'pair': p}] >= sn_threshold if sn_filt else None
+        if sn_filt and not any(sn_pass):
+            continue
+        for t in cc.time[sn_pass] if sn_filt else cc.time:
+            line, = (cc
+                     .sel(pair=p, time=t)
+                     .plot.line(x='lag', alpha=alpha, ax=ax, **c, **kwargs)
+                     )
+        lines.append((line, str(p.values)))
+    plt.legend(list(zip(*lines))[0], list(zip(*lines))[1])
+
+    if sn_filt:
+        ax.set_title(f'{sn.long_name} > {sn_threshold}')
+
+    return ax

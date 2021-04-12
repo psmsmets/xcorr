@@ -18,8 +18,9 @@ __all__ = ['postprocess']
 
 
 def postprocess(
-    ds: xr.Dataset, cmin: float = None, cmax: float = None,
-    filter_kwargs: dict = None
+    ds: xr.Dataset, lag_lim: tuple = None, clim: tuple = None,
+    lag_min: float = None, lag_max: float = None, cmin: float = None,
+    cmax: float = None, filter_kwargs: dict = None
 ):
     """Postprocess an xcorr CCF dataset
 
@@ -29,10 +30,24 @@ def postprocess(
         Xcorr cc dataset.
 
     cmin : `float`, optional
-        Siginal window minimal celerity, in m/s. Defaults to 1460 m/s.
+        Set the lower celerity, in m/s, to set the maximal time lag.
 
     cmax : `float`, optional
-        Signam window maximal celerity, in m/s. Defaults to 1500 m/s.
+        Set the upper celerity, in m/s, to set the minimal time lag.
+
+    clim : `tuple`, optional
+        Set the time lag given a celerity range, in m/s.
+        Overrules ``cmin`` and ``cmax``.
+
+    lag_lim : `tuple`, optional
+        Set the time lag lower and upper limit.
+        Overrules ``lag_min`` and ``lag_max``.
+
+    lag_min : `float`, optional
+        Set the lower time lag of interest.
+
+    lag_max : `float`, optional
+        Set the upper time lag of interest.
 
     filter_kwargs : `dict`, optional
         Dictionary of keyword arguments to pass to the filter.
@@ -50,10 +65,19 @@ def postprocess(
         warnings.warn(f"Dataset already postprocessed on {ds.cc.postprocess}")
         return ds
 
-    # set celerities
-    cmin = cmin or 1450
-    cmax = cmax or 1520
-    d_factor = 1000 if ds.distance.units == 'km' else 1
+    # tuple limits given?
+    if lag_lim is not None:
+        lag_min, lag_max = lag_lim
+    if clim is not None:
+        cmin, cmax = clim
+
+    # extract distance and set SI-unit factor
+    d = ds.distance
+    d_fact = 1000 if d.units == 'km' else 1
+
+    # extract valid times only
+    ds = ds.drop_vars('distance').where(ds.status == 1, drop=True)
+    ds['distance'] = d  # avoids adding extra dimensions!
 
     # set filter arguments
     filter_kwargs = {
@@ -66,14 +90,17 @@ def postprocess(
     # extract time_offset and pair_offset
     delay = -(ds.pair_offset + ds.time_offset)
 
+    # time lag range?
+    lag_min = lag_min or ds.lag.min().item()
+    lag_max = lag_max or ds.lag.max().item()
+
+    # update with celerity range?
+    lag_min = max((lag_min, d.min()*d_fact/cmax)) if cmax else lag_min
+    lag_max = min((lag_max, d.max()*d_fact/cmin)) if cmin else lag_max
+
     # extract and postprocess cc
     cc = (
-        ds.cc.where(
-            (ds.status == 1) &
-            (ds.lag >= ds.distance.min()*d_factor/cmax) &
-            (ds.lag <= ds.distance.max()*d_factor/cmin),
-            drop=True
-        )
+        ds.cc.where((ds.lag >= lag_min) & (ds.lag <= lag_max), drop=True)
         .signal.unbias()
         .signal.demean()
         .signal.taper(max_length=5.)  # timeshift phase wrapping
@@ -85,8 +112,8 @@ def postprocess(
     cc.lag.attrs['cmin'] = cmin
     cc.lag.attrs['cmax'] = cmax
 
-    # replace raw with processed cc
-    ds = ds.drop_vars(('cc', 'lag'))
+    # extract valid time and replace raw with processed cc
+    ds = ds.drop_vars(('cc', 'lag', 'status'))
     ds['cc'] = cc
 
     return ds
