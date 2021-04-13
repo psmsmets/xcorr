@@ -230,7 +230,7 @@ def validate_list(
 
     Parameters
     ----------
-    datasets : `str` or `list`
+    datasets : `str`, `list` or `tuple`
         A glob string, or a list of either glob strings or a
         :class:`xr.Dataset` containing the `xcorr` N-D labelled data arrays.
 
@@ -277,7 +277,7 @@ def validate_list(
     if isinstance(datasets, str):
         datasets = [datasets]
 
-    if not isinstance(datasets, list):
+    if not (isinstance(datasets, list) or isinstance(datasets, tuple)):
         raise TypeError('datasets should be either a string or a list.')
 
     parallel = dask and parallel

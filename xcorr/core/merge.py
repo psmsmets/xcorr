@@ -26,8 +26,8 @@ def merge(
 
     Parameters
     ----------
-    *datasets : :class:`xarray.Dataset` or str
-        A list with either a `str` specifying the path as a glob string or a
+    *datasets : :class:`xarray.Dataset` or `str`
+        Either a `str` specifying the path (can be a glob string) or a
         :class:`xarray.Dataset` containing the `xcorr` N-D labelled data array.
 
     extract : `bool`, optional
@@ -45,7 +45,6 @@ def merge(
         The merged `xcorr` N-D labelled set of data array.
 
     """
-
     # check
     dsets = validate_list(datasets, verb=verb, keep_opened=True,
                           parallel=False, **kwargs)

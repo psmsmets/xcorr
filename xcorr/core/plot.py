@@ -32,7 +32,7 @@ def plot_ccf(
     normalize: bool = False, cmin: float = None, cmax: float = None,
     cmajor: float = None, cminor: float = None, lag_lim: tuple = None,
     freq_lim: tuple = None, spectrogram_db: bool = True,
-    spectrogram_contourf: bool = True, spectrogram_kwargs: dict = None,
+    spectrogram_contourf: bool = False, spectrogram_kwargs: dict = None,
     spectrogram_plot_kwargs: dict = None,
     cc_plot_kwargs: dict = None, cbar_kwargs: dict = None,
     figure: mpl.figure.Figure = None
@@ -221,7 +221,7 @@ def plot_ccf(
 
 
 def plot_ccfs(
-    cc: xr.DataArray, distance: xr.DataArray = None,
+    cc: xr.DataArray, distance: xr.DataArray = None, normalize: bool = False,
     pairs: xr.DataArray = None, cmin: float = None, cmax: float = None,
     cmajor: float = None, cminor: float = None, lag_lim: tuple = None,
     cc_plot_kwargs: dict = None, figure: mpl.figure.Figure = None
@@ -238,6 +238,12 @@ def plot_ccfs(
         The distance used to set the celerity ticks and range. Can be the
         geodetic distance between the cross-correlation pair or the relative
         distance towards a POI.
+
+    normalize : `bool`, optional
+        Normalize the CCFs.
+
+    pairs : :class:`xr.DataArray`, optional
+        Set the subset/reorder pairs to plot.
 
     cmin : `float`, optional
         Siginal window minimal celerity, in m/s. Defaults to 1460 m/s.
@@ -267,9 +273,9 @@ def plot_ccfs(
         Gridset with the figure and axes.
 
     """
-
-    ccf_lim = (-1.05, 1.05)
-    factor = cc.signal.abs().max()
+    ccf_max = cc.signal.abs().max()
+    ccf_lim = (-1.05, 1.05) if normalize else (-1.05 * ccf_max, 1.05 * ccf_max)
+    factor = ccf_max if normalize else 1
 
     pairs = pairs or cc.pair
 
@@ -362,7 +368,8 @@ def plot_snr_ct(
 
 def plot_ccfs_colored(
     cc: xr.DataArray, sn: xr.DataArray = None, sn_threshold: float = None,
-    alpha: float = None, pairs: xr.DataArray = None, ax: mpl.axes.Axes = None,
+    normalize: bool = False, alpha: float = None, lag_lim: tuple = None,
+    lag_min: float = None, lag_max: float = None, ax: mpl.axes.Axes = None,
     **kwargs
 ) -> mpl.axes.Axes:
     """Plot multi-pair CCFs color-coded in a single axes.
@@ -377,7 +384,23 @@ def plot_ccfs_colored(
         Signal-to-noise ratio to filter CCFs with the minimal threshold.
 
     sn_threshold : `float`, optional
-        Set the signal-to-noise ratio threshold to filter CCFs. Defaults to 1.
+        Set the signal-to-noise ratio threshold to filter CCFs. Defaults to 10.
+
+    normalize : `bool`, optional
+        Normalize the CCFs.
+
+    alpha : `float`, optional
+        Set the alpha of the CCFs (per receiver). Defaults to 0.25.
+
+    lag_lim : `tuple`, optional
+        Set the time lag lower and upper limit.
+        Overrules ``lag_min`` and ``lag_max``.
+
+    lag_min : `float`, optional
+        Set the lower time lag of interest.
+
+    lag_max : `float`, optional
+        Set the upper time lag of interest.
 
     ax : :class:`mpl.axes.Axes`, optional
         Axis on which to plot this figure. By default, use the current axis.
@@ -394,23 +417,42 @@ def plot_ccfs_colored(
     ax = ax or plt.gca()
     alpha = alpha or .25
 
+    if lag_lim is not None:
+        lag_min, lag_max = lag_lim
+
+    ccf_max = cc.signal.abs().max()
+    ccf_lim = (-1.05, 1.05) if normalize else (-1.05 * ccf_max, 1.05 * ccf_max)
+    factor = ccf_max if normalize else 1
+
     # filter CCFs by the signal-to-noise ratio?
-    sn_filt = isinstance(sn, xr.DataArray)
+    sn_threshold = (sn_threshold or 10. if isinstance(sn, xr.DataArray)
+                    else None)
+    time = cc.time
 
     lines = []
     for p, c in zip(cc.pair,  mpl.rcParams['axes.prop_cycle']()):
-        sn_pass = sn.loc[{'pair': p}] >= sn_threshold if sn_filt else None
-        if sn_filt and not any(sn_pass):
-            continue
-        for t in cc.time[sn_pass] if sn_filt else cc.time:
-            line, = (cc
-                     .sel(pair=p, time=t)
-                     .plot.line(x='lag', alpha=alpha, ax=ax, **c, **kwargs)
-                     )
-        lines.append((line, str(p.values)))
+        if sn_threshold is not None:
+            sn_pass = sn.loc[{'pair': p}] >= sn_threshold
+            if not any(sn_pass):
+                continue
+            time = cc.time.where(sn_pass, drop=True)
+        ccf = cc.sel(pair=p, time=time)/factor
+        ccf.attrs = cc.attrs
+        line = ccf.plot.line(
+            x='lag', add_legend=False, alpha=alpha, ax=ax, **c, **kwargs
+        )
+        lines.append((line[0], str(p.values)))
+
+    # format ax
+    ax.ticklabel_format(axis='y', useOffset=False, style='plain')
+    ax.set_ylim(*ccf_lim)
+    ax.set_xlim(lag_min, lag_max)
+
+    # legend
     plt.legend(list(zip(*lines))[0], list(zip(*lines))[1])
 
-    if sn_filt:
-        ax.set_title(f'{sn.long_name} > {sn_threshold}')
+    # sn filter?
+    if sn_threshold is not None:
+        ax.set_title(f"{sn.long_name} > {sn_threshold}")
 
     return ax

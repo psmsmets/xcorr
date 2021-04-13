@@ -16,14 +16,14 @@ from functools import wraps
 
 # Relative imports
 from .merge import merge
-from .plot import plot_ccfs, plot_ccf
+from .plot import plot_ccf, plot_ccfs, plot_ccfs_colored
 from .postprocess import postprocess
 from .process import process
 from ..io import write
 from .. import util, version
 
 
-__all__ = ['register_xcorr_dataset_accessor']
+__all__ = []
 
 
 def register_xcorr_dataset_accessor():
@@ -34,21 +34,11 @@ def register_xcorr_dataset_accessor():
         xr.register_dataset_accessor('xcorr')(XcorrAccessor)
 
 
+@xr.register_dataset_accessor('xcorr')
 class XcorrAccessor():
     """Dataset xcorr accessor
     """
     def __init__(self, obj: xr.Dataset):
-
-        # check dtype
-        if not isinstance(obj, xr.Dataset):
-            raise TypeError('An xarray dataset is required')
-
-        # check dimensions and variables
-        dim = ['lag', 'pair', 'time']
-        # var = ['cc', 'distance', 'pair_offset', 'status', 'time_offset']
-        if (dim != sorted(obj.dims)) or ('cc' not in obj.data_vars):
-            raise AttributeError("Dataset is not an xcorr cc product.")
-
         self._obj = obj
 
     @property
@@ -74,6 +64,13 @@ class XcorrAccessor():
         """
         """
         return plot_ccfs(self._obj.cc, self._obj.distance, *args, **kwargs)
+
+
+    @wraps(plot_ccfs_colored)
+    def plot_ccfs_colored(self, *args, **kwargs):
+        """
+        """
+        return plot_ccfs_colored(self._obj.cc, *args, **kwargs)
 
     @wraps(postprocess)
     def postprocess(self, *args, **kwargs):

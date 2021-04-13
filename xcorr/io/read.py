@@ -24,7 +24,6 @@ except ModuleNotFoundError:
 
 # Relative imports
 from ..io.validate import validate, validate_list
-from ..core.accessors import register_xcorr_dataset_accessor
 
 
 __all__ = ['read', 'mfread']
@@ -89,9 +88,6 @@ def read(
     # extract valid data
     if extract:
         dataset['cc'] = dataset.cc.where(dataset.status == 1)
-
-    # register accessor
-    register_xcorr_dataset_accessor()
 
     return dataset
 
@@ -203,8 +199,5 @@ def mfread(
     if naive:
         dataset.attrs['sha_hash'] = None
         dataset.attrs['sha256_hash_metadata'] = None
-
-    # register accessor
-    register_xcorr_dataset_accessor()
 
     return dataset

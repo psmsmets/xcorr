@@ -16,7 +16,6 @@ import json
 
 
 # Relative imports
-from .accessors import register_xcorr_dataset_accessor
 from .. import stream, util
 
 
@@ -324,8 +323,5 @@ def init(
     dataset.attrs['sha256_hash_metadata'] = util.hasher.hash_Dataset(
         dataset, metadata_only=True, debug=False
     )
-
-    # register accessor
-    register_xcorr_dataset_accessor()
 
     return dataset

@@ -4,6 +4,7 @@ xcorr.core init
 """
 
 # Import main functions
+from .accessors import XcorrAccessor
 from .init import init
 from .merge import merge
 from .process import process

@@ -8,7 +8,6 @@ Postprocess xcorr data.
 """
 
 import pandas as pd
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import xcorr
 
@@ -22,33 +21,19 @@ root = '../../data/cc'
 # time of correlation data
 time = pd.to_datetime('2015-01-15')
 
-# receiver parameters
-hydro = {
-    'network': 'IM',
-    'station': 'H03S1',
-    'location': '',
-    'channel': 'EDH',
-}
-seism = {
-    'network': 'IU',
-    'station': 'RAR',
-    'location': '10',
-    'channel': 'BHR',
-}
+# receiver pairs (as a glob string)
+pair = 'IM.H03S1..EDH-IU.RAR.10.BH[RZ]'
 
 
 ###############################################################################
 # Correlations
 # ------------
 
-# file list with two channels
-ds = [
-    xcorr.io.ncfile((hydro, seism), time, root),
-    xcorr.io.ncfile((hydro, {**seism, 'channel': 'BHT'}), time, root)
-]
+# Read files given glob strings
+nc = xcorr.io.ncfile(pair, time, root, verify_receiver=False)
 
-# open merged list
-ds = xcorr.merge(ds, quick_and_dirty=True)
+# open merged files
+ds = xcorr.merge(nc, quick_and_dirty=True)
 assert ds, 'No data found!'
 
 # apply signal processing
@@ -101,43 +86,30 @@ lag_plot(ds.cc_w.isel(time=0).where(n), 'Noise window,')
 plt.show()
 
 
-###############################################################################
-# Signal-to-noise ratio
-# ---------------------
-snr = ds.cc_w.signal.snr(s, n)
-
-# plot of snr values
-snr.plot.line(x='time', hue='pair', **plotset)
-plt.tight_layout()
+# or all at once for signal
+xcorr.plot.plot_ccfs(ds.cc_w.where(s, drop=True), ds.distance)
 plt.show()
 
 
-# lag plot cc colour coded per receiver when snr >= snr_min
-def snr_lag_plot(cc, sn, sn_min=0., alpha=0.3):
-    fig, ax = plt.subplots(ncols=1, nrows=1, figsize=[10, 4])
-    lines = []
-    for p, c in zip(cc.pair,  mpl.rcParams['axes.prop_cycle']()):
-        sn_pass = sn.loc[{'pair': p}] >= sn_min
-        if any(sn_pass):
-            for t in cc.time[sn_pass]:
-                line, = (cc
-                         .sel(pair=p, time=t)
-                         .plot.line(x='lag', alpha=alpha, ax=ax, **c)
-                         )
-            lines.append((line, str(p.values)))
-    plt.legend(list(zip(*lines))[0], list(zip(*lines))[1])
-    ax.set_title(f'{sn.long_name} > {sn_min}')
-    plt.tight_layout()
-    plt.show()
-
-
-# plot each cc colour coded per receiver when snr >= 5.
-snr_lag_plot(ds.cc_w.where(s), snr, 5.)
-
-
 ###############################################################################
 # Signal-to-noise ratio
 # ---------------------
+sn = ds.cc_w.signal.snr(s, n)
+
+# plot of snr values
+sn.plot.line(x='time', hue='pair', **plotset)
+plt.tight_layout()
+plt.show()
+
+# plot each cc colour coded per receiver when snr >= 25.
+plt.figure(figsize=[10, 4])
+xcorr.plot.plot_ccfs_colored(ds.cc_w.where(s, drop=True), sn, 25.)
+plt.tight_layout()
+plt.show()
+
+###############################################################################
+# Spectrogram
+# -----------
 
 # compute spectrogram
 psd = (ds.cc_w
@@ -149,4 +121,8 @@ psd = (ds.cc_w
 plt.figure()
 psd.isel(time=0, pair=-1).plot.imshow(x='lag')
 plt.tight_layout()
+plt.show()
+
+# or all at once
+xcorr.plot.plot_ccf(ds.cc_w.where(s, drop=True), ds.distance, time=0, pair=-1)
 plt.show()

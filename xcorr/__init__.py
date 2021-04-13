@@ -50,6 +50,9 @@ if __dask_spec:
     from .core import lazy_process
     __all__ += ['lazy_process']
 
+from .core.accessors import register_xcorr_dataset_accessor
+register_xcorr_dataset_accessor()
+
 # Version
 try:
     # - Released versions just tags:       1.10.0
