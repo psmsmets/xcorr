@@ -186,7 +186,7 @@ def plot_ccf(
 
     # plot spectrogram
     vmax = p.max().item() if spectrogram_db else .8*p.max().item()
-    vmin = vmax - 36 if spectrogram_db else 0. 
+    vmin = vmax - 30 if spectrogram_db else 0. 
 
     spectrogram_plot_kwargs = {
         'cmap': 'afmhot_r',
