@@ -181,14 +181,17 @@ def plot_ccf(
         **(spectrogram_kwargs or dict())
     }
     p = (cc.isel(time=time)).signal.spectrogram(**spectrogram_kwargs)
-    p = p/p.max() if (normalize or spectrogram_db) else p
+    p = p/p.max() if normalize else p
     p = (10 * xr.ufuncs.log10(p.where(p > 0))) if spectrogram_db else p
 
     # plot spectrogram
+    vmax = p.max().item() if spectrogram_db else .8*p.max().item()
+    vmin = vmax - 36 if spectrogram_db else 0. 
+
     spectrogram_plot_kwargs = {
         'cmap': 'afmhot_r',
-        'vmin': -36 if spectrogram_db else (0 if normalize else None),
-        'vmax': -0 if spectrogram_db else (.5 if normalize else None),
+        'vmin': vmin,
+        'vmax': vmax,
         'ax': ax2,
         **(spectrogram_plot_kwargs or dict()),
         'add_colorbar': False,
@@ -209,7 +212,7 @@ def plot_ccf(
     cbar_kwargs = {
         'cax': ax3,
         'use_gridspec': True,
-        'extend': 'both',
+        'extend': 'both' if spectrogram_db else 'max',
         **(cbar_kwargs or dict()),
     }
     if spectrogram_contourf:
