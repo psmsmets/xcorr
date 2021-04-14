@@ -14,7 +14,7 @@ import xarray as xr
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
-from matplotlib.ticker import AutoMinorLocator
+from matplotlib.ticker import AutoMinorLocator, StrMethodFormatter
 
 # Relative imports
 from ..signal.trigger import plot_trigs
@@ -123,6 +123,7 @@ def plot_ccf(
 
     ccf_max = cc.signal.abs().max()
     ccf_lim = (-1.05, 1.05) if normalize else (-1.05 * ccf_max, 1.05 * ccf_max)
+    ccf = cc / ccf_max if normalize else cc
     freq_lim = freq_lim or ()
 
     cmin = cmin or 1460
@@ -154,19 +155,21 @@ def plot_ccf(
         'add_legend': False,
         **(cc_plot_kwargs or dict()),
     }
-    (cc/ccf_max if normalize else cc).plot.line(**cc_plot_kwargs)
+    ccf.plot.line(**cc_plot_kwargs)
     if envelope:
         cc_plot_kwargs = {
             **cc_plot_kwargs,
             'color': 'r',
             **(envelope_plot_kwargs or dict()),
         }
-        (cc/ccf_max if normalize else cc).signal.envelope(dim='lag').plot.line(**cc_plot_kwargs)
+        ccf.signal.envelope(dim='lag').plot.line(**cc_plot_kwargs)
     ax1.set_title(None)
     ax1.set_xlim(*lag_lim)
     ax1.set_xlabel(None)
     ax1.set_ylim(*ccf_lim)
     ax1.ticklabel_format(axis='y', useOffset=False, style='plain')
+    if not normalize:
+        ax1.yaxis.set_major_formatter(StrMethodFormatter("{x:.0e}"))
     ax1.set_ylabel('CCF [-]')
     ax1.xaxis.set_minor_locator(AutoMinorLocator())
     ax1.tick_params(labelbottom=False)
@@ -197,7 +200,7 @@ def plot_ccf(
 
     # plot spectrogram
     vmax = p.max().item() if spectrogram_db else .8*p.max().item()
-    vmin = vmax - 30 if spectrogram_db else 0. 
+    vmin = vmax - 30 if spectrogram_db else 0
 
     spectrogram_plot_kwargs = {
         'cmap': 'afmhot_r',
@@ -230,6 +233,8 @@ def plot_ccf(
         cbar_kwargs.pop('extend')
     cb = plt.colorbar(p, **cbar_kwargs)
     cb.set_label(r'PSD [dB]' if spectrogram_db else r'PSD [-]')
+    if not (normalize and spectrogram_db):
+        cb.ax.yaxis.set_major_formatter(StrMethodFormatter("{x:.0e}"))
 
     return gs
 
