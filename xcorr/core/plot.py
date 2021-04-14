@@ -33,9 +33,9 @@ def plot_ccf(
     cmajor: float = None, cminor: float = None, lag_lim: tuple = None,
     freq_lim: tuple = None, spectrogram_db: bool = True,
     spectrogram_contourf: bool = False, spectrogram_kwargs: dict = None,
-    spectrogram_plot_kwargs: dict = None,
-    cc_plot_kwargs: dict = None, cbar_kwargs: dict = None,
-    figure: mpl.figure.Figure = None
+    spectrogram_plot_kwargs: dict = None, cc_plot_kwargs: dict = None,
+    envelope_plot_kwargs: dict = None, envelope: bool = False,
+    cbar_kwargs: dict = None, figure: mpl.figure.Figure = None
 ) -> GridSpec:
     """Plot a single-pair xcorr CCFs and it's spectrogram
 
@@ -72,6 +72,9 @@ def plot_ccf(
     cminor : `float`, optional
         Celerity minor thick spacing, in m/s. Defaults to 1 m/s.
 
+    envelope : `bool`, optional
+        Add the amplitude of the analytical signal to the cc plot.
+
     lag_lim : `tuple`, optional
         Set the lag lower and upper limit.
 
@@ -85,15 +88,16 @@ def plot_ccf(
         Plot the spectrogram using contourf. Defaults to `True`.
 
     spectrogram_kwargs : `dict`
-        Dictionary of keyword arguments to pass to the spectrogram computation
-        function.
+        Dictionary of keyword arguments to pass to the spectrogram computation.
 
     spectrogram_plot_kwargs : `dict`
-        Dictionary of keyword arguments to pass to the spectrogram plot
-        function.
+        Dictionary of keyword arguments to pass to the spectrogram plot.
 
     cc_plot_kwargs : `dict`, optional
-        Dictionary of keyword arguments to pass to the cc line plot function.
+        Dictionary of keyword arguments to pass to the cc line plot.
+
+    envelope_plot_kwargs : `dict`, optional
+        Dictionary of keyword arguments to pass to the envelope line plot.
 
     cbar_kwargs : `dict`, optional
         Dictionary of keyword arguments to pass to the colorbar.
@@ -151,6 +155,13 @@ def plot_ccf(
         **(cc_plot_kwargs or dict()),
     }
     (cc/ccf_max if normalize else cc).plot.line(**cc_plot_kwargs)
+    if envelope:
+        cc_plot_kwargs = {
+            **cc_plot_kwargs,
+            'color': 'r',
+            **(envelope_plot_kwargs or dict()),
+        }
+        (cc/ccf_max if normalize else cc).signal.envelope(dim='lag').plot.line(**cc_plot_kwargs)
     ax1.set_title(None)
     ax1.set_xlim(*lag_lim)
     ax1.set_xlabel(None)
