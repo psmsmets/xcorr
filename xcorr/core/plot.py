@@ -121,10 +121,12 @@ def plot_ccf(
     if sorted(cc.dims) != ['lag', 'time']:
         raise ValueError("cc can only have dimensions 'time' and 'lag'")
 
-    ccf_max = cc.signal.abs().max()
-    ccf_lim = (-1.05, 1.05) if normalize else (-1.05 * ccf_max, 1.05 * ccf_max)
-    ccf = cc / ccf_max if normalize else cc
-    freq_lim = freq_lim or ()
+    cc_max = cc.signal.abs().max()
+    cc_lim = (-1.05, 1.05) if normalize else (-1.05 * cc_max, 1.05 * cc_max)
+    cc_fmt = StrMethodFormatter("{x:.1f}" if normalize else "{x:.0e}")
+    cc_attrs = cc.attrs
+    cc = cc / cc_max if normalize else cc
+    cc.attrs = cc_attrs
 
     cmin = cmin or 1460
     cmax = cmax or 1500
@@ -155,21 +157,19 @@ def plot_ccf(
         'add_legend': False,
         **(cc_plot_kwargs or dict()),
     }
-    ccf.plot.line(**cc_plot_kwargs)
+    cc.plot.line(**cc_plot_kwargs)
     if envelope:
         cc_plot_kwargs = {
             **cc_plot_kwargs,
             'color': 'r',
             **(envelope_plot_kwargs or dict()),
         }
-        ccf.signal.envelope(dim='lag').plot.line(**cc_plot_kwargs)
+        cc.signal.envelope(dim='lag').plot.line(**cc_plot_kwargs)
     ax1.set_title(None)
     ax1.set_xlim(*lag_lim)
     ax1.set_xlabel(None)
-    ax1.set_ylim(*ccf_lim)
-    ax1.ticklabel_format(axis='y', useOffset=False, style='plain')
-    if not normalize:
-        ax1.yaxis.set_major_formatter(StrMethodFormatter("{x:.0e}"))
+    ax1.set_ylim(*cc_lim)
+    ax1.yaxis.set_major_formatter(cc_fmt)
     ax1.set_ylabel('CCF [-]')
     ax1.xaxis.set_minor_locator(AutoMinorLocator())
     ax1.tick_params(labelbottom=False)
@@ -292,9 +292,12 @@ def plot_ccfs(
         Gridset with the figure and axes.
 
     """
-    ccf_max = cc.signal.abs().max()
-    ccf_lim = (-1.05, 1.05) if normalize else (-1.05 * ccf_max, 1.05 * ccf_max)
-    factor = ccf_max if normalize else 1
+    cc_max = cc.signal.abs().max()
+    cc_lim = (-1.05, 1.05) if normalize else (-1.05 * cc_max, 1.05 * cc_max)
+    cc_fmt = StrMethodFormatter("{x:.1f}" if normalize else "{x:.0e}")
+    cc_attrs = cc.attrs
+    cc = cc / cc_max if normalize else cc
+    cc.attrs = cc_attrs
 
     pairs = pairs or cc.pair
 
@@ -328,13 +331,13 @@ def plot_ccfs(
         ax = (fig.add_subplot(gs[i, 0]) if i == 0 else
               fig.add_subplot(gs[i, 0], sharex=axis[0], sharey=axis[0]))
 
-        (cc.sel(pair=pair)/factor).plot.line(**cc_plot_kwargs, ax=ax)
+        cc.sel(pair=pair).plot.line(**cc_plot_kwargs, ax=ax)
         ax.set_title(None)
+        ax.yaxis.set_major_formatter(cc_fmt)
 
         if i != len(pairs)-1:
             ax.set_xlabel(None)
             ax.tick_params(labelbottom=False)
-            ax.ticklabel_format(axis='y', useOffset=False, style='plain')
 
         if isinstance(distance, xr.DataArray):
             d = distance.sel(pair=pair).item()*d_factor
@@ -347,7 +350,7 @@ def plot_ccfs(
         ax.set_ylabel('CCF [-]' if i == 0 else None)
         ax.tick_params(labelleft=i == 0)
         ax.set_xlim(*lag_lim)
-        ax.set_ylim(*ccf_lim)
+        ax.set_ylim(*cc_lim)
         ax.xaxis.set_minor_locator(AutoMinorLocator())
         ax.yaxis.set_ticks_position('both')
         ax.text(0.02, 0.96, str(pair.values),
@@ -439,9 +442,12 @@ def plot_ccfs_colored(
     if lag_lim is not None:
         lag_min, lag_max = lag_lim
 
-    ccf_max = cc.signal.abs().max()
-    ccf_lim = (-1.05, 1.05) if normalize else (-1.05 * ccf_max, 1.05 * ccf_max)
-    factor = ccf_max if normalize else 1
+    cc_max = cc.signal.abs().max()
+    cc_lim = (-1.05, 1.05) if normalize else (-1.05 * cc_max, 1.05 * cc_max)
+    cc_fmt = StrMethodFormatter("{x:.1f}" if normalize else "{x:.0e}")
+    cc_attrs = cc.attrs
+    cc = cc / cc_max if normalize else cc
+    cc.attrs = cc_attrs
 
     # filter CCFs by the signal-to-noise ratio?
     sn_threshold = (sn_threshold or 10. if isinstance(sn, xr.DataArray)
@@ -450,22 +456,23 @@ def plot_ccfs_colored(
 
     lines = []
     for p, c in zip(cc.pair,  mpl.rcParams['axes.prop_cycle']()):
+        # filter time based on signal-to-noise?
         if sn_threshold is not None:
             sn_pass = sn.loc[{'pair': p}] >= sn_threshold
             if not any(sn_pass):
                 continue
             time = cc.time.where(sn_pass, drop=True)
-        ccf = cc.sel(pair=p, time=time)/factor
-        ccf.attrs = cc.attrs
-        line = ccf.plot.line(
+        # plot ccfs color coded per pair
+        line = cc.sel(pair=p, time=time).plot.line(
             x='lag', add_legend=False, alpha=alpha, ax=ax, **c, **kwargs
         )
         lines.append((line[0], str(p.values)))
 
     # format ax
     ax.ticklabel_format(axis='y', useOffset=False, style='plain')
-    ax.set_ylim(*ccf_lim)
+    ax.set_ylim(*cc_lim)
     ax.set_xlim(lag_min, lag_max)
+    ax.yaxis.set_major_formatter(cc_fmt)
 
     # legend
     plt.legend(list(zip(*lines))[0], list(zip(*lines))[1])
