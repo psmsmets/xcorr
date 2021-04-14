@@ -65,7 +65,6 @@ class XcorrAccessor():
         """
         return plot_ccfs(self._obj.cc, self._obj.distance, *args, **kwargs)
 
-
     @wraps(plot_ccfs_colored)
     def plot_ccfs_colored(self, *args, **kwargs):
         """
