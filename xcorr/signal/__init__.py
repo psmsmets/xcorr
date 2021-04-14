@@ -10,7 +10,7 @@ from .correlate import correlate1d, correlate2d
 from .detrend import detrend, demean
 from .fft import fft, ifft, rfft, irfft
 from .filter import filter
-from .hilbert import hilbert
+from .hilbert import hilbert, envelope
 from .lombscargle import lombscargle
 from .normalize import norm1d, norm2d
 from .rms import rms

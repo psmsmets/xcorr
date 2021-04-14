@@ -20,9 +20,10 @@ except ModuleNotFoundError:
 
 # Relative imports
 from ..util.history import historicize
+from .absolute import absolute
 
 
-__all__ = ['hilbert']
+__all__ = ['hilbert', 'envelope']
 
 
 def hilbert(
@@ -81,3 +82,35 @@ def hilbert(
     })
 
     return y
+
+
+def envelope(
+    x: xr.DataArray, dim: str = None, **kwargs
+):
+    """
+    Compute the amplitude envelope of an N-D labelled array of data.
+    The amplitude envelope is the magnitude of the analytic signal, estimated
+    by the Hilbert transform.
+
+    The transformation is done along the last axis by default.
+
+    Parameters
+    ----------
+    x : :class:`xarray.DataArray`
+        The array of data to compute the amplitude envelope for.
+
+    dim : `str`, optional
+        The coordinates name of ``x`` to be filtered over. Default is the
+        last dimension.
+
+    **kwargs :
+        Any additional keyword arguments will be passed to
+        :func:`signal.hilbert`.
+
+    Returns
+    -------
+    y : :class:`xarray.DataArray` or `None`
+        The amplitude envelope of ``x``.
+
+    """
+    return absolute(hilbert(x, dim, **kwargs))

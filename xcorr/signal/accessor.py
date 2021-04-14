@@ -27,6 +27,7 @@ from .fft import rfft as rfft_
 from .fft import irfft as irfft_
 from .filter import filter as filter_
 from .hilbert import hilbert as hilbert_
+from .hilbert import envelope as envelope_
 from .lombscargle import lombscargle as lombscargle_
 from .normalize import norm1d as norm1d_
 from .normalize import norm2d as norm2d_
@@ -114,6 +115,15 @@ class SignalAccessor():
         Do not edit here.
         """
         return detrend_(self._obj, *args, **kwargs)
+
+    @wraps(envelope_)
+    def envelope(self, *args, **kwargs):
+        """
+        The docstring and signature are taken from
+        :func:`~xcorr.signal.envelope`.
+        Do not edit here.
+        """
+        return envelope_(self._obj, *args, **kwargs)
 
     @wraps(fft_)
     def fft(self, *args, **kwargs):
