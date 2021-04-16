@@ -13,6 +13,7 @@ from .filter import filter
 from .hilbert import hilbert, envelope
 from .lombscargle import lombscargle
 from .normalize import norm1d, norm2d
+from .peak_local_max import peak_local_max
 from .rms import rms
 from .snr import snr
 from .spectrogram import spectrogram

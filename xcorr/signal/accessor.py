@@ -31,6 +31,7 @@ from .hilbert import envelope as envelope_
 from .lombscargle import lombscargle as lombscargle_
 from .normalize import norm1d as norm1d_
 from .normalize import norm2d as norm2d_
+from .peak_local_max import peak_local_max as peak_local_max_
 from .rms import rms as rms_
 from .snr import snr as snr_
 from .spectrogram import spectrogram as spectrogram_
@@ -205,6 +206,15 @@ class SignalAccessor():
         Do not edit here.
         """
         return norm2d_(self._obj, *args, **kwargs)
+
+    @wraps(peak_local_max_)
+    def peak_local_max(self, *args, **kwargs):
+        """
+        The docstring and signature are taken from
+        :func:`~xcorr.signal.peak_local_max`.
+        Do not edit here.
+        """
+        return peak_local_max_(self._obj, *args, **kwargs)
 
     @wraps(plane_wave_)
     def plane_wave_estimate(self, *args, **kwargs):
