@@ -46,7 +46,7 @@ def hilbert(
 
     **kwargs :
         Any additional keyword arguments will be passed to
-        :func:`signal.hilbert`.
+        :func:`scipy.signal.hilbert`.
 
     Returns
     -------
@@ -105,7 +105,7 @@ def envelope(
 
     **kwargs :
         Any additional keyword arguments will be passed to
-        :func:`signal.hilbert`.
+        :func:`scipy.signal.hilbert`.
 
     Returns
     -------
