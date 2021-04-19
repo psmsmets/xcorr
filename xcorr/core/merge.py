@@ -22,7 +22,7 @@ def merge(
     *datasets, extract: bool = False, verb: int = 0, **kwargs
 ):
     """
-    Merge a list of xcorr N-D labelled data arrays.
+    Merge a list of xcorr N-D labelled set of data arrays.
 
     Parameters
     ----------
@@ -41,8 +41,8 @@ def merge(
 
     Returns
     -------
-    datasets : :class:`xarray.Dataset`
-        The merged `xcorr` N-D labelled set of data array.
+    dataset : :class:`xarray.Dataset`
+        The merged N-D labelled set of data arrays.
 
     """
     # check
