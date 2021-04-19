@@ -27,7 +27,7 @@ __all__ = ['peak_local_max']
 
 def peak_local_max(
     x: xr.DataArray, dims: tuple = None, as_index: bool = True,
-    as_dataframe: bool = False, **kwargs
+    as_dataframe: bool = False, extend: bool = False, **kwargs
 ):
     """
     Finding local maxima of an N-D labelled array of data.
@@ -51,16 +51,23 @@ def peak_local_max(
     as_dataframe : `bool`, optional
         Returns ``y`` as a :class:`pandas.DataFrame`. Defaults to `False`.
 
+    extend : `bool`, optional
+        Return all parameters such as the peak local maxima, the index and the
+        relative threshold. Defaults to `False`.
+
     **kwargs :
         Any additional keyword arguments will be passed to
         :func:`skimage.feature.peak_local_max`.
 
     Returns
     -------
-    y : :class:`xarray.DataArray` or :class:`pandas.DataFrame`
-        The local maxima of ``x`` as ordered (descending) integer counts if
-        ``as_index`` or as true value of ``x``. The return type is set by
-        ``as_dataframe``.
+    y : various
+        Defaults to a :class:`xr.DataArray` with the local maxima of ``x``
+        either as the descending integer index or as the true value.
+        In case of ``extend`` both are returned as a :class:`xr.Dataset`,
+        including the relative threshold.
+        When ``as_dataframe`` is `True` the return type is a
+        :class:`pd.DataFrame`.
 
     """
     # dim
@@ -71,6 +78,9 @@ def peak_local_max(
     for d in dims:
         if d not in x.dims:
             raise ValueError(f'x has no dimensions "{dims}"')
+
+    # defaults
+    as_index = True if extend else as_index
 
     # unfunc wrapper
     def _peak_local_max(x, **kwargs):
@@ -98,10 +108,10 @@ def peak_local_max(
 
     # attributes
     y.attrs = {**x.attrs, **dict(**kwargs)}
-    y.name = f"peak_local_max_{x.name}"
-    y.attrs['long_name'] = f"Local Maximum {x.long_name}"
-    y.attrs['standard_name'] = f"peak_local_max_{x.standard_name}"
-    y.attrs['units'] = "-" if as_index else x.attrs['units']
+    y.name = f"plmax"
+    y.attrs["long_name"] = f"Local Maximum {x.long_name}"
+    y.attrs["standard_name"] = f"peak_local_max_{x.standard_name}"
+    y.attrs["units"] = "-" if as_index else x.attrs["units"]
 
     # log workflow
     historicize(y, f='peak_local_max', a={
@@ -109,5 +119,22 @@ def peak_local_max(
         'dims': dims,
         '**kwargs': kwargs,
     })
+
+    if extend:
+        ds = xr.Dataset()
+        ds[y.name] = x.where(y >= 0)
+        ds[y.name].attrs["units"] = x.attrs["units"]
+
+        ds[f"{y.name}_index"] = y
+        ds[f"{y.name}_index"].attrs["long_name"] = f"Local Maximum {x.long_name} Index"
+        ds[f"{y.name}_index"].attrs["standard_name"] = f"peak_local_max_{x.standard_name}_index"
+        ds[f"{y.name}_index"].attrs["units"] = "-"
+
+        ds[f"{y.name}_threshold"] = ds[y.name] / ds[y.name].max(dims, skipna=True)
+        ds[f"{y.name}_threshold"].attrs["long_name"] = f"Local Maximum {x.long_name} Threshold"
+        ds[f"{y.name}_threshold"].attrs["standard_name"] = f"peak_local_max_{x.standard_name}_threshold"
+        ds[f"{y.name}_threshold"].attrs["units"] = "-"
+
+        y = ds
 
     return y.to_dataframe().dropna() if as_dataframe else y
