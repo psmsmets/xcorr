@@ -19,6 +19,7 @@ dependencies:
   - xarray>=0.16.0
   - cartopy
   - pyproj
+  - pytables
   - dask
   - distributed!=2021.03.0
   - bottleneck
