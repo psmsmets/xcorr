@@ -18,9 +18,10 @@ __all__ = ['postprocess']
 
 
 def postprocess(
-    ds: xr.Dataset, lag_lim: tuple = None, clim: tuple = None,
-    lag_min: float = None, lag_max: float = None, cmin: float = None,
-    cmax: float = None, filter_kwargs: dict = None
+    ds: xr.Dataset, lag_lim: tuple = None, time_lim: tuple = None,
+    clim: tuple = None, cmin: float = None, cmax: float = None,
+    time_min: float = None, time_max: float = None, lag_min: float = None,
+    lag_max: float = None, filter_kwargs: dict = None
 ):
     """Postprocess an xcorr CCF dataset
 
@@ -49,6 +50,16 @@ def postprocess(
     lag_max : `float`, optional
         Set the upper time lag of interest.
 
+    time_lim : `tuple`, optional
+        Set the time lower and upper limit.
+        Overrules ``time_min`` and ``time_max``.
+
+    time_min : `np.datetime64`, optional
+        Set the lower time of interest.
+
+    time_max : `np.datetime64`, optional
+        Set the upper time of interest.
+
     filter_kwargs : `dict`, optional
         Dictionary of keyword arguments to pass to the filter.
         Defaults to a 2nd order highpass filter with a 3Hz corner frequency.
@@ -68,6 +79,8 @@ def postprocess(
     # tuple limits given?
     if lag_lim is not None:
         lag_min, lag_max = lag_lim
+    if time_lim is not None:
+        time_min, time_max = time_lim
     if clim is not None:
         cmin, cmax = clim
 
@@ -75,8 +88,15 @@ def postprocess(
     d = ds.distance
     d_fact = 1000 if d.units == 'km' else 1
 
+    # time range?
+    time_min = time_min or ds.time.min().item()
+    time_max = time_max or ds.time.max().item()
+
     # extract valid times only
-    ds = ds.drop_vars('distance').where(ds.status == 1, drop=True)
+    ds = ds.drop_vars('distance').where(
+        (ds.status == 1) & (ds.time >= time_min) & (ds.time <= time_max),
+        drop=True
+    )
     ds['distance'] = d  # avoids adding extra dimensions!
 
     # set filter arguments
