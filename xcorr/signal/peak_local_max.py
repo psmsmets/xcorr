@@ -108,7 +108,7 @@ def peak_local_max(
 
     # attributes
     y.attrs = {**x.attrs, **dict(**kwargs)}
-    y.name = f"plmax"
+    y.name = "plmax"
     y.attrs["long_name"] = f"Local Maximum {x.long_name}"
     y.attrs["standard_name"] = f"peak_local_max_{x.standard_name}"
     y.attrs["units"] = "-" if as_index else x.attrs["units"]
@@ -122,18 +122,24 @@ def peak_local_max(
 
     if extend:
         ds = xr.Dataset()
-        ds[y.name] = x.where(y >= 0)
-        ds[y.name].attrs["units"] = x.attrs["units"]
 
-        ds[f"{y.name}_index"] = y
-        ds[f"{y.name}_index"].attrs["long_name"] = f"Local Maximum {x.long_name} Index"
-        ds[f"{y.name}_index"].attrs["standard_name"] = f"peak_local_max_{x.standard_name}_index"
-        ds[f"{y.name}_index"].attrs["units"] = "-"
+        var = y.name
+        ds[var] = x.where(y >= 0)
+        ds[var].attrs["long_name"] = f"Local Maximum {x.long_name}"
+        ds[var].attrs["standard_name"] = f"peak_local_max_{x.standard_name}"
+        ds[var].attrs["units"] = x.attrs["units"]
 
-        ds[f"{y.name}_threshold"] = ds[y.name] / ds[y.name].max(dims, skipna=True)
-        ds[f"{y.name}_threshold"].attrs["long_name"] = f"Local Maximum {x.long_name} Threshold"
-        ds[f"{y.name}_threshold"].attrs["standard_name"] = f"peak_local_max_{x.standard_name}_threshold"
-        ds[f"{y.name}_threshold"].attrs["units"] = "-"
+        var = f"{y.name}_index"
+        ds[var] = y
+        ds[var].attrs["long_name"] = f"{y.long_name} Index"
+        ds[var].attrs["standard_name"] = f"{y.standard_name}_index"
+        ds[var].attrs["units"] = "-"
+
+        var = f"{y.name}_threshold"
+        ds[var] = ds[y.name] / ds[y.name].max(dims, skipna=True)
+        ds[var].attrs["long_name"] = f"{y.long_name} Threshold"
+        ds[var].attrs["standard_name"] = f"{y.standard_name}_threshold"
+        ds[var].attrs["units"] = "-"
 
         y = ds
 
