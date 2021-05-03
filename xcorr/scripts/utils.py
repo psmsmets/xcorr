@@ -20,8 +20,8 @@ import os
 from ..version import version
 
 
-__all__ = ['init_logging', 'init_dask', 'ncfile', 'add_common_arguments',
-           'add_attrs_group', 'parse_attrs_group']
+__all__ = ['init_logging', 'init_dask', 'filename', 'ncfile', 'h5file',
+           'add_common_arguments', 'add_attrs_group', 'parse_attrs_group']
 _global_attrs = ('title', 'institution', 'author', 'source',
                  'references', 'comment')
 
@@ -79,8 +79,8 @@ def init_dask(n_workers=None, scheduler_file=None, logger=None):
     return cluster, client
 
 
-def ncfile(title, pair, start, end, prefix=None, suffix=None):
-    """Construct netCDF filename.
+def filename(title, pair, start, end, ext='nc', prefix=None, suffix=None):
+    """Construct a filename.
     """
     start = to_datetime(start)
     end = to_datetime(end)
@@ -88,12 +88,28 @@ def ncfile(title, pair, start, end, prefix=None, suffix=None):
         pair = 'all'
     else:
         pair = pair.translate({ord(c): None for c in '*?'})
-    nc = "{}{}_{}_{}_{}{}.nc".format(
-        f"{prefix}" if prefix else '',
-        title, pair, start.strftime('%Y%j'), end.strftime('%Y%j'),
-        f"{suffix}" if suffix else '',
+    fname = "{prefix}{title}_{pair}_{start}_{end}{suffix}.{ext}".format(
+        prefix=f"{prefix}" if prefix else '',
+        title=title,
+        pair=pair,
+        start=start.strftime('%Y%j'),
+        end=end.strftime('%Y%j'),
+        suffix=f"{suffix}" if suffix else '',
+        ext=ext or 'nc',
     )
-    return nc
+    return fname
+
+
+def ncfile(*args, **kwargs):
+    """Construct a netCDF filename.
+    """
+    return filename(*args, **kwargs, ext='nc')
+
+
+def h5file(*args, **kwargs):
+    """Construct a HDF5 filename.
+    """
+    return filename(*args, **kwargs, ext='h5')
 
 
 def add_common_arguments(parser: ArgumentParser, dask: bool = True):
