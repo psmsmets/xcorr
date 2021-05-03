@@ -109,7 +109,7 @@ def filter(
                        **dargs)
 
     # log workflow
-    historicize(x, f='filter', a={
+    historicize(y, f='filter', a={
         'x': y.name,
         'frequency': frequency,
         'btype': btype,
