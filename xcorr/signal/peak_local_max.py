@@ -20,6 +20,7 @@ except ModuleNotFoundError:
 
 # Relative imports
 from ..util.history import historicize
+from ..util.metadata import global_attrs
 
 
 __all__ = ['peak_local_max']
@@ -27,7 +28,8 @@ __all__ = ['peak_local_max']
 
 def peak_local_max(
     x: xr.DataArray, dims: tuple = None, as_index: bool = True,
-    as_dataframe: bool = False, extend: bool = False, **kwargs
+    as_dataframe: bool = False, extend: bool = False, attrs: dict = None,
+    **kwargs
 ):
     """
     Finding local maxima of an N-D labelled array of data.
@@ -54,6 +56,9 @@ def peak_local_max(
     extend : `bool`, optional
         Return all parameters such as the peak local maxima, the index and the
         relative threshold. Defaults to `False`.
+
+    attrs : dict, optional
+        A dictionary to set the dataset global metadata attributes.
 
     **kwargs :
         Any additional keyword arguments will be passed to
@@ -122,6 +127,29 @@ def peak_local_max(
 
     if extend:
         ds = xr.Dataset()
+        attrs = attrs or dict()
+        ds.attrs = global_attrs({
+            'title': (
+                attrs.pop('title', '') +
+                ' Local Maxima'
+            ).strip(),
+            **attrs,
+            'references': (
+                 'Stéfan van der Walt, '
+                 'Johannes L. Schönberger, '
+                 'Juan Nunez-Iglesias, '
+                 'François Boulogne, '
+                 'Joshua D. Warner, '
+                 'Neil Yager, '
+                 'Emmanuelle Gouillart, '
+                 'Tony Yu '
+                 'and the scikit-image contributors. '
+                 'scikit-image: Image processing in Python. '
+                 'PeerJ 2:e453 (2014) '
+                 'https://doi.org/10.7717/peerj.453.'
+            ),
+        })
+        ds.attrs['source_attrs'] = x.attrs
 
         var = y.name
         ds[var] = x.where(y >= 0)
