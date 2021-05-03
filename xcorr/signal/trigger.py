@@ -216,22 +216,23 @@ def trigger_periods(trigs: xr.DataArray):
 
     """
 
-    per = []
+    periods = []
 
-    for i in range(trigs.max(skipna=True).astype(int).item()):
-        trig = trigs.time.where(trigs == i, drop=True)
-        per.append(
+    for (index, period) in trigs.groupby(trigs):
+        start = period.time[0].values
+        end = period.time[-1].values
+        periods.append(
             pd.DataFrame(
                 data={
-                    'start': [trig[0].values],
-                    'end': [trig[-1].values],
-                    'days': [to_seconds(trig[-1] - trig[0]).values/86400.],
+                    'start': [start],
+                    'end': [end],
+                    'days': [to_seconds(end-start)/86400.],
                 },
-                index=[i]
+                index=[int(index)]
             )
         )
 
-    return pd.concat(per)
+    return pd.concat(periods)
 
 
 def trigger_values(x: xr.DataArray, trigs: xr.DataArray):
