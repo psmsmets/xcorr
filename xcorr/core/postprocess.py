@@ -9,6 +9,7 @@ Predefined cc postproccessing
 
 
 # Mandatory imports
+import numpy as np
 import pandas as pd
 import xarray as xr
 import warnings
@@ -89,8 +90,13 @@ def postprocess(
     d_fact = 1000 if d.units == 'km' else 1
 
     # time range?
-    time_min = time_min or ds.time.min().item()
-    time_max = time_max or ds.time.max().item()
+    time_min = time_min or ds.time.min().values
+    time_max = time_max or ds.time.max().values
+    if (
+        not isinstance(time_min, np.datetime64) or
+        not isinstance(time_max, np.datetime64)
+    ):
+        raise TypeError('time min and max should be of type numpy.datetime64')
 
     # extract valid times only
     ds = ds.drop_vars('distance').where(
