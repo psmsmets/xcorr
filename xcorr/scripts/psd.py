@@ -69,11 +69,12 @@ def spectrogram(cc):
 
 
 @dask.delayed
-def combine(ds, psd, snr):
+def combine(ds, psd, snr, attrs):
     """Combine all into a single dataset
     """
     ds['psd'] = psd
     ds['snr'] = snr.loc[{'pair': ds.pair[0]}]
+    ds.attrs = {**ds.attrs, **attrs}
     return ds
 
 
@@ -103,7 +104,7 @@ def write(ds, period, root):
 # Lazy psd for pairs and periods
 # ------------------------------
 
-def period_spectrograms(snr, ct, root, attrs, overwrite: bool = False):
+def period_spectrograms(snr, ct, root, attrs, overwrite: bool = True):
     """Evaluate psds for a pair and a set of periods
     """
     periods = xcorr.signal.trigger.trigger_periods(ct)
@@ -115,7 +116,7 @@ def period_spectrograms(snr, ct, root, attrs, overwrite: bool = False):
         for pair in snr.pair:
             ds = load_and_postprocess(pair, period, root)
             psd = spectrogram(ds.cc)
-            ds = combine(ds, psd, snr_period)
+            ds = combine(ds, psd, snr_period, attrs)
             fname = write(ds, period, root)
             fnames.append(fname)
 
