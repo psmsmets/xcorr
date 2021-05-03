@@ -61,6 +61,8 @@ def taper(
         raise TypeError('dim should be a string')
     if dim not in x.dims:
         raise ValueError(f'x has no dimensions "{dim}"')
+    wtype = wtype or 'hann'
+    side = side or 'both'
 
     w = window(x[dim], wtype, max_percentage, max_length, side).astype(x.dtype)
 
@@ -68,7 +70,7 @@ def taper(
 
     y.attrs = x.attrs
 
-    historicize(y, f='filter', a={
+    historicize(y, f='taper', a={
         'x': x.name,
         'wtype': wtype,
         'max_percentage': max_percentage,
