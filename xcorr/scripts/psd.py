@@ -28,42 +28,6 @@ __all__ = []
 # Delayed functions
 # -----------------
 
-@dask.delayed
-def load(pair, period, root):
-    """Load cc of a single pair for a period.
-    """
-    t0 = period.start + pd.tseries.offsets.DateOffset(normalize=True)
-    t1 = period.end + pd.tseries.offsets.DateOffset(normalize=True)
-    src = os.path.join(root, 'cc')
-
-    files = []
-    for t in pd.date_range(t0, t1, freq='1D'):
-        files.append(xcorr.io.ncfile(str(pair.values), t, src))
-
-    ds = xcorr.merge(files)
-
-    # extract valid data
-    t0, t1 = np.datetime64(period.start), np.datetime64(period.end)
-    mask = ((ds.lag >= ds.distance/1.50) & (ds.lag <= ds.distance/1.46) &
-            (ds.status == 1) & (ds.time >= t0) & (ds.time <= t1))
-
-    # copy to avoid dimension blow-up
-    distance = ds.distance
-    pair_offset = ds.pair_offset
-    time_offset = ds.time_offset
-
-    # drop and mask
-    ds = ds.drop_vars(
-        ['status', 'distance', 'pair_offset', 'time_offset']
-    ).where(mask, drop=True)
-
-    # add back
-    ds['distance'] = distance
-    ds['pair_offset'] = pair_offset
-    ds['time_offset'] = time_offset
-
-    return ds
-
 
 @dask.delayed
 def extract_period(ds, period):
@@ -76,33 +40,38 @@ def extract_period(ds, period):
 
 
 @dask.delayed
-def preprocess(ds):
-    """Preprocess cc
+def load_and_postprocess(pair, period, root):
+    """Load cc of a single pair for a period.
     """
-    cc = (ds.cc
-          .signal.unbias()
-          .signal.demean()
-          .signal.filter(frequency=1.5, btype='highpass', order=4)
-          .signal.taper(max_length=2/3)
-          )
+    t0 = period.start + pd.tseries.offsets.DateOffset(normalize=True)
+    t1 = period.end + pd.tseries.offsets.DateOffset(normalize=True)
+    src = os.path.join(root, 'cc')
 
-    return cc
+    files = [xcorr.io.ncfile(str(pair.values), t, src)
+             for t in pd.date_range(t0, t1, freq='1D')]
+
+    ds = xcorr.mfread(files).postprocess(
+        clim=(1.46, 1.50),
+        time_lim=(np.datetime64(period.start), np.datetime64(period.end)),
+        filter_kwargs=dict(frequency=1.5, order=4),
+    )
+
+    return ds
 
 
 @dask.delayed
 def spectrogram(cc):
     """Calculate spectrogram
     """
-    psd = cc.signal.spectrogram(duration=2., padding_factor=4)
-    psd = psd.where((psd.freq >= 1.5) & (psd.freq <= 18.), drop=True)
+    psd = cc.signal.spectrogram(duration=2.5, padding_factor=4)
+    psd = psd.where((psd.freq <= 20.), drop=True)  # Nyquist
     return psd
 
 
 @dask.delayed
-def combine(ds, cc, psd, snr):
+def combine(ds, psd, snr):
     """Combine all into a single dataset
     """
-    ds['cc'] = cc
     ds['psd'] = psd
     ds['snr'] = snr.loc[{'pair': ds.pair[0]}]
     return ds
@@ -144,12 +113,12 @@ def period_spectrograms(snr, ct, root, attrs, overwrite: bool = False):
         snr_period = extract_period(snr, period)
 
         for pair in snr.pair:
-            ds = load(pair, period, root)
-            cc = preprocess(ds)
-            psd = spectrogram(cc)
-            ds = combine(ds, cc, psd, snr_period)
+            ds = load_and_postprocess(pair, period, root)
+            psd = spectrogram(ds.cc)
+            ds = combine(ds, psd, snr_period)
             fname = write(ds, period, root)
             fnames.append(fname)
+
     return fnames
 
 

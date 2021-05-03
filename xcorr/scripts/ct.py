@@ -132,7 +132,7 @@ def main():
     peak = ds.snr.where(ds.ct >= 0).min(dim='pair').max()
     ds['snr'] = ds.snr.where(ds.snr <= peak)
 
-    # timelapse filename
+    # output filename
     nc = utils.ncfile(
         'snr_ct', args.pair, ds.time[0].item(), ds.time[-1].item(),
         args.prefix, args.suffix
