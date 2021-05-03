@@ -158,7 +158,7 @@ def plane_wave(
     ds.attrs = global_attrs({
         'title': (
             kwargs.pop('title', '') +
-            'Least-Squares Estimated Plane Wave'
+            ' Least-Squares Estimated Plane Wave'
         ).strip(),
         **kwargs,
         'references': (
