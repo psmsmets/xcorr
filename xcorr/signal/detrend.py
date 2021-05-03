@@ -108,7 +108,10 @@ def detrend(x: xr.DataArray, dim: str = None, type: str = None,
     else:
         type = 'constant'
         y = x - x.mean(dim=dim, skipna=skipna, keep_attrs=True)
-        y.attrs = x.attrs
+
+    # restore attributes
+    y.name = x.name
+    y.attrs = x.attrs
 
     # log workflow
     historicize(y, f='detrend', a={

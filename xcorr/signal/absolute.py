@@ -71,6 +71,10 @@ def absolute(
                        **dargs,
                        kwargs={**kwargs})
 
+    # restore attributes
+    y.name = x.name
+    y.attrs = x.attrs
+
     # log workflow
     historicize(y, f='absolute', a={
         'x': x.name,

@@ -74,6 +74,10 @@ def hilbert(
                        **dargs,
                        kwargs={'axis': -1, **kwargs})
 
+    # restore attributes
+    y.name = x.name
+    y.attrs = x.attrs
+
     # log workflow
     historicize(y, f='hilbert', a={
         'x': x.name,

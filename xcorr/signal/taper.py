@@ -68,8 +68,11 @@ def taper(
 
     y = x * w
 
+    # restore attributes
+    y.name = x.name
     y.attrs = x.attrs
 
+    # log workflow
     historicize(y, f='taper', a={
         'x': x.name,
         'wtype': wtype,
