@@ -29,7 +29,7 @@ __all__ = []
 
 
 @dask.delayed
-def load_and_postprocess(pair, period, root):
+def load_and_postprocess(pair, period, root, clim=(1460, 1500)):
     """Load cc of a single pair for a period.
     """
     t0 = period.start + pd.tseries.offsets.DateOffset(normalize=True)
@@ -46,14 +46,13 @@ def load_and_postprocess(pair, period, root):
     if not files:
         return
 
-    ds = xcorr.merge(*files, fast=True, parallel=False)
-    # ds = xcorr.mfread(files, naive=True)
+    ds = xcorr.mfread(files, naive=True, parallel=False)
     if ds is None:
         return
     ds = ds.xcorr.postprocess(
-        clim=(1460, 1500),
+        clim=clim,
         time_lim=(period.start.to_datetime64(), period.end.to_datetime64()),
-        filter_kwargs=dict(frequency=1.5, order=4),
+        filter_kwargs=dict(frequency=3., order=2),
     )
 
     return ds
@@ -69,29 +68,26 @@ def spectrogram(ds):
 
 
 @dask.delayed
-def peak_local_max(psd):
+def peak_local_max(da, attrs):
     """Determine spectrogram peak local max
     """
-    if psd is None:
+    if da is None:
         return
-    return psd.signal.peak_local_max(min_distance=25, threshold_rel=.01,
-                                     extend=True, as_dataframe=False)
-
-
-@dask.delayed
-def to_dataframe(ds):
-    """Convert a dataset to a dataframe and flatten (reset) the index.
-    """
-    if ds is None:
-        return
-    return ds.to_dataframe().dropna().reset_index()
+    df = da.signal.peak_local_max(
+        min_distance=25,
+        threshold_rel=.01,
+        extend=True,
+        as_dataframe=True,
+        attrs=attrs
+    )
+    return df.reset_index()
 
 
 ###############################################################################
 # Lazy psd for pairs and periods
 # ------------------------------
 
-def period_spectrograms_max(snr, ct, root, attrs):
+def period_spectrograms_max(snr, ct, root, clim, attrs):
     """Evaluate psds for a pair and a set of periods
     """
     periods = xcorr.signal.trigger.trigger_periods(ct)
@@ -99,10 +95,9 @@ def period_spectrograms_max(snr, ct, root, attrs):
 
     for index, period in periods.iterrows():
         for pair in snr.pair:
-            ds = load_and_postprocess(pair, period, root)
-            d = spectrogram(ds)
-            d = peak_local_max(d)
-            d = to_dataframe(d)
+            d = load_and_postprocess(pair, period, root, clim)
+            d = spectrogram(d)
+            d = peak_local_max(d, attrs)
             df.append(d)
 
     return df
@@ -153,6 +148,10 @@ def main():
         help=('Set cross-correlation root directory (default: current '
               'working directory)')
     )
+    parser.add_argument(
+        '-c', '--clim', metavar='..', type=str, default="1460, 1500",
+        help='Celerity range (min, max) in meters per second'
+    )
 
     utils.add_common_arguments(parser)
     utils.add_attrs_group(parser)
@@ -169,14 +168,19 @@ def main():
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
         args.end = pd.to_datetime(args.end, format=args.format)
+    args.clim = tuple(eval(args.clim))
+    if len(args.clim) != 2:
+        raise ValueError("Celerity range should be a tuple of length 2: "
+                         "(min, max)")
 
     # print header and core parameters
-    print(f'xcorr-psd v{xcorr.__version__}')
+    print(f'xcorr-psdmax v{xcorr.__version__}')
     print('{:>20} : {}'.format('root', args.root))
     print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
                                else args.pair))
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
+    print('{:>20} : {}'.format('clim', args.clim))
     print('{:>20} : {}'.format('overwrite', args.overwrite))
 
     args.start = args.start or pd.to_datetime(snr_ct.time[0].item())
@@ -234,7 +238,7 @@ def main():
     print(".. spectrogram local maximum for all active periods")
 
     mapped = client.compute(
-        period_spectrograms_max(snr, ct, args.root, args.attrs)
+        period_spectrograms_max(snr, ct, args.root, args.clim, args.attrs)
     )
     distributed.wait(mapped)
 

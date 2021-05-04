@@ -9,8 +9,9 @@ Finding local maxima of an N-D labelled array of data.
 
 
 # Mandatory imports
-import xarray as xr
 import numpy as np
+import pandas as pd
+import xarray as xr
 from skimage import feature
 try:
     import dask
@@ -109,7 +110,7 @@ def peak_local_max(
                        kwargs=kwargs)
 
     # mask
-    y = y.where(y > -1) if as_index else x.where(y >= 0)
+    y = y.where(y > -1).astype(np.int64) if as_index else x.where(y >= 0)
 
     # attributes
     y.attrs = {**x.attrs, **dict(**kwargs)}
@@ -171,4 +172,9 @@ def peak_local_max(
 
         y = ds
 
-    return y.to_dataframe().dropna() if as_dataframe else y
+    if as_dataframe:
+        attrs = y.attrs
+        y = y.to_dataframe().dropna()
+        y.attrs = attrs
+
+    return y
