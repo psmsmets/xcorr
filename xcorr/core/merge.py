@@ -19,7 +19,8 @@ __all__ = ['merge']
 
 
 def merge(
-    *datasets, extract: bool = False, verb: int = 0, **kwargs
+    *datasets, extract: bool = False, verb: int = 0, parallel: bool = False,
+    **kwargs
 ):
     """
     Merge a list of xcorr N-D labelled set of data arrays.
@@ -37,6 +38,9 @@ def merge(
     verb : {0, 1, 2, 3, 4}, optional
         Level of verbosity. Defaults to 0.
 
+    parallel : `bool`, optional
+        Enabled parallellization if `True` (requires Dask). Defaults to `False`.
+
     Any additional keyword arguments will be passed to :func:`validate_list`.
 
     Returns
@@ -47,7 +51,7 @@ def merge(
     """
     # check
     dsets = validate_list(datasets, verb=verb, keep_opened=True,
-                          parallel=False, **kwargs)
+                          parallel=parallel, **kwargs)
 
     # merge
     ds = xr.combine_by_coords(
