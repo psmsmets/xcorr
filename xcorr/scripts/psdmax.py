@@ -49,11 +49,14 @@ def load_and_postprocess(pair, period, root, clim=(1460, 1500)):
     ds = xcorr.mfread(files, naive=True, parallel=False)
     if ds is None:
         return
-    ds = ds.xcorr.postprocess(
-        clim=clim,
-        time_lim=(period.start.to_datetime64(), period.end.to_datetime64()),
-        filter_kwargs=dict(frequency=3., order=2),
-    )
+    try:
+        ds = ds.xcorr.postprocess(
+            clim=clim,
+            time_lim=(period.start.to_datetime64(), period.end.to_datetime64()),
+            filter_kwargs=dict(frequency=3., order=2),
+        )
+    except ValueError:
+        ds = None
 
     return ds
 
@@ -190,8 +193,8 @@ def main():
     cluster, client = utils.init_dask(n_workers=args.nworkers,
                                       scheduler_file=args.scheduler)
 
-    # filter snr and ct
-    print('.. filter snr and ct')
+    # extract snr and ct
+    print('..Extract snr and ct')
     if args.debug:
         print(snr_ct)
     snr = snr_ct.snr.where(
@@ -235,7 +238,7 @@ def main():
     container = pd.HDFStore(h5)
 
     # construct datasets with preprocessed cc, snr and psd
-    print(".. spectrogram local maximum for all active periods")
+    print("..Find spectrogram local maxima for all active periods")
 
     mapped = client.compute(
         period_spectrograms_max(snr, ct, args.root, args.clim, args.attrs)
@@ -251,17 +254,17 @@ def main():
         print(df)
 
     # write to hdf5
-    print(f'.. write to "{h5}"')
+    print(f'..Write to "{h5}"')
     container['df'] = df
     container.close()
 
     # close dask client and cluster
-    print('.. close dask')
+    print('..Close dask')
     client.close()
     if cluster is not None:
         cluster.close()
 
-    print('.. done')
+    print('..Done')
     sys.exit(0)
 
 

@@ -101,7 +101,7 @@ def postprocess(
     # extract valid times only
     m = (ds.status == 1) & (ds.time >= time_min) & (ds.time <= time_max)
     if not m.any():
-        raise ValueError("No data left after extracting valid times.")
+        raise ValueError("No data after extracting valid times")
     ds = ds.drop_vars('distance').where(m, drop=True)
     ds['distance'] = d  # avoids adding extra dimensions!
 
@@ -127,7 +127,7 @@ def postprocess(
     # extract
     m = (ds.lag >= lag_min) & (ds.lag <= lag_max)
     if not m.any():
-        raise ValueError("No data after extracting time lag.")
+        raise ValueError("No data after extracting time lag")
 
     # postprocess
     cc = (
