@@ -51,7 +51,7 @@ def load_and_postprocess(pair, period, root):
              for t in pd.date_range(t0, t1, freq='1D')]
 
     ds = xcorr.mfread(files).postprocess(
-        clim=(1.46, 1.50),
+        clim=(1460, 1500),
         time_lim=(np.datetime64(period.start), np.datetime64(period.end)),
         filter_kwargs=dict(frequency=1.5, order=4),
     )
