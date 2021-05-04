@@ -79,7 +79,7 @@ def init_dask(n_workers=None, scheduler_file=None, logger=None):
     return cluster, client
 
 
-def filename(title, pair, start, end, ext='nc', prefix=None, suffix=None):
+def filename(title, pair, start, end, prefix=None, suffix=None, ext='nc'):
     """Construct a filename.
     """
     start = to_datetime(start)
