@@ -13,7 +13,7 @@ NAME = 'xcorr'
 
 setup(
     name=NAME,
-    python_requires='>3.6.0',
+    python_requires='>=3.7.0',
     description=DESCRIPTION,
     long_description=README,
     author='Pieter Smets',
@@ -56,6 +56,7 @@ setup(
         'pandas>=1.0',
         'pyproj>=2.0',
         'tabulate>=0.8',
+        'pytables>=3.1',
     ],
     use_scm_version={
         'root': '.',

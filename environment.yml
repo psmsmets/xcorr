@@ -35,6 +35,7 @@ dependencies:
   - flake8
   - scikit-learn
   - scikit-image
+  - pytables
   - python-slugify
   - pip
   - pip:
