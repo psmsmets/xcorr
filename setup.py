@@ -56,7 +56,7 @@ setup(
         'pandas>=1.0',
         'pyproj>=2.0',
         'tabulate>=0.8',
-        'pytables>=3.1',
+        'pytables>=3.6',
     ],
     use_scm_version={
         'root': '.',
