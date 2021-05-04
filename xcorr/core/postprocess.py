@@ -87,7 +87,7 @@ def postprocess(
 
     # extract distance and set SI-unit factor
     d = ds.distance
-    d_fact = 1000 if d.units == 'km' else 1
+    d_fact = 1000 if (d.units == 'km' and (cmin > 10 and cmax > 10)) else 1
 
     # time range?
     time_min = time_min or ds.time.min().values
@@ -99,10 +99,10 @@ def postprocess(
         raise TypeError('time min and max should be of type numpy.datetime64')
 
     # extract valid times only
-    ds = ds.drop_vars('distance').where(
-        (ds.status == 1) & (ds.time >= time_min) & (ds.time <= time_max),
-        drop=True
-    )
+    m = (ds.status == 1) & (ds.time >= time_min) & (ds.time <= time_max)
+    if not m.any():
+        raise ValueError("No data left after extracting valid times.")
+    ds = ds.drop_vars('distance').where(m, drop=True)
     ds['distance'] = d  # avoids adding extra dimensions!
 
     # set filter arguments
@@ -121,12 +121,17 @@ def postprocess(
     lag_max = lag_max or ds.lag.max().item()
 
     # update with celerity range?
-    lag_min = max((lag_min, d.min()*d_fact/cmax)) if cmax else lag_min
-    lag_max = min((lag_max, d.max()*d_fact/cmin)) if cmin else lag_max
+    lag_min = max((lag_min, d.min().values*d_fact/cmax)) if cmax else lag_min
+    lag_max = min((lag_max, d.max().values*d_fact/cmin)) if cmin else lag_max
 
-    # extract and postprocess cc
+    # extract
+    m = (ds.lag >= lag_min) & (ds.lag <= lag_max)
+    if not m.any():
+        raise ValueError("No data after extracting time lag.")
+
+    # postprocess
     cc = (
-        ds.cc.where((ds.lag >= lag_min) & (ds.lag <= lag_max), drop=True)
+        ds.cc.where(m, drop=True)
         .signal.unbias()
         .signal.demean()
         .signal.taper(max_length=5.)  # timeshift phase wrapping
