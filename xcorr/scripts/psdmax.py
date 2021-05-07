@@ -29,45 +29,37 @@ __all__ = []
 
 
 @dask.delayed
-def load_and_postprocess(pair, period, root, clim=(1460, 1500)):
-    """Load cc of a single pair for a period.
+def get_spectrogram(pair, time, root, period=None, clim=(1460, 1500)):
+    """Load spectrogram for a pair and time.
     """
-    t0 = period.start + pd.tseries.offsets.DateOffset(normalize=True)
-    t1 = period.end + pd.tseries.offsets.DateOffset(normalize=True)
-    src = os.path.join(root, 'cc')
-
-    files = []
-    for t in pd.date_range(t0, t1, freq='1D'):
-        file = xcorr.io.ncfile(str(pair.values), t, src)
-        if os.path.isfile(file):
-            files.append(file)
-
-    # nothing found?
-    if not files:
+    # construct filename
+    nc = xcorr.io.ncfile(pair, time, root)
+    if not os.path.isfile(nc):
         return
 
-    ds = xcorr.mfread(files, naive=True, parallel=False)
+    # read
+    ds = xcorr.read(nc, fast=True, engine='h5netcdf')
     if ds is None:
         return
+
+    # process
     try:
         ds = ds.xcorr.postprocess(
             clim=clim,
-            time_lim=(period.start.to_datetime64(), period.end.to_datetime64()),
+            time_lim=period,
             filter_kwargs=dict(frequency=3., order=2),
         )
     except ValueError:
         ds = None
 
-    return ds
+    # obtain spectrogram
+    psd = ds.cc.signal.spectrogram(duration=2.5, padding_factor=4)
 
+    # clean
+    ds.close()
+    del ds
 
-@dask.delayed
-def spectrogram(ds):
-    """Calculate spectrogram
-    """
-    if ds is None:
-        return
-    return ds.cc.signal.spectrogram(duration=2.5, padding_factor=4)
+    return psd
 
 
 @dask.delayed
@@ -90,18 +82,18 @@ def peak_local_max(da, attrs):
 # Lazy psd for pairs and periods
 # ------------------------------
 
-def period_spectrograms_max(snr, ct, root, clim, attrs):
+def period_spectrograms_max(pairs, ct, root, clim, attrs):
     """Evaluate psds for a pair and a set of periods
     """
-    periods = xcorr.signal.trigger.trigger_periods(ct)
     df = []
-
-    for index, period in periods.iterrows():
-        for pair in snr.pair:
-            d = load_and_postprocess(pair, period, root, clim)
-            d = spectrogram(d)
-            d = peak_local_max(d, attrs)
-            df.append(d)
+    for (pid, period) in ct.time.groupby(ct):
+        t0 = period[0].values
+        t1 = period[-1].values
+        for day in pd.date_range(t0, t1, freq='1D', normalize=True):
+            for pair in pairs:
+                p = get_spectrogram(pair, day, root, (t0, t1), clim)
+                p = peak_local_max(p, attrs)
+                df.append(p)
 
     return df
 
@@ -166,7 +158,6 @@ def main():
     snr_ct = xr.open_dataset(args.snr_ct)
 
     # update arguments
-    args.root = os.path.abspath(args.root)
     if args.start:
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
@@ -241,7 +232,7 @@ def main():
     print("..Find spectrogram local maxima for all active periods")
 
     mapped = client.compute(
-        period_spectrograms_max(snr, ct, args.root, args.clim, args.attrs)
+        period_spectrograms_max(snr.pair, ct, args.root, args.clim, args.attrs)
     )
     distributed.wait(mapped)
 
