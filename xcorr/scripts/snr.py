@@ -151,7 +151,6 @@ def main():
     ]))
 
     # update some arguments
-    args.root = os.path.abspath(args.root)
     args.start = pd.to_datetime(args.start, format=args.format)
     args.end = pd.to_datetime(args.end, format=args.format)
     args.out = utils.ncfile('snr_envelope' if args.envelope else 'snr',

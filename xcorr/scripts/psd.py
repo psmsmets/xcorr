@@ -178,7 +178,6 @@ def main():
     snr_ct = xr.open_dataset(args.snr_ct)
 
     # update arguments
-    args.root = os.path.abspath(args.root)
     if args.start:
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
