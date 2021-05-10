@@ -7,6 +7,7 @@ xcorr.signal init
 from .absolute import abs, absolute
 from .beamform import plane_wave
 from .correlate import correlate1d, correlate2d
+from .cwt import cwt
 from .detrend import detrend, demean
 from .fft import fft, ifft, rfft, irfft
 from .filter import filter
