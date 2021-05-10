@@ -161,7 +161,7 @@ def write(
     if verb > 0:
         print('To temporary netcdf', end='. ')
     data.to_netcdf(
-        path=tmp, mode='w', format='netcdf4',
+        path=tmp, mode='w', format='netcdf4', compute=True,
         **{'engine': engine, **kwargs},
     )
 
