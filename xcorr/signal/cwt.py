@@ -211,15 +211,17 @@ def scaleogram(
     if dim not in x.dims:
         raise ValueError(f'x has no dimensions "{dim}"')
 
-    if (
-        "sampling_rate" not in x[dim].attrs and
-        "sampling_period" not in x[dim].attrs
-    ):
+    # sampling rate
+    if "sampling_rate" in x[dim].attrs:
+        fs = x[dim].attrs['sampling_rate']
+    elif "sampling_period" in x[dim].attrs:
+        fs = 1/x[dim].attrs['sampling_period']
+    else:
         raise KeyError("x has no attribute 'sampling_rate' nor "
                        "'sampling_period'")
 
     # scales
-    s = scales or np.logspace(np.log10(1), np.log10(100), 200)
+    s = scales or np.logspace(np.log10(2), np.log10(fs*fs/4), 200)
 
     # cwt
     y = cwt(x, scales=s, **kwargs)
