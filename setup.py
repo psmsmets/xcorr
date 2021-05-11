@@ -55,6 +55,7 @@ setup(
         'xarray>=0.16',
         'pandas>=1.0',
         'pyproj>=2.0',
+        'pywt>=1.0',
         'tabulate>=0.8',
         'tables>=3.2.3',
     ],
