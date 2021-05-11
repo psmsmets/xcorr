@@ -219,7 +219,7 @@ def scaleogram(
                        "'sampling_period'")
 
     # scales
-    s = scales or np.logspace(np.log10(2), np.log10(100), 200)
+    s = scales or np.logspace(np.log10(1), np.log10(100), 200)
 
     # cwt
     y = cwt(x, scales=s, **kwargs)

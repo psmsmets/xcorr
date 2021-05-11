@@ -10,7 +10,6 @@ Finding local maxima of an N-D labelled array of data.
 
 # Mandatory imports
 import numpy as np
-import pandas as pd
 import xarray as xr
 from skimage import feature
 try:
