@@ -11,7 +11,7 @@ Perform the continuous wavelet transform of an N-D labelled array of data.
 # Mandatory imports
 import numpy as np
 import xarray as xr
-import scipy as sp
+import pywt
 try:
     import dask
 except ModuleNotFoundError:
@@ -19,51 +19,47 @@ except ModuleNotFoundError:
 
 # Relative import
 from ..util.history import historicize
+from .absolute import absolute
 
 
-__all__ = ['cwt']
+__all__ = ['cwt', 'scaleogram']
 
 
 def cwt(
-    x: xr.DataArray, wavelet: callable = None, freqs=None, widths=None,
-    dim: str = None, dtype: np.dtype = None, **kwargs
+    x: xr.DataArray, scales, wavelet=None, method: str = None, dim: str = None
 ):
     """
-    Compute the continuous wavelet transform of an N-D labelled dataarray.
+    Compute the continuous wavelet transform of an N-D labelled data array.
 
-    Implementation of :func:`scipy.signal.cwt` to a
-    :class:`xarray.DataArray`.
+    Implementation of :func:`pywt.cwt` to a :class:`xarray.DataArray`.
 
     Parameters
     ----------
     x : :class:`xarray.DataArray`
         The array of data for which to perform the wavelet transform.
 
-    wavelet : `function`
-        Wavelet function, which should take 2 arguments.
-        The first argument is the number of points that the returned vector
-        will have (len(wavelet(length,width)) == length).
-        The second is a width parameter, defining the size of the wavelet
-        (e.g. standard deviation of a gaussian). See `ricker`, which
-        satisfies these requirements.
+    scales : `array_like`
+        The wavelet scales to use.
 
-    freqs : `sequence`
-        Frequencies to use for transform.
+    wavelet : `Wavelet object or name`, optional
+        Wavelet to use. Defaults to 'cmor'.
+        See ``pywt.wavelist(kind='continuous')`` for a list of continuous
+        wavelet families.
 
-    widths : `sequence`
-        Widths to use for transform.
+    method : {'conv', 'fft'}, optional
+        The method used to compute the CWT. Can be any of:
+            o ``conv`` uses `numpy.convolve`.
+            o ``fft`` uses frequency domain convolution.
+            o ``auto`` uses automatic selection based on an estimate of the
+              computational complexity at each scale.
+        The conv method complexity is ``O(len(scale) * len(data))``. The fft
+        method is ``O(N * log2(N))`` with ``N = len(scale) + len(data) - 1``.
+        It is well suited for large size signals but slightly slower than
+        ``conv`` on small ones
 
     dim : `str`, optional
         The time dimension of ``x`` used to compute the wavelet transform.
         Defaults to the last dimension.
-
-    dtype : :class:`np.dtype`, optional
-        The desired data type of output. Defaults to `np.float64` if the output
-        of wavelet is real and `np.complex128` if it is complex.
-
-    **kwargs :
-        Any additional keyword arguments will be passed to
-        :func:`scipy.signal.cwt`.
 
     Returns
     -------
@@ -77,80 +73,73 @@ def cwt(
     if dim not in x.dims:
         raise ValueError(f'x has no dimensions "{dim}"')
 
-    # set wavelet
-    wavelet = wavelet or sp.signal.ricker
-
-    # widths and frequencies
-    if widths is None:
+    # sampling rate
+    if "sampling_rate" in x[dim].attrs:
         fs = x[dim].attrs['sampling_rate']
-        if freqs is None:
-            freqs = np.linspace(1/fs, fs/2, 100)
-        elif isinstance(freqs, int):
-            freqs = np.linspace(1/fs, fs/2, np.abs(freqs))
-        elif isinstance(freqs, tuple):
-            if len(freqs) != 3:
-                raise ValueError('Freqs should be a tuple with '
-                                 '(min, max, steps)')
-            f_min, f_max, f_steps = freqs
-            if f_min <= 0:
-                raise ValueError('Minimum frequency cannot be <= 0')
-            if f_max > fs/2:
-                raise ValueError('Maximum frequency cannot be > Nyquist')
-            freqs = np.linspace(f_min, f_max, f_steps)
-        elif isinstance(freqs, xr.DataArray):
-            freqs = freqs.values
-        else:
-            freqs = np.array(freqs)
-        w = kwargs['w'] if 'w' in kwargs else 1.
-        widths = w*fs/(2*np.pi*freqs)
-        new_dim = xr.DataArray(
-            data=freqs,
-            dims=('freq',),
-            name='freq',
-            attrs={
-                'long_name': 'Frequency',
-                'standard_name': 'frequency',
-                'units': 'Hz',
-                'w': w,
-                'fs': fs,
-            },
-        )
+    elif "sampling_period" in x[dim].attrs:
+        fs = 1/x[dim].attrs['sampling_period']
     else:
-        freqs = None
-        widths = (widths.values if isinstance(widths, xr.DataArray)
-                  else np.array(widths))
-        new_dim = xr.DataArray(
-            data=widths,
-            dims=('width',),
-            name='width',
-            attrs={
-                'long_name': 'Continuous Wavelet Transform Width',
-                'standard_name': 'continuous_wavelet_transform_width',
-                'units': '-',
-            },
-        )
+        fs = 1.
+
+    # wavelet
+    w = wavelet or "cmor1.5-1.0"
+    if isinstance(w, str):
+        w = pywt.ContinuousWavelet(w)
+    elif not isinstance(w, pywt.ContinuousWavelet):
+        raise TypeError("Wavelet should be of type 'pywt.ContinuousWavelet'")
+
+    # scales
+    s = scales.values if isinstance(scales, xr.DataArray) else np.array(scales)
+
+    # frequency
+    f = pywt.scale2frequency(w, s) * fs
+
+    # method
+    method = method or 'fft'
 
     # dask collection?
     dargs = {}
     if dask and dask.is_dask_collection(x):
         dargs = dict(
             dask='allowed',
-            output_dtypes=[dtype or np.float64],  # or np.complex128
-            output_sizes={new_dim.name: len(widths)}
+            output_dtypes=[np.complex128 if w.complex_cwt else np.float64],
+            output_sizes={"freq": len(scales)}
         )
 
+    # ufunc wrapper (catch frequency return)
+    def _cwt(x, **kwargs):
+        c, f = pywt.cwt(x, **kwargs)
+        return np.moveaxis(c, 0, -2)
+
     # apply cwt as ufunc (and optional dask distributed)
-    y = xr.apply_ufunc(sp.signal.cwt, x,
+    y = xr.apply_ufunc(_cwt, x,
                        input_core_dims=[[dim]],
-                       output_core_dims=[[new_dim.name, dim]],
+                       output_core_dims=[["freq", dim]],
                        keep_attrs=True,
-                       vectorize=True,
-                       kwargs=dict(wavelet=wavelet, widths=widths,
-                                   dtype=dtype, **kwargs),
+                       vectorize=False,
+                       kwargs=dict(
+                           scales=s,
+                           wavelet=w,
+                           method=method,
+                           axis=-1,
+                       ),
                        **dargs)
 
-    # add frequency coordinate
-    y = y.assign_coords(width=new_dim) if freqs is None else y.assign_coords(freq=new_dim)
+    # add width coordinate
+    y = y.assign_coords(
+        freq=xr.DataArray(
+            data=f,
+            dims=("freq",),
+            name="freq",
+            attrs={
+                'long_name': 'Frequency',
+                'standard_name': 'Frequency',
+                'units': '-',
+                'sampling_rate': fs,
+                'wavelet': w.name,
+            },
+        )
+    )
 
     # set attributes
     y.name = 'cwt'
@@ -159,14 +148,101 @@ def cwt(
         'long_name': f"{x.long_name} Continuous Wavelet Transform",
         'standard_name': f"{x.standard_name}_continuous_wavelet_transform",
         'units': '-',
-        'wavelet': repr(wavelet),
+        'sampling_rate': fs,
+        'wavelet': w.name,
+        'wavelet_bandwidth_frequency': w.bandwidth_frequency,
+        'wavelet_center_frequency': w.center_frequency,
+        'wavelet_family_name': w.family_name,
     }
     y.encoding = {'zlib': True, 'complevel': 9}
 
     # log workflow
     historicize(y, f='cwt', a={
         'x': x.name,
-        'wavelet': repr(wavelet),
+        'wavelet': w.name,
+        'method': method,
+        'dim': dim,
+    })
+
+    return y
+
+
+def scaleogram(
+    x: xr.DataArray, scales=None, magnitude: bool = True,
+    dim: str = None, dtype: np.dtype = None, **kwargs
+):
+    """
+    Compute the scaleogram using the continuous wavelet transform of an N-D
+    labelled data array.
+
+    Implementation of :func:`pywt.cwt` to a :class:`xarray.DataArray`.
+
+    Parameters
+    ----------
+    x : :class:`xarray.DataArray`
+        The array of data for which to compute the scaleogram.
+
+    scales : `array_like`, optional
+        The wavelet scales to use.
+
+    magnitude : `bool`, optional
+        Compute the magnitude (norm) of the (complex) wavelet transform.
+
+    dim : `str`, optional
+        The time dimension of ``x`` used to compute the wavelet transform.
+        Defaults to the last dimension.
+
+    dtype : :class:`np.dtype`, optional
+        The desired data type of output. Defaults to `np.float64` if the output
+        of wavelet is real and `np.complex128` if it is complex.
+
+    **kwargs :
+        Any additional keyword arguments will be passed to :func:`cwt`.
+
+    Returns
+    -------
+    y : :class:`xarray.DataArray`
+        The scaleogram of ``x``.
+
+    """
+    dim = dim or x.dims[-1]
+    if not isinstance(dim, str):
+        raise TypeError('dim should be a string')
+    if dim not in x.dims:
+        raise ValueError(f'x has no dimensions "{dim}"')
+
+    if (
+        "sampling_rate" not in x[dim].attrs and
+        "sampling_period" not in x[dim].attrs
+    ):
+        raise KeyError("x has no attribute 'sampling_rate' nor "
+                       "'sampling_period'")
+
+    # scales
+    s = scales or np.logspace(np.log10(2), np.log10(100), 200)
+
+    # cwt
+    y = cwt(x, scales=s, **kwargs)
+
+    # magnitude?
+    if magnitude:
+        y = absolute(y).astype(dtype or x.dtype)
+        lname = 'Magnitude Scaleogram'
+        sname = 'magnitude_'
+    else:
+        lname = 'Scaleogram'
+        sname = 'scaleogram'
+
+    # update attributes
+    y.name = 'Scwt'
+    y.attrs['long_name'] = f"{x.long_name} {lname}"
+    y.attrs['standard_name'] = f"{x.standard_name}_{sname}",
+
+    # log workflow
+    historicize(y, f='scaleogram', a={
+        'x': x.name,
+        'magnitude': magnitude,
+        'dim': dim,
         '**kwargs': kwargs,
     })
 

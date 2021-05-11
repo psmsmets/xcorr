@@ -19,6 +19,8 @@ from .absolute import absolute as absolute_
 from .beamform import plane_wave as plane_wave_
 from .correlate import correlate1d as correlate1d_
 from .correlate import correlate2d as correlate2d_
+from .cwt import cwt as cwt_
+from .cwt import scaleogram as scaleogram_
 from .detrend import detrend as detrend_
 from .detrend import demean as demean_
 from .fft import fft as fft_
@@ -98,6 +100,15 @@ class SignalAccessor():
         Do not edit here.
         """
         return correlate2d_(self._obj, *args, **kwargs)
+
+    @wraps(cwt_)
+    def cwt(self, *args, **kwargs):
+        """
+        The docstring and signature are taken from
+        :func:`~xcorr.signal.cwt`.
+        Do not edit here.
+        """
+        return cwt_(self._obj, *args, **kwargs)
 
     @wraps(demean_)
     def demean(self, *args, **kwargs):
@@ -233,6 +244,15 @@ class SignalAccessor():
         Do not edit here.
         """
         return rms_(self._obj, *args, **kwargs)
+
+    @wraps(scaleogram_)
+    def scaleogram(self, *args, **kwargs):
+        """
+        The docstring and signature are taken from
+        :func:`~xcorr.signal.scaleogram_`.
+        Do not edit here.
+        """
+        return scaleogram_(self._obj, *args, **kwargs)
 
     @wraps(snr_)
     def snr(self, *args, **kwargs):
