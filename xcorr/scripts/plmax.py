@@ -1,8 +1,8 @@
 """
-PSDMAX
+PLMAX
 ======
 
-Spectrogram peak local maxima of triggered datasets by snr using dask.
+Spectrogram/scaleogram peak local maxima of snr triggered periods.
 
 """
 
@@ -29,7 +29,9 @@ __all__ = []
 
 
 @dask.delayed
-def get_spectrogram(pair, time, root, period=None, clim=(1460, 1500)):
+def get_spectrogram(
+    pair, time, root, period=None, clim=(1460, 1500), cwt=False
+):
     """Load spectrogram for a pair and time.
     """
     # construct filename
@@ -53,13 +55,14 @@ def get_spectrogram(pair, time, root, period=None, clim=(1460, 1500)):
         ds = None
 
     # obtain spectrogram
-    psd = ds.cc.signal.spectrogram(duration=2.5, padding_factor=4)
+    s = (ds.cc.signal.scaleogram(wavelet="cmor1.0-3.0", scales=500) if cwt else
+         ds.cc.signal.spectrogram(duration=2.5, padding_factor=4))
 
     # clean
     ds.close()
     del ds
 
-    return psd
+    return s
 
 
 @dask.delayed
@@ -79,10 +82,10 @@ def peak_local_max(da, attrs):
 
 
 ###############################################################################
-# Lazy psd for pairs and periods
-# ------------------------------
+# Lazy plmax for pairs and periods
+# --------------------------------
 
-def period_spectrograms_max(pairs, ct, root, clim, attrs):
+def period_plmax(pairs, ct, root, clim, cwt, attrs):
     """Evaluate psds for a pair and a set of periods
     """
     df = []
@@ -91,7 +94,7 @@ def period_spectrograms_max(pairs, ct, root, clim, attrs):
         t1 = period[-1].values
         for day in pd.date_range(t0, t1, freq='1D', normalize=True):
             for pair in pairs:
-                p = get_spectrogram(pair, day, root, (t0, t1), clim)
+                p = get_spectrogram(pair, day, root, (t0, t1), clim, cwt)
                 p = peak_local_max(p, attrs)
                 df.append(p)
 
@@ -107,9 +110,9 @@ def main():
     """
     # arguments
     parser = argparse.ArgumentParser(
-        prog='xcorr-psdmax',
-        description=('Spectrogram peak local maxima estimation of '
-                     ' signal-to-noise ratio triggered periods.'),
+        prog='xcorr-plmax',
+        description=('Spectrogram/Scaleogram peak local maxima of '
+                     'signal-to-noise ratio triggered periods.'),
         epilog=('See also xcorr-psd xcorr-snr xcorr-ct xcorr-timelapse '
                 'xcorr-beamform'),
     )
@@ -147,6 +150,12 @@ def main():
         '-c', '--clim', metavar='..', type=str, default="1460, 1500",
         help='Celerity range (min, max) in meters per second'
     )
+    parser.add_argument(
+        '-w', '--wavelet', action="store_true", default=False,
+        help=('Compute the scaleogram by the Continuous Wavelet Transform '
+              'using a cmor1.0-3.0 wavelet instead of the default '
+              'short-time Fourier-based spectogram.')
+    )
 
     utils.add_common_arguments(parser)
     utils.add_attrs_group(parser)
@@ -175,6 +184,8 @@ def main():
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
     print('{:>20} : {}'.format('clim', args.clim))
+    print('{:>20} : {}'.format('method', ('scaleogram (CWT)' if args.wavelet
+                                          else 'spectrogram (FFT)')))
     print('{:>20} : {}'.format('overwrite', args.overwrite))
 
     args.start = args.start or pd.to_datetime(snr_ct.time[0].item())
@@ -216,7 +227,8 @@ def main():
 
     # output filename
     h5 = utils.h5file(
-        'psdmax', args.pair, snr.time[0].item(), snr.time[-1].item(),
+        "plmax_{}".format('scaleogram' if args.cwt else 'spectogram'),
+        args.pair, snr.time[0].item(), snr.time[-1].item(),
         args.prefix, args.suffix
     )
 
@@ -232,7 +244,8 @@ def main():
     print("..Find spectrogram local maxima for all active periods")
 
     mapped = client.compute(
-        period_spectrograms_max(snr.pair, ct, args.root, args.clim, args.attrs)
+        period_plmax(snr.pair, ct, args.root, args.clim,
+                     args.wavelet, args.attrs)
     )
     distributed.wait(mapped)
 

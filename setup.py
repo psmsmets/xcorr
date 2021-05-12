@@ -29,8 +29,8 @@ setup(
     entry_points={
         'console_scripts': [
            f'{NAME}-snr=xcorr.scripts.snr:main',
+           f'{NAME}-plmax=xcorr.scripts.plmax:main',
            f'{NAME}-psd=xcorr.scripts.psd:main',
-           f'{NAME}-psdmax=xcorr.scripts.psdmax:main',
            f'{NAME}-ct=xcorr.scripts.ct:main',
            f'{NAME}-timelapse=xcorr.scripts.timelapse:main',
            f'{NAME}-beamform=xcorr.scripts.beamform:main',
