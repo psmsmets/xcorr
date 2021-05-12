@@ -177,7 +177,7 @@ def main():
                          "(min, max)")
 
     # print header and core parameters
-    print(f'xcorr-psdmax v{xcorr.__version__}')
+    print(f'xcorr-plmax v{xcorr.__version__}')
     print('{:>20} : {}'.format('root', args.root))
     print('{:>20} : {}'.format('pair', 'all' if args.pair in ('*', '')
                                else args.pair))
@@ -227,7 +227,7 @@ def main():
 
     # output filename
     h5 = utils.h5file(
-        "plmax_{}".format('scaleogram' if args.cwt else 'spectogram'),
+        "plmax_{}".format('scaleogram' if args.wavelet else 'spectogram'),
         args.pair, snr.time[0].item(), snr.time[-1].item(),
         args.prefix, args.suffix
     )
