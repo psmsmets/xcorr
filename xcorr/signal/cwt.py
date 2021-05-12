@@ -42,7 +42,7 @@ def cwt(
         The wavelet scales to use.
 
     wavelet : `Wavelet object or name`, optional
-        Wavelet to use. Defaults to 'cmor'.
+        Wavelet to use. Defaults to 'cmor1.5-1.0'.
         See ``pywt.wavelist(kind='continuous')`` for a list of continuous
         wavelet families.
 
@@ -169,7 +169,8 @@ def cwt(
 
 def scaleogram(
     x: xr.DataArray, scales=None, magnitude: bool = True,
-    dim: str = None, dtype: np.dtype = None, **kwargs
+    dim: str = None, freq_lim: tuple = None, dtype: np.dtype = None,
+    **kwargs
 ):
     """
     Compute the scaleogram using the continuous wavelet transform of an N-D
@@ -191,6 +192,9 @@ def scaleogram(
     dim : `str`, optional
         The time dimension of ``x`` used to compute the wavelet transform.
         Defaults to the last dimension.
+
+    freq_lim : `tuple`, optional
+        Limit the frequency dimension given the minimum and maximum frequency.
 
     dtype : :class:`np.dtype`, optional
         The desired data type of output. Defaults to `np.float64` if the output
@@ -221,10 +225,27 @@ def scaleogram(
                        "'sampling_period'")
 
     # scales
-    s = scales or np.logspace(np.log10(2), np.log10(fs*fs/4), 200)
+    s, s0, s1, sn = None, 2, fs*fs/4, 200
+    if isinstance(scales, int):
+        sn = scales
+    elif isinstance(scales, tuple) and len(scales) == 3:
+        s0, s1, sn = scales
+    elif isinstance(scales, xr.DataArray):
+        s = scales.values
+    elif scales is not None:
+        s = np.array(scales)     
+    s = s or np.logspace(np.log10(s0), np.log10(s1), sn)
 
     # cwt
     y = cwt(x, scales=s, **kwargs)
+
+    # freq limit?
+    if freq_lim is not None:
+        try:
+            f0, f1 = freq_lim
+        except Exception:
+            raise ValueError("freq_lim should be a tuple with min and max")
+        y = y.where((y.freq >= f0) & (y.freq <= f1), drop=True)
 
     # magnitude?
     if magnitude:
