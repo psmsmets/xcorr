@@ -39,7 +39,8 @@ def merge(
         Level of verbosity. Defaults to 0.
 
     parallel : `bool`, optional
-        Enabled parallellization if `True` (requires Dask). Defaults to `False`.
+        Enabled parallellization if `True` (requires Dask).
+        Defaults to `False`.
 
     Any additional keyword arguments will be passed to :func:`validate_list`.
 
