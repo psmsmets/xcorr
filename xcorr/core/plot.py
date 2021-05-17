@@ -31,11 +31,12 @@ def plot_ccf(
     cc: xr.DataArray, distance=None, pair: int = 0, time: int = 0,
     normalize: bool = False, cmin: float = None, cmax: float = None,
     cmajor: float = None, cminor: float = None, lag_lim: tuple = None,
-    freq_lim: tuple = None, spectrogram_db: bool = True,
-    spectrogram_contourf: bool = False, spectrogram_kwargs: dict = None,
-    spectrogram_plot_kwargs: dict = None, cc_plot_kwargs: dict = None,
-    envelope_plot_kwargs: dict = None, envelope: bool = False,
-    cbar_kwargs: dict = None, figure: mpl.figure.Figure = None
+    freq_lim: tuple = None, spectrogram_cwt: bool = False,
+    spectrogram_db: bool = True, spectrogram_contourf: bool = False,
+    spectrogram_kwargs: dict = None, spectrogram_plot_kwargs: dict = None,
+    cc_plot_kwargs: dict = None, envelope_plot_kwargs: dict = None,
+    envelope: bool = False, cbar_kwargs: dict = None,
+    figure: mpl.figure.Figure = None
 ) -> GridSpec:
     """Plot a single-pair xcorr CCFs and it's spectrogram
 
@@ -81,11 +82,15 @@ def plot_ccf(
     freq_lim : `tuple`, optional
         Set the frequency lower and upper limit.
 
+    spectrogram_cwt : `bool`, optional
+        Plot the wavelet transform based scaleogram if `True` instead of the
+        FFT-based spectrogram . Defaults to `False`.
+
     spectrogram_db : `bool`, optional
         Plot the spectrogram in dB. Defaults to `True`.
 
     spectrogram_contourf : `bool`, optional
-        Plot the spectrogram using contourf. Defaults to `True`.
+        Plot the spectrogram using contourf. Defaults to `False`.
 
     spectrogram_kwargs : `dict`
         Dictionary of keyword arguments to pass to the spectrogram computation.
@@ -141,6 +146,7 @@ def plot_ccf(
     else:
         d = None
         lag_lim = lag_lim or (cc.lag.min().item(), cc.lag.max().item())
+    freq_lim = freq_lim or tuple()
 
     fig = figure or plt.figure(constrained_layout=True, figsize=(7, 4))
     gs = GridSpec(2, 2, figure=fig, width_ratios=(40, 1))
@@ -189,12 +195,16 @@ def plot_ccf(
              transform=ax1.transAxes, ha='right', va='top')
 
     # compute spectrogram and normalize
-    spectrogram_kwargs = {
-        'duration': 2.5,
-        'padding_factor': 4,
-        **(spectrogram_kwargs or dict())
-    }
-    p = (cc.isel(time=time)).signal.spectrogram(**spectrogram_kwargs)
+    spectrogram_kwargs = spectrogram_kwargs or dict()
+    if spectrogram_cwt:
+        p = (cc.isel(time=time)).signal.scaleogram(**spectrogram_kwargs)
+    else:
+        spectrogram_kwargs = {
+            'duration': 2.5,
+            'padding_factor': 4,
+            **spectrogram_kwargs
+        }
+        p = (cc.isel(time=time)).signal.spectrogram(**spectrogram_kwargs)
     p = p/p.max() if normalize else p
     p = (10 * xr.ufuncs.log10(p.where(p > 0))) if spectrogram_db else p
 
@@ -211,7 +221,7 @@ def plot_ccf(
         'add_colorbar': False,
     }
     p = (p.plot.contourf(**spectrogram_plot_kwargs) if spectrogram_contourf
-         else p.plot.imshow(**spectrogram_plot_kwargs))
+         else p.plot.pcolormesh(**spectrogram_plot_kwargs))
 
     ax2.set_title(None)
     ax2.xaxis.set_minor_locator(AutoMinorLocator())
