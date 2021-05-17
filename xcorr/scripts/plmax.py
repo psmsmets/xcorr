@@ -30,7 +30,7 @@ __all__ = []
 
 @dask.delayed
 def get_spectrogram(
-    pair, time, root, period=None, clim=(1460, 1500), cwt=False
+    pair, time, root, period=None, clim=(1460, 1500), freq_lim=None, cwt=False,
 ):
     """Load spectrogram for a pair and time.
     """
@@ -57,6 +57,11 @@ def get_spectrogram(
     # obtain spectrogram
     s = (ds.cc.signal.scaleogram(wavelet="cmor1.0-3.0", scales=500) if cwt else
          ds.cc.signal.spectrogram(duration=2.5, padding_factor=4))
+
+    # low-frequency cut-off
+    if isinstance(freq_lim, tuple) and len(freq_lim) == 2:
+        fmin, fmax = freq_lim
+        s = s.where((s.freq >= fmin) & (s.freq <= fmax), drop=True)
 
     # clean
     ds.close()
@@ -85,7 +90,7 @@ def peak_local_max(da, attrs):
 # Lazy plmax for pairs and periods
 # --------------------------------
 
-def period_plmax(pairs, ct, root, clim, cwt, attrs):
+def period_plmax(pairs, ct, root, clim, flim, cwt, attrs):
     """Evaluate psds for a pair and a set of periods
     """
     df = []
@@ -94,7 +99,7 @@ def period_plmax(pairs, ct, root, clim, cwt, attrs):
         t1 = period[-1].values
         for day in pd.date_range(t0, t1, freq='1D', normalize=True):
             for pair in pairs:
-                p = get_spectrogram(pair, day, root, (t0, t1), clim, cwt)
+                p = get_spectrogram(pair, day, root, (t0, t1), clim, flim, cwt)
                 p = peak_local_max(p, attrs)
                 df.append(p)
 
@@ -151,6 +156,10 @@ def main():
         help='Celerity range (min, max) in meters per second'
     )
     parser.add_argument(
+        '-f', '--freq-lim', metavar='..', type=str, default="0, Nyquist",
+        help='Frequency range (min, max) in Hz'
+    )
+    parser.add_argument(
         '-w', '--wavelet', action="store_true", default=False,
         help=('Compute the scaleogram by the Continuous Wavelet Transform '
               'using a cmor1.0-3.0 wavelet instead of the default '
@@ -175,6 +184,13 @@ def main():
     if len(args.clim) != 2:
         raise ValueError("Celerity range should be a tuple of length 2: "
                          "(min, max)")
+    if args.freq_lim != "0, Nyquist":
+        args.freq_lim = tuple(eval(args.freq_lim))
+        if len(args.freq_lim) != 2:
+            raise ValueError("Frequency range should be a tuple of length 2: "
+                             "(min, max)")
+    else:
+        args.freq_lim = None
 
     # print header and core parameters
     print(f'xcorr-plmax v{xcorr.__version__}')
@@ -184,6 +200,7 @@ def main():
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
     print('{:>20} : {}'.format('clim', args.clim))
+    print('{:>20} : {}'.format('freq_lim', args.freq_lim))
     print('{:>20} : {}'.format('method', ('scaleogram (CWT)' if args.wavelet
                                           else 'spectrogram (FFT)')))
     print('{:>20} : {}'.format('overwrite', args.overwrite))
@@ -245,7 +262,7 @@ def main():
 
     mapped = client.compute(
         period_plmax(snr.pair, ct, args.root, args.clim,
-                     args.wavelet, args.attrs)
+                     args.freq_lim, args.wavelet, args.attrs)
     )
     distributed.wait(mapped)
 
