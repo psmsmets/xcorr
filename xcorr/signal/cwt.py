@@ -26,7 +26,8 @@ __all__ = ['cwt', 'scaleogram']
 
 
 def cwt(
-    x: xr.DataArray, scales, wavelet=None, method: str = None, dim: str = None
+    x: xr.DataArray, scales=None, wavelet=None, method: str = None,
+    dim: str = None
 ):
     """
     Compute the continuous wavelet transform of an N-D labelled data array.
@@ -89,7 +90,17 @@ def cwt(
         raise TypeError("Wavelet should be of type 'pywt.ContinuousWavelet'")
 
     # scales
-    s = scales.values if isinstance(scales, xr.DataArray) else np.array(scales)
+    smin, smax = w.center_frequency*2, w.center_frequency*fs*fs/2
+    s, s0, s1, sn = None, smin*1, smax*1, 200
+    if isinstance(scales, int):
+        sn = scales
+    elif isinstance(scales, tuple) and len(scales) == 3:
+        s0, s1, sn = scales
+    elif isinstance(scales, xr.DataArray):
+        s = scales.values
+    elif scales is not None:
+        s = np.array(scales)
+    s = s or np.logspace(np.log10(s0), np.log10(s1), sn)
 
     # frequency
     f = pywt.scale2frequency(w, s) * fs
@@ -168,8 +179,8 @@ def cwt(
 
 
 def scaleogram(
-    x: xr.DataArray, scales=None, magnitude: bool = True,
-    dim: str = None, freq_lim: tuple = None, dtype: np.dtype = None,
+    x: xr.DataArray, magnitude: bool = True, dim: str = None,
+    freq_lim: tuple = None, dtype: np.dtype = None,
     **kwargs
 ):
     """
@@ -182,9 +193,6 @@ def scaleogram(
     ----------
     x : :class:`xarray.DataArray`
         The array of data for which to compute the scaleogram.
-
-    scales : `array_like`, optional
-        The wavelet scales to use.
 
     magnitude : `bool`, optional
         Compute the magnitude (norm) of the (complex) wavelet transform.
@@ -215,29 +223,8 @@ def scaleogram(
     if dim not in x.dims:
         raise ValueError(f'x has no dimensions "{dim}"')
 
-    # sampling rate
-    if "sampling_rate" in x[dim].attrs:
-        fs = x[dim].attrs['sampling_rate']
-    elif "sampling_period" in x[dim].attrs:
-        fs = 1/x[dim].attrs['sampling_period']
-    else:
-        raise KeyError("x has no attribute 'sampling_rate' nor "
-                       "'sampling_period'")
-
-    # scales
-    s, s0, s1, sn = None, 2, fs*fs/4, 200
-    if isinstance(scales, int):
-        sn = scales
-    elif isinstance(scales, tuple) and len(scales) == 3:
-        s0, s1, sn = scales
-    elif isinstance(scales, xr.DataArray):
-        s = scales.values
-    elif scales is not None:
-        s = np.array(scales)     
-    s = s or np.logspace(np.log10(s0), np.log10(s1), sn)
-
     # cwt
-    y = cwt(x, scales=s, **kwargs)
+    y = cwt(x, **kwargs)
 
     # freq limit?
     if freq_lim is not None:
