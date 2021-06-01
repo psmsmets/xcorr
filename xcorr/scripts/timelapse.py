@@ -139,7 +139,7 @@ def init_spectrogram_timelapse(pair: xr.DataArray, time: xr.DataArray,
     return ds
 
 
-def get_spectrogram(pair, time, root):
+def get_spectrogram(pair, time, root, velocity=(1460, 1500), wavelet=False):
     """Load spectrogram for a pair and time.
     """
     # construct abs path and filename
@@ -179,9 +179,11 @@ def get_spectrogram(pair, time, root):
         raise ValueError("cc trace load failed from" + f)
 
     # extract cc
+    cmin, cmax = velocity
+    factor = 1000 if ds.distance.units == 'km' else 1
     cc = ds.cc.where(
-        (ds.lag >= ds.distance/1.50) &
-        (ds.lag <= ds.distance/1.46),
+        (ds.lag >= ds.distance/cmax*factor) &
+        (ds.lag <= ds.distance/cmin*factor),
         drop=True,
     )
 
@@ -193,24 +195,27 @@ def get_spectrogram(pair, time, root):
     delay = -(ds.pair_offset + ds.time_offset)
 
     # process cc and obtain spectrogram
-    psd = (cc
-           .signal.unbias()
-           .signal.demean()
-           .signal.taper(max_length=5.)  # timeshift phase wrapping
-           .signal.timeshift(delay=delay, dim='lag', fast=True)
-           .signal.filter(frequency=1.5, btype='highpass', order=4)
-           .signal.taper(max_length=3/2)  # filter artefacts
-           .signal.spectrogram(duration=2.5, padding_factor=4)
-           )
+    cc = (cc
+          .signal.unbias()
+          .signal.demean()
+          .signal.taper(max_length=5.)  # timeshift phase wrapping
+          .signal.timeshift(delay=delay, dim='lag', fast=True)
+          .signal.filter(frequency=1.5, btype='highpass', order=4)
+          .signal.taper(max_length=3/2)  # filter artefacts
+          )
+
+    # obtain spectrogram
+    s = (cc.signal.scaleogram(wavelet="cmor1.0-3.0", scales=500) if wavelet
+         else cc.signal.spectrogram(duration=2.5, padding_factor=4))
 
     # clean
     del cc
     del ds
 
-    return psd
+    return s
 
 
-def correlate_spectrogram(obj, loc, root):
+def correlate_spectrogram(obj, loc, *args, **kwargs):
     """Correlate spectrogram.
     """
     # already done?
@@ -224,8 +229,8 @@ def correlate_spectrogram(obj, loc, root):
     # load cc and compute psd on-the-fly
     psd1, psd2 = None, None
     try:
-        psd1 = get_spectrogram(loc['pair'], loc['time1'], root)
-        psd2 = get_spectrogram(loc['pair'], loc['time2'], root)
+        psd1 = get_spectrogram(loc['pair'], loc['time1'], *args, **kwargs)
+        psd2 = get_spectrogram(loc['pair'], loc['time2'], *args, **kwargs)
     except Exception as e:
         print("Spectrogram computation failed:", e)
         return
@@ -270,7 +275,7 @@ def correlate_spectrogram(obj, loc, root):
     return
 
 
-def correlate_spectrograms(obj, root):
+def correlate_spectrograms(obj, *args, **kwargs):
     """Correlate spectrograms.
     """
 
@@ -286,7 +291,7 @@ def correlate_spectrograms(obj, root):
         for time1 in obj.time1:
             for pair in obj.pair:
                 loc = dict(pair=pair, time1=time1, time2=time2)
-                correlate_spectrogram(obj, loc, root)
+                correlate_spectrogram(obj, loc, *args, **kwargs)
 
     # clean
     gc.collect()
@@ -359,6 +364,7 @@ def fill_upper_triangle(ds):
 
 def spectrogram_timelapse_on_client(
     ds: xr.Dataset, client: distributed.Client, root: str,
+    velocity: tuple = (1460, 1500), wavelet: bool = False,
     chunk: int = 10, debug: bool = False, plot: bool = False,
 ):
     """2-d correlate spectrograms on a Dask client
@@ -366,22 +372,31 @@ def spectrogram_timelapse_on_client(
     Parameters:
     -----------
 
-    ds: :class:`xr.Dataset`
+    ds : :class:`xr.Dataset`
         Timelapse dataset.
 
-    client: :class:`distributed.Client`
+    client : :class:`distributed.Client`
         Dask distributed client object.
 
-    root: `str`
+    root : `str`
         Cross-correlation root directory
 
-    chunk: `int`, optional
+    velocity : `tuple`, optional
+         Velocity range (min, max) in meters per second (default:
+         `(1460, 1500)`).
+
+    wavelet : `bool`, optional
+        Compute the scaleogram by the Continuous Wavelet Transform using a
+        cmor1.0-3.0 wavelet instead of the default short-time Fourier-based
+        spectogram (defaults: `False`).
+
+    chunk : `int`, optional
         Dask map blocks chunk size for time1 and time2 (default: 10).
 
-    debug: `bool`, optional
+    debug : `bool`, optional
         Verbose more (defaults to `False`).
 
-    plot: `bool`, optional
+    plot : `bool`, optional
         Plot results (defaults to `False`).
     """
 
@@ -418,7 +433,7 @@ def spectrogram_timelapse_on_client(
     log.info("├── map and persist blocks")
     mapped = new.map_blocks(
         correlate_spectrograms,
-        args=[root],
+        args=[root, velocity, wavelet],
         template=new,
     )
     new = client.persist(mapped)
@@ -519,6 +534,17 @@ def main():
         '-c', '--chunk', metavar='..', type=int, default=10,
         help=('Set dask chunks for time dimension (default: 10)')
     )
+    parser.add_argument(
+        '-v', '--velocity', metavar='..', type=str, default="1460, 1500",
+        help=('Velocity range (min, max) in meters per second (default: '
+              '"1460., 1500.")')
+    )
+    parser.add_argument(
+        '-w', '--wavelet', action="store_true", default=False,
+        help=('Compute the scaleogram by the Continuous Wavelet Transform '
+              'using a cmor1.0-3.0 wavelet instead of the default '
+              'short-time Fourier-based spectogram.')
+    )
     utils.add_common_arguments(parser)
     utils.add_attrs_group(parser)
 
@@ -556,9 +582,17 @@ def main():
         args.end = pd.to_datetime(args.end, format=args.format)
     if args.init:
         args.frequency = np.array(eval(args.frequency))
+        args.velocity = tuple(eval(args.velocity))
+        if len(args.velocity) != 2:
+            raise ValueError("Velocity range should be a tuple of length 2: "
+                             "(min, max)")
     else:
         args.frequency = np.array([ds.freq.values - ds.freq_bw.values/2,
                                    ds.freq.values + ds.freq_bw.values/2])
+        args.velocity = (tuple(ds.attrs['timelapse_velocity'])
+                         if 'timelapse_velocity' in ds.attrs else (1460, 1500))
+        args.wavelet = ('cwt_' in ds.attrs['timelapse_method']
+                        if 'timelapse_method' in ds.attrs else False)
 
     # print core parameters
     log.info("Parameters:")
@@ -569,6 +603,7 @@ def main():
     arg_info('end', args.end)
     arg_info('frequency', ', '.join([f'{f[0]}-{f[1]}'
                                      for f in args.frequency]))
+    arg_info('velocity', args.velocity)
 
     # init timelapse dataset
     if args.init:
@@ -616,6 +651,9 @@ def main():
             pair=snr.pair,
             time=ct.time.where(ct >= 0, drop=True),
             freq=args.frequency,
+            timelapse_method=("cwt_scaleogram_correlation" if args.wavelet else
+                              "psd_spectrogram_correlation"),
+            timelapse_velocity=list(args.velocity),
             **args.attrs,
         )
 
@@ -671,8 +709,9 @@ def main():
 
     # process on client
     log.info("Start spectrogram time lapse:")
-    ds = spectrogram_timelapse_on_client(ds, client, args.root,
-                                         args.chunk, args.debug, args.plot)
+    ds = spectrogram_timelapse_on_client(ds, client, args.root, args.velocity,
+                                         args.wavelet, args.chunk, args.debug,
+                                         args.plot)
     log.info("Spectrogram time lapse completed")
 
     # to netcdf
