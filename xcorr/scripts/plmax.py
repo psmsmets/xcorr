@@ -152,12 +152,13 @@ def main():
               'working directory)')
     )
     parser.add_argument(
-        '-c', '--celerity', metavar='..', type=str, default="1460, 1500",
-        help='Celerity range (min, max) in meters per second'
-    )
-    parser.add_argument(
         '-f', '--frequency', metavar='..', type=str, default="0, Nyquist",
         help='Frequency range (min, max) in Hz'
+    )
+    parser.add_argument(
+        '-v', '--velocity', metavar='..', type=str, default="1460, 1500",
+        help=('Velocity range (min, max) in meters per second (default: '
+              '"1460., 1500.")')
     )
     parser.add_argument(
         '-w', '--wavelet', action="store_true", default=False,
@@ -181,9 +182,9 @@ def main():
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
         args.end = pd.to_datetime(args.end, format=args.format)
-    args.celerity = tuple(eval(args.celerity))
-    if len(args.celerity) != 2:
-        raise ValueError("Celerity range should be a tuple of length 2: "
+    args.velocity = tuple(eval(args.velocity))
+    if len(args.velocity) != 2:
+        raise ValueError("Velocity range should be a tuple of length 2: "
                          "(min, max)")
     if args.frequency != "0, Nyquist":
         args.frequency = tuple(eval(args.frequency))
@@ -200,7 +201,7 @@ def main():
                                else args.pair))
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
-    print('{:>20} : {}'.format('celerity', args.celerity))
+    print('{:>20} : {}'.format('velocity', args.velocity))
     print('{:>20} : {}'.format('frequency', args.frequency))
     print('{:>20} : {}'.format('method', ('scaleogram (CWT)' if args.wavelet
                                           else 'spectrogram (FFT)')))
@@ -262,7 +263,7 @@ def main():
     print("..Find spectrogram local maxima for all active periods")
 
     mapped = client.compute(
-        period_plmax(snr.pair, ct, args.root, args.celerity,
+        period_plmax(snr.pair, ct, args.root, args.velocity,
                      args.frequency, args.wavelet, args.attrs)
     )
     distributed.wait(mapped)
