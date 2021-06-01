@@ -30,7 +30,7 @@ __all__ = []
 
 @dask.delayed
 def get_spectrogram(
-    pair, time, root, period=None, clim=(1460, 1500), freq_lim=None, cwt=False,
+    pair, time, root, period=None, clim=(1460, 1500), flim=None, cwt=False,
 ):
     """Load spectrogram for a pair and time.
     """
@@ -59,8 +59,8 @@ def get_spectrogram(
          ds.cc.signal.spectrogram(duration=2.5, padding_factor=4))
 
     # low-frequency cut-off
-    if isinstance(freq_lim, tuple) and len(freq_lim) == 2:
-        fmin, fmax = freq_lim
+    if isinstance(flim, tuple) and len(flim) == 2:
+        fmin, fmax = flim
         s = s.where((s.freq >= fmin) & (s.freq <= fmax), drop=True)
 
     # clean
@@ -152,11 +152,11 @@ def main():
               'working directory)')
     )
     parser.add_argument(
-        '-c', '--clim', metavar='..', type=str, default="1460, 1500",
+        '-c', '--celerity', metavar='..', type=str, default="1460, 1500",
         help='Celerity range (min, max) in meters per second'
     )
     parser.add_argument(
-        '-f', '--freq-lim', metavar='..', type=str, default="0, Nyquist",
+        '-f', '--frequency', metavar='..', type=str, default="0, Nyquist",
         help='Frequency range (min, max) in Hz'
     )
     parser.add_argument(
@@ -169,6 +169,7 @@ def main():
     utils.add_common_arguments(parser)
     utils.add_attrs_group(parser)
 
+    # parse arguments
     args = parser.parse_args()
     args.attrs = utils.parse_attrs_group(args)
 
@@ -180,17 +181,17 @@ def main():
         args.start = pd.to_datetime(args.start, format=args.format)
     if args.end:
         args.end = pd.to_datetime(args.end, format=args.format)
-    args.clim = tuple(eval(args.clim))
-    if len(args.clim) != 2:
+    args.celerity = tuple(eval(args.celerity))
+    if len(args.celerity) != 2:
         raise ValueError("Celerity range should be a tuple of length 2: "
                          "(min, max)")
-    if args.freq_lim != "0, Nyquist":
-        args.freq_lim = tuple(eval(args.freq_lim))
-        if len(args.freq_lim) != 2:
+    if args.frequency != "0, Nyquist":
+        args.frequency = tuple(eval(args.frequency))
+        if len(args.frequency) != 2:
             raise ValueError("Frequency range should be a tuple of length 2: "
                              "(min, max)")
     else:
-        args.freq_lim = None
+        args.frequency = None
 
     # print header and core parameters
     print(f'xcorr-plmax v{xcorr.__version__}')
@@ -199,8 +200,8 @@ def main():
                                else args.pair))
     print('{:>20} : {}'.format('start', args.start))
     print('{:>20} : {}'.format('end', args.end))
-    print('{:>20} : {}'.format('clim', args.clim))
-    print('{:>20} : {}'.format('freq_lim', args.freq_lim))
+    print('{:>20} : {}'.format('celerity', args.celerity))
+    print('{:>20} : {}'.format('frequency', args.frequency))
     print('{:>20} : {}'.format('method', ('scaleogram (CWT)' if args.wavelet
                                           else 'spectrogram (FFT)')))
     print('{:>20} : {}'.format('overwrite', args.overwrite))
@@ -261,8 +262,8 @@ def main():
     print("..Find spectrogram local maxima for all active periods")
 
     mapped = client.compute(
-        period_plmax(snr.pair, ct, args.root, args.clim,
-                     args.freq_lim, args.wavelet, args.attrs)
+        period_plmax(snr.pair, ct, args.root, args.celerity,
+                     args.frequency, args.wavelet, args.attrs)
     )
     distributed.wait(mapped)
 
