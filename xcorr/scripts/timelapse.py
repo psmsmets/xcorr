@@ -604,6 +604,7 @@ def main():
     arg_info('frequency', ', '.join([f'{f[0]}-{f[1]}'
                                      for f in args.frequency]))
     arg_info('velocity', args.velocity)
+    arg_info('method', "scaleogram (CWT)" if args.wavelet else "spectrogram (PSD)")
 
     # init timelapse dataset
     if args.init:
