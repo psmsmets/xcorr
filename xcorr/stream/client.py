@@ -371,7 +371,7 @@ class Client(object):
         verb: int = 0, **kwargs
     ) -> bool:
         """
-        Wrapper to write a day stream of data to the local SDS archive.
+        Check the duration of a stream.
 
         Parameters
         ----------
@@ -852,8 +852,9 @@ class Client(object):
         self, receiver: str, time: pd.Timestamp, operations: dict,
         duration: float = 86400., centered: bool = True,
         inventory: Inventory = None, substitute: bool = True,
-        three_components: str = '12Z',  duration_check: bool = True,
-        strict: bool = True, raise_error: bool = False, verb: int = 0,
+        three_components: str = '12Z',  sampling_rate: float = None,
+        duration_check: bool = True, strict: bool = True,
+        raise_error: bool = False, verb: int = 0,
         **kwargs
     ) -> Stream:
         """
@@ -891,6 +892,9 @@ class Client(object):
         three_components: {'12Z', 'NEZ'}, optional
             Set the three-component orientation characters. Defaults to '12Z'.
             Is no longer needed. All orientations '12ZNE' are evaluated.
+
+        sampling_rate: `float`, optional
+            Very the processed stream sampling rate in Hz with the given value.
 
         duration_check: `bool`, optional
             If `True` (default), verify the processed stream duration using
@@ -1015,6 +1019,22 @@ class Client(object):
         # remove the optional buffer
         st = st.trim(starttime=t0, endtime=t1)
 
+        # check stream sampling rate
+        if sampling_rate:
+
+            st_sampling_rate = st[0].stats.sampling_rate
+            if not np.isclose(st_sampling_rate, sampling_rate, atol=0.0):
+
+                error = ('Processed stream fails sampling rate check: '
+                         '{} Hz obtained vs {} Hz provided.'
+                         .format(st_sampling_rate, sampling_rate))
+                if raise_error:
+                    raise ValueError(error)
+                else:
+                    warnings.warn(error)
+
+                return Stream()
+
         # check stream duration
         if duration_check:
 
@@ -1022,13 +1042,13 @@ class Client(object):
 
             if diff > (0 if strict else 2):
 
+                error = ('Processed stream fails {}duration check: '
+                         '{} sample difference.'
+                         .format('strict ' if strict else '', diff))
                 if raise_error:
-
-                    raise ValueError(
-                        ('Processed stream fails {}duration check: '
-                         '{} sample difference.')
-                        .format('strict ' if strict else '', diff)
-                    )
+                    raise ValueError(error)
+                else:
+                    warnings.warn(error)
 
                 return Stream()
 

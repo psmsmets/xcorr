@@ -113,6 +113,7 @@ def process(
                 operations=o,
                 duration=t.window_length,
                 inventory=inventory,
+                sampling_rate=dataset.lag.attrs['sampling_rate'],
                 verb=verb-1,
                 strict=True,
                 **kwargs
@@ -127,8 +128,8 @@ def process(
 
                 if test_run:
                     break
-
-                continue
+                else:
+                    continue
 
             # track timing offsets
             dataset.pair_offset.loc[pt] = (
