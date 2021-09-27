@@ -11,7 +11,10 @@ Finding local maxima of an N-D labelled array of data.
 # Mandatory imports
 import numpy as np
 import xarray as xr
-from skimage import feature
+try:
+    from skimage import feature
+except ModuleNotFoundError:
+    feature = False
 try:
     import dask
 except ModuleNotFoundError:
@@ -75,6 +78,12 @@ def peak_local_max(
         :class:`pd.DataFrame`.
 
     """
+    # check if sckimage is found
+    if feature == False:
+        raise ModuleNotFoundError(
+            "peak_local_max requires module sckimage.feature from scikit-image"
+        )
+
     # dim
     dims = dims or x.dims[-2:]
     if not isinstance(dims, tuple) or len(dims) != 2:
