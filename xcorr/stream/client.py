@@ -451,8 +451,9 @@ class Client(object):
             to a full day: 86400s.
 
         buffer : `float`, optional
-            Symmetrically extent the time window by a buffer, in seconds.
-            Defaults to 60s.
+            Symmetrically extent the time window by a buffer, in decimale
+            percentage of the window duration  (ranging from 0. to 0.5).
+            Defaults to 0.05 (5%).
 
         allow_wildscards : `bool`, optional
             Enable wildcards '*' and '?' in the ``receiver`` SEED-id string.
@@ -495,11 +496,15 @@ class Client(object):
             raise ValueError('duration cannot be zero or negative.')
 
         # check buffer
-        buffer = buffer or 60.
+        buffer = buffer or 0.05
 
-        if not (isinstance(buffer, float) or isinstance(buffer, int)):
+        if not isinstance(buffer, float):
 
-            raise TypeError('buffer should be in float seconds.')
+            raise TypeError('buffer should be a float.')
+
+        if buffer < 0. or buffer >= 0.5:
+
+            raise ValueError('buffer should range from 0. to 0.5.')
 
         # center time of 24h window -12h
         t0 = pd.to_datetime(time)
@@ -510,8 +515,8 @@ class Client(object):
         t1 = t0 + pd.offsets.DateOffset(seconds=duration)
 
         if buffer > 0.:
-            t0 -= pd.offsets.DateOffset(seconds=buffer)
-            t1 += pd.offsets.DateOffset(seconds=buffer)
+            t0 -= pd.offsets.DateOffset(seconds=buffer*duration)
+            t1 += pd.offsets.DateOffset(seconds=buffer*duration)
 
         if verb > 0:
             print(f"Get waveforms for {receiver} from {t0} until {t1}")
@@ -1006,6 +1011,9 @@ class Client(object):
                 )
 
             return Stream()
+
+        # remove the optional buffer
+        st = st.trim(starttime=t0, endtime=t1)
 
         # check stream duration
         if duration_check:
