@@ -112,7 +112,6 @@ def process(
                 time=t.values,
                 operations=o,
                 duration=t.window_length,
-                buffer=t.window_length/20,  # 5%
                 inventory=inventory,
                 verb=verb-1,
                 strict=True,
