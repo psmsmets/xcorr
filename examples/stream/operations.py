@@ -168,7 +168,7 @@ EDH = client.get_processed_waveforms(
     duration=3600,
     operations=preprocess,
     inventory=inv,
-    sampling_rate=500.,
+    sampling_rate=50.,  # verify sampling rate
     verb=0,
 )
 f = EDH.plot()
