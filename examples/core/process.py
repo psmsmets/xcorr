@@ -165,8 +165,8 @@ time = times[0]
 # initialize xcorr dataset
 ds = xcorr.init(
     pair=pair,
-    starttime=time,
-    endtime=time + pd.offsets.DateOffset(1),
+    starttime=time.start_time,
+    endtime=time.end_time,
     attrs=attrs,
     preprocess=preprocess,
     sampling_rate=sampling_rate,
@@ -223,7 +223,7 @@ for pair in pairs:
             ds = xcorr.init(
                 pair=pair,
                 starttime=time,
-                endtime=time + pd.offsets.DateOffset(1),
+                endtime=time + time.freq,
                 attrs=attrs,
                 preprocess=preprocess,
                 sampling_rate=sampling_rate,

@@ -58,7 +58,7 @@ def single_threaded_process(
         data = core.init(
             pair=pair,
             starttime=time,
-            endtime=time + pd.offsets.DateOffset(1),
+            endtime=time + time.freq,
             inventory=inventory,
             **init_args
         )
@@ -97,7 +97,7 @@ def lazy_processes(
         Expects a list of `str`, with receiver couple SEED-id's separated
         by a dash ('-').
 
-    times : `pandas.data_range`
+    times : `pandas.date_range`
         Date range from start to end with ``freq``='D'.
 
     availability : :class:`xarray.DataArray`
@@ -209,7 +209,7 @@ def lazy_process(
         Expects a list of `str`, with receiver couple SEED-id's separated
         by a dash ('-').
 
-    times : `pandas.data_range`
+    times : `pandas.DatetimeIndex`
         Date range from start to end with ``freq``='D'.
 
     init_args : `dict`
