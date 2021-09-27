@@ -58,7 +58,7 @@ def init(
         ['institution', 'author', 'source']
 
     sampling_rate : `float`
-        Sampling rate for the cross-correlation lag time.
+        Sampling rate for the cross-correlation lag time, in Hz.
 
     window_length : `float`, optional
         Cross-correlation window length, in seconds. Defaults to 86400s.
