@@ -79,7 +79,7 @@ def peak_local_max(
 
     """
     # check if sckimage is found
-    if feature == False:
+    if feature is False:
         raise ModuleNotFoundError(
             "peak_local_max requires module sckimage.feature from scikit-image"
         )
