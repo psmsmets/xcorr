@@ -10,6 +10,7 @@ Some predefined plotting routines
 
 # Mandatory imports
 import numpy as np
+import pandas as pd
 import xarray as xr
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -20,7 +21,7 @@ from matplotlib.ticker import AutoMinorLocator, StrMethodFormatter
 from ..signal.trigger import plot_trigs
 
 
-__all__ = ['plot_ccf', 'plot_ccfs', 'plot_snr_ct']
+__all__ = ['plot_ccf', 'plot_ccfs', 'plot_snr_ct', 'set_year_labels']
 
 
 # set fontsize
@@ -492,3 +493,28 @@ def plot_ccfs_colored(
         ax.set_title(f"{sn.long_name} > {sn_threshold}")
 
     return ax
+
+
+def set_year_labels(ax, start='2014-01-01', end='2021-01-01', **kwargs):
+    """Helper function to properly position year labels at the center location
+    """
+    t0, t1 = pd.to_datetime(start), pd.to_datetime(end)
+
+    ax.set_xlim(t0.to_datetime64(), t1.to_datetime64())
+    ax.set_xlabel(None)
+
+    ticks = pd.date_range(t0, t1, freq='1YS')
+    labels = pd.date_range(t0 + pd.DateOffset(month=7),
+                           t1 + pd.DateOffset(month=7),
+                           freq='12M')
+
+    ax.set_xticks(ticks.values)
+    ax.xaxis.set_major_formatter(mpl.ticker.NullFormatter())
+
+    ax.set_xticks(labels.values, minor=True)
+    ax.set_xticklabels(labels.strftime("%Y").values, minor=True, **kwargs)
+
+    for tick in ax.xaxis.get_minor_ticks():
+        tick.tick1line.set_markersize(0)
+        tick.tick2line.set_markersize(0)
+        tick.label1.set_horizontalalignment('center')
