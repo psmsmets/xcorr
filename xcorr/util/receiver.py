@@ -27,7 +27,7 @@ __all__ = ['check_receiver', 'split_pair', 'receiver_to_dict',
 
 
 _regex_seed_id = (
-    r'^([A-Z]{2})\.([A-Z,0-9]{3,5})\.([0-9]{0,2})\.([A-Z]{2}[0-9,A-Z]{1})'
+    r'^([A-Z,0-9]{2})\.([A-Z,0-9]{3,5})\.([0-9]{0,2})\.([A-Z]{2}[0-9,A-Z]{1})'
 )
 _regex_seed_id_wildcards = (
     r'^([A-Z,?*]{1,2})\.([A-Z,0-9,?*]{1,5})\.'
