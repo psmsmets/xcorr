@@ -256,18 +256,21 @@ def apply_operation(
             warnings.warn(msg, UserWarning)
             return False
 
-    if not is_operation(operation):
-        msg = f'"{operation}" is not an operation.'
+    if is_operation(operation):
+        method = _operations[operation]['method']
+        params = inject_dynamic_parameters(
+            operation, parameters, **dynamic_parameters
+        ) if dynamic_parameters else parameters
+    elif callable(operation):
+        method = operation
+        params = parameters
+    else:
+        msg = f'"{operation}" is not an implemented operation or callable.'
         if raise_error:
             raise NotImplementedError(msg)
         else:
             warnings.warn(msg, UserWarning)
             return False
-
-    method = _operations[operation]['method']
-    params = inject_dynamic_parameters(
-        operation, parameters, **dynamic_parameters
-    ) if dynamic_parameters else parameters
 
     if verb > 0:
         print(f'{stdout_prefix}{operation} :', params)
@@ -374,7 +377,7 @@ def process(
                 warnings.warn(msg, UserWarning)
                 continue
         operation, parameters = operation_params
-        if not is_operation(operation):
+        if not (is_operation(operation) or callable(operation)):
             msg = ('Provided operation "{}" is invalid thus ignored.'
                    .format(operation))
             if raise_error:
