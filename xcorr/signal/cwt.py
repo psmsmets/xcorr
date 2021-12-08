@@ -98,8 +98,10 @@ def cwt(
         s0, s1, sn = scales
     elif isinstance(scales, xr.DataArray):
         s = scales.values
+        sn = len(s)
     elif scales is not None:
         s = np.array(scales)
+        sn = len(s)
     s = s or np.logspace(np.log10(s0), np.log10(s1), sn)
 
     # frequency
@@ -114,7 +116,7 @@ def cwt(
         dargs = dict(
             dask='allowed',
             output_dtypes=[np.complex128 if w.complex_cwt else np.float64],
-            output_sizes={"freq": len(scales)}
+            output_sizes={"freq": s}
         )
 
     # ufunc wrapper (catch frequency return)
