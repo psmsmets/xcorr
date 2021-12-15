@@ -962,9 +962,6 @@ class Client(object):
                         st += tr
                     else:
                         break
-                # stream completed?
-                if len(st) == 3:
-                    break
 
             # Check if all three components are present
             if len(list(set([tr.stats.channel for tr in st]))) != 3:
