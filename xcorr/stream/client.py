@@ -967,10 +967,10 @@ class Client(object):
                     break
 
             # Check if all three components are present
-            # if len(st) != 3:
-            #     raise ValueError(
-            #         "Three-component stream expected with substitute=True"
-            #     )
+            if len(list(set([tr.stats.channel for tr in st]))) != 3:
+                raise ValueError(
+                    "Three-component stream expected with substitute=True"
+                )
 
         else:
             st = self.get_waveforms(
