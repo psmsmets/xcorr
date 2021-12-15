@@ -927,11 +927,11 @@ class Client(object):
                                      raise_error=True)
 
         # No longer needed. Test all '12NEZ' components
-        # three_components = three_components or '12Z'
-        # if three_components not in ('12Z', 'NEZ'):
-        #     raise ValueError(
-        #         "three_components should be either '12Z' or 'NEZ'!"
-        #     )
+        three_components = three_components or '12Z'
+        if three_components not in ('12Z', 'NEZ'):
+            raise ValueError(
+                "three_components should be either '12Z' or 'NEZ'!"
+            )
 
         ch = receiver.split('.')[-1]
         if ch not in operations.keys():
@@ -1214,6 +1214,12 @@ class Client(object):
         if parallel and not dask:
             raise RuntimeError("Dask is required but cannot be found!")
 
+        three_components = three_components or '12Z'
+        if three_components not in ('12Z', 'NEZ'):
+            raise ValueError(
+                "three_components should be either '12Z' or 'NEZ'!"
+            )
+
         # verbose
         if verb > 0:
             print('Verify waveform availability')
@@ -1390,6 +1396,12 @@ class Client(object):
 
         if parallel and not dask:
             raise RuntimeError('Dask is required but cannot be found!')
+
+        three_components = three_components or '12Z'
+        if three_components not in ('12Z', 'NEZ'):
+            raise ValueError(
+                "three_components should be either '12Z' or 'NEZ'!"
+            )
 
         # verbose
         if verb > 0:

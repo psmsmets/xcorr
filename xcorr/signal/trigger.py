@@ -266,7 +266,7 @@ def trigger_values(x: xr.DataArray, trigs: xr.DataArray):
     return pd.concat(val).reset_index()
 
 
-def plot_trigs(x: xr.DataArray, trigs: xr.DataArray, ax: plt.Axes = None):
+def plot_trigs(x: xr.DataArray, trigs: xr.DataArray, ax: plt.Axes = None, ylim=None):
     """
     Plot the triggered periods and values.
 
@@ -285,7 +285,7 @@ def plot_trigs(x: xr.DataArray, trigs: xr.DataArray, ax: plt.Axes = None):
 
     """
     ax = ax or plt.gca()
-    ymin, ymax = 0., x.max(skipna=True).item()
+    ymin, ymax = ylim or (0., x.max(skipna=True).item())
 
     imin = trigs.min(skipna=True).astype(int).item()
     imax = trigs.max(skipna=True).astype(int).item()
