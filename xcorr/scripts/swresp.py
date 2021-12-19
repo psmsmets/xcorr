@@ -35,7 +35,7 @@ def load(pairs, time, root):
     """
     try:
         ds = xcorr.merge(
-            [xcorr.io.ncfile(pair, time, root) for pair in pairs],
+            *[xcorr.io.ncfile(pair, time, root) for pair in pairs],
             fast=True
         )
     except Exception:
