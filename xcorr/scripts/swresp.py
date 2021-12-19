@@ -30,13 +30,13 @@ __all__ = []
 # -----------------
 
 @dask.delayed
-def load(pairs, time, root):
+def load(pairs, time, root, qd):
     """
     """
     try:
         ds = xcorr.merge(
             *[xcorr.io.ncfile(pair, time, root) for pair in pairs],
-            quick_and_dirty=True
+            fast=True, quick_and_dirty=qd,
         )
     except Exception:
         ds = None
@@ -121,12 +121,12 @@ def surface_wave_response(cc, normalize: bool = True, **kwargs):
     return resp
 
 
-def surface_wave_response_list(pair, start, end, root, **kwargs):
+def surface_wave_response_list(pair, start, end, root, qd, **kwargs):
     """Evaluate surface wave response for a list of filenames
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
-        ds = load(pair, day, root)
+        ds = load(pair, day, root, qd)
         cc = process(ds)
         resp = surface_wave_response(cc, **kwargs)
         results.append(resp)
@@ -250,7 +250,7 @@ def main():
     print('.. compute surface wave response per day for period')
     mapped = client.compute(
         surface_wave_response_list(
-            pair, args.start, args.end, args.root,
+            pair, args.start, args.end, args.root, args.quick_and_dirty,
             normalize=args.normalize,
         )
     )

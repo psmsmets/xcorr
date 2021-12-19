@@ -30,13 +30,13 @@ __all__ = []
 # -----------------
 
 @dask.delayed
-def load(pairs, time, root):
+def load(pairs, time, root, qd=False):
     """
     """
     try:
         ds = xcorr.merge(
             *[xcorr.io.ncfile(pair, time, root) for pair in pairs],
-            quick_and_dirty=True
+            fast=True, quick_and_dirty=qd,
         )
     except Exception as e:
         print(f'Error @ loading pairs for {time}:', e)
@@ -95,12 +95,12 @@ def lse_fit(cc, xy, envelope, attrs):
         return fit
 
 
-def delayed_plane_wave_fit(xy, start, end, root, envelope, attrs):
+def delayed_plane_wave_fit(xy, start, end, root, qd, envelope, attrs):
     """Plane wave fit for a time period
     """
     results = []
     for day in pd.date_range(start, end, freq='1D'):
-        ds = load(xy.pair, day, root)
+        ds = load(xy.pair, day, root, qd)
         cc = process(ds)
         fit = lse_fit(cc, xy, envelope, attrs)
         results.append(fit)
@@ -241,7 +241,7 @@ def main():
     print('.. compute plane wave per day for period')
     mapped = client.compute(
         delayed_plane_wave_fit(xy, args.start, args.end, args.root,
-                               args.envelope, args.attrs)
+                               args.quick_and_dirty, args.envelope, args.attrs)
     )
     distributed.wait(mapped)
 

@@ -146,6 +146,10 @@ def add_common_arguments(parser: ArgumentParser, dask: bool = True):
         help='Generate plots during processing (stalls)'
     )
     parser.add_argument(
+        '--quick-and-dirty', action='store_true', default=False,
+        help='Omit hash verification input files (default: False)'
+    )
+    parser.add_argument(
         '--debug', action='store_true',
         help='Maximize verbosity'
     )
