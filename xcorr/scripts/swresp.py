@@ -201,8 +201,11 @@ def main():
     args.pairs = sorted(list(set([
         p.split(os.path.sep)[-1]
         for p in glob(os.path.join(args.root, '*', f'*{args.station}*'))
-        if args.channels[0] in p or args.channels[1] in p
+        if p[-1] in args.channels
     ])))
+
+    if args.debug:
+        print(args.pairs)
 
     if len(args.pairs) != 2:
         raise ValueError(
