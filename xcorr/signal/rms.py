@@ -9,6 +9,7 @@ Root-mean-square of an N-D labelled array of data.
 
 
 # Mandatory imports
+import numpy as np
 import xarray as xr
 
 
@@ -47,13 +48,13 @@ def rms(
         raise ValueError(f'x has no dimensions "{dim}"')
 
     # square
-    y = xr.ufuncs.square(x)
+    y = np.square(x)
 
     # mean
     y = y.mean(dim=dim, skipna=True, keep_attrs=True)
 
     # root
-    y = xr.ufuncs.sqrt(y)
+    y = np.sqrt(y)
 
     # preserve attributes
     y.attrs = x.attrs

@@ -207,7 +207,7 @@ def plot_ccf(
         }
         p = (cc.isel(time=time)).signal.spectrogram(**spectrogram_kwargs)
     p = p/p.max() if normalize else p
-    p = (10 * xr.ufuncs.log10(p.where(p > 0))) if spectrogram_db else p
+    p = (10 * np.log10(p.where(p > 0))) if spectrogram_db else p
 
     # plot spectrogram
     vmax = p.max().item() if spectrogram_db else .8*p.max().item()

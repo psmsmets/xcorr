@@ -102,7 +102,7 @@ def fft(
 
     # delta and frequency
     delta = np.round(
-        xr.ufuncs.fabs(x[dim][1] - x[dim][0]).values.item(),
+        np.fabs(x[dim][1] - x[dim][0]).values.item(),
         decimals=10
     )
     freq = fftlib.fftshift(fftlib.fftfreq(x[dim].size, d=delta))
@@ -224,7 +224,7 @@ def ifft(
 
     # delta
     delta = np.round(
-        xr.ufuncs.fabs(x[dim][1] - x[dim][0]).values.item(),
+        np.fabs(x[dim][1] - x[dim][0]).values.item(),
         decimals=10
     )
     time = np.linspace(

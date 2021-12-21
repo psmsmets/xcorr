@@ -188,7 +188,7 @@ def get_spectrogram(pair, time, root, velocity=(1460, 1500), wavelet=False):
     )
 
     # no valid data?
-    if xr.ufuncs.isnan(cc).any():
+    if np.isnan(cc).any():
         raise ValueError("cc trace contains NaN in" + f)
 
     # extract time_offset and pair_offset
@@ -223,7 +223,7 @@ def correlate_spectrogram(obj, loc, *args, **kwargs):
         return
 
     # no need to process?
-    if xr.ufuncs.isnan(obj.status.loc[loc]).all():
+    if np.isnan(obj.status.loc[loc]).all():
         return
 
     # load cc and compute psd on-the-fly
@@ -280,7 +280,7 @@ def correlate_spectrograms(obj, *args, **kwargs):
     """
 
     # complete or no need to process obj?
-    if (obj.status == 1).all() or xr.ufuncs.isnan(obj.status).all():
+    if (obj.status == 1).all() or np.isnan(obj.status).all():
         return obj
 
     # catch memory error

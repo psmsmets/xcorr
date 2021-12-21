@@ -9,8 +9,8 @@ Estimate the signal-to-noise ratio of an N-D labelled array of data.
 
 
 # Mandatory imports
-import xarray as xr
 import numpy as np
+import xarray as xr
 
 
 # Relative imports
@@ -83,7 +83,7 @@ def snr(
         raise ValueError(f'x has no dimensions "{dim}"')
     argmax = f'{dim}_s_max'
 
-    if xr.ufuncs.isnan(x).any() and envelope:
+    if np.isnan(x).any() and envelope:
         raise ValueError('x contains NaN values')
 
     ds = xr.Dataset()
@@ -115,10 +115,10 @@ def snr(
 
     ds['snr'] = ds.s/ds.n
     if decibels:
-        ds['snr'] = 20 * xr.ufuncs.log10(ds.snr)
+        ds['snr'] = 20 * np.log10(ds.snr)
         power = True
     elif power:
-        ds['snr'] = xr.ufuncs.square(ds.snr)
+        ds['snr'] = np.square(ds.snr)
 
     ds.s.attrs = {
         **x.attrs,

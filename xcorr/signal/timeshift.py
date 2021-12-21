@@ -93,7 +93,7 @@ def timeshift(
     X = X * np.exp(-1j * 2 * np.pi * delay * X.freq)
 
     # irfft
-    y = irfft(X, **kwargs) if fast else xr.ufuncs.real(ifft(X, **kwargs))
+    y = irfft(X, **kwargs) if fast else np.real(ifft(X, **kwargs))
 
     # restore dtype
     y = y.astype(x.dtype)

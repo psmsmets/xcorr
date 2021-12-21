@@ -7,6 +7,7 @@ Signal-to-noise ratio estimation of cross-crorrelations.
 """
 
 # Mandatory imports
+import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -45,7 +46,7 @@ def estimate_snr_for_day(
             if ds is None:
                 continue
             cc = ds.cc.where((ds.status == 1), drop=True)
-            if xr.ufuncs.isnan(cc).any():
+            if np.isnan(cc).any():
                 continue
             delay = -(ds.pair_offset + ds.time_offset)
             cc = (cc

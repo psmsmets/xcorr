@@ -7,6 +7,7 @@ Least-squares beamforming of a plane wave traversing the array.
 """
 
 # Mandatory imports
+import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -56,7 +57,7 @@ def process(ds):
             (ds.lag <= ds.distance.mean()/1.46),
             drop=True,
         )
-        if xr.ufuncs.isnan(cc).any():
+        if  np.isnan(cc).any():
             return
         delay = -(ds.pair_offset + ds.time_offset)
         cc = (cc

@@ -59,7 +59,7 @@ def process(ds):
             (ds.status == 1),
             drop=True,
         )
-        if xr.ufuncs.isnan(cc).any():
+        if np.isnan(cc).any():
             return
         delay = -(ds.pair_offset + ds.time_offset)
         cc = (cc
@@ -87,7 +87,7 @@ def surface_wave_response(cc, normalize: bool = True, **kwargs):
             cc = cc.signal.norm1d(dim='lag')
 
         Y = cc.signal.rfft()
-        F = Y.isel(pair=1) * xr.ufuncs.conj(Y.isel(pair=0))  # Vertical first
+        F = Y.isel(pair=1) * np.conj(Y.isel(pair=0))  # Vertical first
 
         resp = xr.Dataset()
         resp.attrs = xcorr.util.metadata.global_attrs({
@@ -107,14 +107,13 @@ def surface_wave_response(cc, normalize: bool = True, **kwargs):
             ),
         })
 
-        resp['magnitude'] = xcorr.signal.abs(F*xr.ufuncs.conj(F))
+        resp['magnitude'] = xcorr.signal.abs(F*np.conj(F))
         resp['magnitude'].attrs = {
             'long_name': 'Magnitude',
             'units': '-',
             'normalize': normalize,
         }
-        resp['phase'] = xr.ufuncs.arctan2(xr.ufuncs.real(F),
-                                          xr.ufuncs.imag(F)) / np.pi
+        resp['phase'] = np.arctan2(np.real(F), np.imag(F)) / np.pi
         resp['phase'].attrs = {'long_name': 'Phase', 'units': 'pi'}
     except Exception:
         resp = None
