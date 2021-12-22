@@ -40,7 +40,7 @@ def estimate_snr_for_day(
     snr = []
     for pair in pairs:
         if debug:
-            print('.'*6, str(pair.values))
+            print('.'*6, str(pair))
         try:
             ds = xcorr.read(xcorr.io.ncfile(pair, day, root), fast=True)
             if ds is None:
@@ -58,7 +58,7 @@ def estimate_snr_for_day(
                   .signal.taper(max_length=3/2)  # filter artefacts
                   )
         except Exception as e:
-            print(f'Error @ process cc {str(pair.values)} {day}:', e)
+            print(f'Error @ process cc {str(pair)} {day}:', e)
             continue
         try:
             s = (cc.lag >= ds.distance/1.50) & (cc.lag <= ds.distance/1.46)
