@@ -85,14 +85,15 @@ Acknowledgements
 ================
 
 If you publish results for which you used xcorr, please give credit by citing
-`Smets et al. (2022)  <#>`_ and the `Zenodo-DOI <https://zenodo.org/badge/latestdoi/450085786>`_ of the release:
+the `DOI 10.5281/zenodo.5883341 <https:://doi.org/10.5281/zenodo.5883341>`_ and the manuscript
+`Smets et al. (2022)  <#>`_ :
 
     Smets, Weemstra and Evers (2022),
     Hydroacoustic travel time variations as a proxy for passive deep-ocean
     thermometry - a cookbook,
     Journal (number), pages, DOI: `doi <#>`_.
 
-All stable releases have a `Zenodo-DOI <https://zenodo.org/badge/latestdoi/450085786>`_.
+All stable releases have a dedicated `Zenodo-DOI <https://zenodo.org/badge/latestdoi/450085786>`_.
 
 
 Contributing
