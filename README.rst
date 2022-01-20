@@ -107,5 +107,6 @@ License
 
 Copyright 2022 Pieter Smets.
 
-Licensed under the GNU GPLv3 License. See the ``LICENSE``- and ``NOTICE``-files
-or the documentation for more information.
+Licensed under the GNU GPLv3 License. See the
+`LICENSE <https://github.com/psmsmets/xcorr/blob/master/LICENSE>`_
+file or the documentation for more information.
