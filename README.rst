@@ -93,7 +93,7 @@ the DOI `10.5281/zenodo.5883341 <https:://doi.org/10.5281/zenodo.5883341>`_ and 
     thermometry - a cookbook,
     Journal (number), pages, DOI: `doi <#>`_.
 
-All stable releases have a dedicated `Zenodo-DOI <https://zenodo.org/badge/latestdoi/450085786>`_.
+All stable releases have a dedicated Zenodo-DOI: `https:://doi.org/10.5281/zenodo.5883341`_.
 
 
 Contributing
