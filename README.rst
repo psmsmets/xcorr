@@ -2,13 +2,15 @@
 xcorr - xarray contained correlations
 *************************************
 
+.. image:: https://zenodo.org/badge/450085786.svg
+   :target: https://zenodo.org/badge/latestdoi/450085786
 
-**xcorr** is an open-source project existing of tools to cross-correlate
-waveform timeseries (`obspy.Stream` objects) contained in a self-describing
-N-D labelled `xarray.Dataset` following CF-1.9 Conventions and FAIR data
-guidelines. Data and metadata are stored as a `NetCDF Dataset` to be easily
-read / postprocessed by other packages, using different languages or on other 
-platforms.
+**xcorr** provides tools for reusable and reproducible time-series
+cross-correlation analysis. Cross-correlation functions of waveform timeseries
+(`obspy.Stream` objects) are contained in a self-describing N-D labelled
+`xarray.Dataset` following CF-1.9 Conventions and FAIR data guidelines. Data
+and metadata are stored as a `NetCDF Dataset` to be easily read / postprocessed
+by other packages, using different languages or on other platforms.
 
 
 Features
@@ -72,7 +74,7 @@ Required are Python version 3.7 or higher and the modules `NumPy`, `SciPy`,
 `ObsPy`, `Pandas`, and `Xarray`.
 `Dask` is required to run the scripts but needed for the base functionality.
 
-Create a conda environment named ``xcorr`` with Python 3.8 and all required packages:
+Create a conda environment named ``xcorr`` with Python 3.9 and all required packages:
 
 .. code-block:: console
 
@@ -85,12 +87,12 @@ Acknowledgements
 If you publish results for which you used xcorr, please give credit by citing
 `Smets et al. (2021)  <#>`_:
 
-    Smets, Weemstra and Evers (2021),
-    Stationary phase travel time variations as a proxy for passive deep-ocean
-    thermometry – a cookbook,
+    Smets, Weemstra and Evers (2022),
+    Hydroacoustic travel time variations as a proxy for passive deep-ocean
+    thermometry - a cookbook,
     Journal (number), pages, DOI: `doi <#>`_.
 
-All stable releases have a Zenodo-DOI, which can be found on `Zenodo-DOI <#>`_.
+All stable releases have a `Zenodo-DOI <https://zenodo.org/badge/latestdoi/450085786>`_.
 
 
 Contributing
@@ -102,7 +104,7 @@ Only accepts pull requests that fixes bugs / fixes typos / improves existing con
 License
 =======
 
-Copyright 2021 Pieter Smets.
+Copyright 2022 Pieter Smets.
 
 Licensed under the GNU GPLv3 License. See the ``LICENSE``- and ``NOTICE``-files
 or the documentation for more information.
