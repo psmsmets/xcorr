@@ -57,7 +57,7 @@ Create a clone, or copy of the xcorr repository
 
 .. code-block:: console
 
-    git clone https://gitlab.com/psmsmets/xcorr.git
+    git clone https://github.com/psmsmets/xcorr.git
 
 Run ``git pull`` to update the local repository to this master repository.
 
@@ -70,7 +70,7 @@ Install xcorr via ``pip``:
    pip install -e .
 
 
-Required are Python version 3.7 or higher and the modules `NumPy`, `SciPy`,
+Required are Python3.7 or higher and the modules `NumPy`, `SciPy`,
 `ObsPy`, `Pandas`, and `Xarray`.
 `Dask` is required to run the scripts but needed for the base functionality.
 
@@ -85,7 +85,7 @@ Acknowledgements
 ================
 
 If you publish results for which you used xcorr, please give credit by citing
-`Smets et al. (2021)  <#>`_:
+`Smets et al. (2022)  <#>`_ `Zenodo-DOI <https://zenodo.org/badge/latestdoi/450085786>`_:
 
     Smets, Weemstra and Evers (2022),
     Hydroacoustic travel time variations as a proxy for passive deep-ocean
