@@ -84,16 +84,17 @@ Create a conda environment named ``xcorr`` with Python 3.9 and all required pack
 Acknowledgements
 ================
 
-If you publish results for which you used xcorr, please give credit by citing
-the DOI `10.5281/zenodo.5883341 <https:://doi.org/10.5281/zenodo.5883341>`_ and the manuscript
-`Smets et al. (2022)  <#>`_ :
+If you publish results for which you used xcorr, please give credit by citing both the
+DOI `10.5281/zenodo.5883341 <https:://doi.org/10.5281/zenodo.5883341>`_
+and the manuscript `Smets et al. (2022)  <#>`_ :
 
     Smets, Weemstra and Evers (2022),
     Hydroacoustic travel time variations as a proxy for passive deep-ocean
     thermometry - a cookbook,
     Journal (number), pages, DOI: `doi <#>`_.
 
-All stable releases have a dedicated Zenodo-DOI: `https:://doi.org/10.5281/zenodo.5883341 <https:://doi.org/10.5281/zenodo.5883341>`_.
+All stable releases have a dedicated Zenodo-DOI:
+`https:://doi.org/10.5281/zenodo.5883341 <https:://doi.org/10.5281/zenodo.5883341>`_.
 
 
 Contributing
