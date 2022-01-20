@@ -1,0 +1,9 @@
+include CHANGELOG.rst README.rst
+include CONTRIBUTORS LICENSE
+include MANIFEST.in
+include pyproject.toml
+include xcorr/version.py
+
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.pyc
