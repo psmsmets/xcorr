@@ -85,7 +85,7 @@ Acknowledgements
 ================
 
 If you publish results for which you used xcorr, please give credit by citing
-`Smets et al. (2022)  <#>`_ `Zenodo-DOI <https://zenodo.org/badge/latestdoi/450085786>`_:
+`Smets et al. (2022)  <#>`_ and the `Zenodo-DOI <https://zenodo.org/badge/latestdoi/450085786>`_ of the release:
 
     Smets, Weemstra and Evers (2022),
     Hydroacoustic travel time variations as a proxy for passive deep-ocean
