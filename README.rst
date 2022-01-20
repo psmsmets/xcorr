@@ -85,7 +85,7 @@ Acknowledgements
 ================
 
 If you publish results for which you used xcorr, please give credit by citing
-the `DOI 10.5281/zenodo.5883341 <https:://doi.org/10.5281/zenodo.5883341>`_ and the manuscript
+the DOI `10.5281/zenodo.5883341 <https:://doi.org/10.5281/zenodo.5883341>`_ and the manuscript
 `Smets et al. (2022)  <#>`_ :
 
     Smets, Weemstra and Evers (2022),
