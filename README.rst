@@ -86,9 +86,7 @@ Acknowledgements
 
 If you publish results for which you used `xcorr <https://github.com/psmsmets/xcorr>`_
 or `xcorr-cookbook-data <https://github.com/psmsmets/xcorr-cookbook-data>`_, 
-please give credit by citing both the code DOI
-`10.5281/zenodo.5883341 <https://doi.org/10.5281/zenodo.5883341>`_, the datasets DOI
-`10.5281/zenodo.5902705 <https://doi.org/10.5281/zenodo.5902705>`_, and the manuscript
+please give credit by citing both the relevant DOI and the manuscript
 `Smets et al. (2022)  <#>`_ :
 
     Smets, Weemstra and Evers (2022),
