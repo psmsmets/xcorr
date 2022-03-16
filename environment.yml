@@ -1,8 +1,6 @@
 name: xcorr
 channels:
   - conda-forge
-  - intel
-  - defaults
 dependencies:
   - python=3.9
   - numpy
@@ -11,7 +9,7 @@ dependencies:
   - pandas>=1.1.2
   - seaborn
   - obspy>=1.2.0
-  - basemap
+#  - basemap
   - pyfftw
   - h5py
   - h5netcdf
