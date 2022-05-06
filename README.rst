@@ -87,12 +87,12 @@ Acknowledgements
 If you publish results for which you used `xcorr <https://github.com/psmsmets/xcorr>`_
 or `xcorr-cookbook-data <https://github.com/psmsmets/xcorr-cookbook-data>`_, 
 please give credit by citing the applicable DOI and the manuscript
-`Smets et al. (2022)  <#>`_ :
+`Smets et al. (2022)  <https://doi.org/10.1029/2022JC018451>`_ :
 
     Smets, Weemstra and Evers (2022),
     Hydroacoustic travel time variations as a proxy for passive deep-ocean
     thermometry - a cookbook,
-    Journal (number), pages, DOI: `doi <#>`_.
+    Journal of Geophysical Research Oceans, DOI: `10.1029/2022JC018451 <https://doi.org/10.1029/2022JC018451>`_.
 
 All stable releases have a dedicated Zenodo-DOI:
 
