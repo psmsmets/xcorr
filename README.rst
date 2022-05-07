@@ -7,9 +7,9 @@ xcorr - xarray contained correlations
 
 **xcorr** provides tools for reusable and reproducible time-series
 cross-correlation analysis. Cross-correlation functions of waveform timeseries
-(`obspy.Stream` objects) are contained in a self-describing N-D labelled
-`xarray.Dataset` following CF-1.9 Conventions and FAIR data guidelines. Data
-and metadata are stored as a `NetCDF Dataset` to be easily read / postprocessed
+(``obspy.Stream`` objects) are contained in a self-describing N-D labelled
+``xarray.Dataset`` following CF-1.9 Conventions and FAIR data guidelines. Data
+and metadata are stored as a ``NetCDF Dataset`` to be easily read and postprocessed
 by other packages, using different languages or on other platforms.
 
 
