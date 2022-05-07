@@ -6,10 +6,10 @@ xcorr - xarray contained correlations
    :target: https://zenodo.org/badge/latestdoi/450085786
 
 **xcorr** provides tools for reusable and reproducible time-series
-cross-correlation analysis. Cross-correlation functions of waveform timeseries
+cross-correlation analysis. Cross-correlation functions of waveform time-series
 (``obspy.Stream`` objects) are contained in a self-describing N-D labelled
 ``xarray.Dataset`` following CF-1.9 Conventions and FAIR data guidelines. Data
-and metadata are stored as a ``NetCDF Dataset`` to be easily read and postprocessed
+and metadata are stored as a ``NetCDF Dataset`` to be easily read and post-processed
 by other packages, using different languages or on other platforms.
 
 
@@ -20,17 +20,17 @@ Main `xcorr` features listed per submodule:
 
 - **core**: initiate and process an N-D labelled
   cross-correlation dataset via accessors.
-  Batch process by `Dask <https://dask.org>`_ after verifying both waveform
+  Batch processing is handled by `Dask <https://dask.org>`_ after verifying both the waveform
   availability and stream preprocessing operations.
   Output files are structered in an SDS-like folder structure
   (year/pair/ncfile) and can easily be read and merged in parallel.
 
-- **stream**: fetch and archive waveforms using the waterfall-base ``Client``,
+- **stream**: fetch and archive waveforms using the waterfall-based ``Client`` class,
   wrapping various getters from both local archives and remote services.
   Generalized SEED-channel based waveform processing.
 
 - **signal**: signal processing of an `xarray.DataArray` timeseries.
-  Each signal routine is **Dask** capable for large datasets.
+  Each signal routine is **Dask** capable supporting large datasets.
   Functions are available as `.signal` accessor.
 
 
